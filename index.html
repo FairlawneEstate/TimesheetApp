@@ -823,7 +823,7 @@ async function submitEntry() {
     return;
   }
 
-  const jobObj = jobs.find(j => j.id === jobId);
+  const jobObj = jobs.find(j => j.id === jobId) || recurringJobs.find(j => j.id === jobId) || absenceTypes.find(a => a.id === jobId);
   const entry = { id: uid(), worker: currentWorker, jobId, date, hours, comments, amendments: [], createdAt: new Date().toISOString(), property: jobObj ? jobObj.property : '', description: jobObj ? jobObj.description : '' };
   entries.push(entry);
   localStorage.setItem('entries', JSON.stringify(entries));
