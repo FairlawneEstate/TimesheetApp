@@ -302,7 +302,37 @@ textarea { height: 60px; resize: none; }
         <div class="card">
           <div class="row-between card-header">
             <p class="section-heading" id="daily-view-heading">Today's entries</p>
-            <button class="btn btn-sm" onclick="renderDailyView()">↻ Refresh</button>
+            <div style="display:flex;gap:8px;">
+              <button class="btn btn-sm" id="daily-add-entry-toggle" onclick="toggleDailyAddEntry()">+ Add entry</button>
+              <button class="btn btn-sm" onclick="renderDailyView()">↻ Refresh</button>
+            </div>
+          </div>
+          <div id="daily-add-entry-form" style="display:none;margin-bottom:1rem;padding:1rem;background:var(--color-background-secondary);border-radius:var(--border-radius-md);">
+            <p style="font-size:13px;font-weight:500;margin-bottom:0.75rem;">Add time entry</p>
+            <div class="grid2">
+              <div>
+                <label style="margin-top:0;">Worker</label>
+                <select id="dae-worker" onchange="populateDailyEntryJobDropdown()"></select>
+              </div>
+              <div>
+                <label style="margin-top:0;">Job</label>
+                <select id="dae-job"></select>
+              </div>
+            </div>
+            <div class="grid2" style="margin-top:10px;">
+              <div>
+                <label style="margin-top:0;">Hours</label>
+                <input type="number" id="dae-hours" placeholder="e.g. 4" min="0.5" max="16" step="0.5">
+              </div>
+              <div>
+                <label style="margin-top:0;">Comments (optional)</label>
+                <input type="text" id="dae-comments" placeholder="What was done...">
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:0.75rem;">
+              <button class="btn btn-primary btn-sm" onclick="submitDailyEntry()">Save entry</button>
+              <button class="btn btn-sm" onclick="toggleDailyAddEntry()">Cancel</button>
+            </div>
           </div>
           <div id="daily-view-list"><p class="text-muted">Loading...</p></div>
         </div>
@@ -1903,15 +1933,19 @@ function renderDailyView() {
             <td style="padding:9px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${jobDescription}</td>
             <td style="padding:9px 6px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-weight:500;text-align:center;white-space:nowrap;width:46px;">${e.hours}h</td>
             <td style="padding:9px 10px;font-size:12px;font-style:italic;color:var(--color-text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${e.comments || ''}${amended && lastAmend.note !== 'Created by Office' ? ` · Amended by ${lastAmend.by}` : ''}</td>
+            <td style="padding:4px 8px;text-align:right;vertical-align:middle;width:160px;white-space:nowrap;">
+              <button class="btn btn-sm" onclick="toggleEditOfficeEntries('${e.id}')">Edit</button>
+              <button class="btn btn-sm" style="color:var(--color-text-error);border-color:var(--color-border-error);margin-left:4px;" onclick="deleteEntry('${e.id}', true)">Delete</button>
+            </td>
           </tr>`;
         }).join('') + `
           <tr style="background:var(--color-background-secondary);border-bottom:1.5px solid var(--color-border-secondary);">
-            <td style="padding:6px 10px;border-right:0.5px solid var(--color-border-tertiary);width:100px;"></td>
             <td style="padding:6px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-weight:600;width:110px;">Total</td>
             <td style="padding:6px 10px;border-right:0.5px solid var(--color-border-tertiary);width:200px;"></td>
             <td style="padding:6px 10px;border-right:0.5px solid var(--color-border-tertiary);"></td>
-            <td style="padding:6px 6px;font-size:12px;font-weight:600;text-align:center;width:46px;">${dayTotal}h</td>
+            <td style="padding:6px 6px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-weight:600;text-align:center;width:46px;">${dayTotal}h</td>
             <td></td>
+            <td style="width:160px;"></td>
           </tr>`;
 
     html += `
@@ -1927,6 +1961,7 @@ function renderDailyView() {
               <th>Description</th>
               <th style="width:46px;text-align:center;">Hrs</th>
               <th>Comments</th>
+              <th style="width:160px;"></th>
             </tr>
           </thead>
           <tbody>${entryRows}</tbody>
@@ -1935,6 +1970,59 @@ function renderDailyView() {
   });
 
   el.innerHTML = html;
+}
+
+function toggleDailyAddEntry() {
+  const form = document.getElementById('daily-add-entry-form');
+  const btn = document.getElementById('daily-add-entry-toggle');
+  const open = form.style.display === 'none';
+  form.style.display = open ? 'block' : 'none';
+  btn.textContent = open ? '✕ Cancel' : '+ Add entry';
+  if (open) {
+    const workerSel = document.getElementById('dae-worker');
+    const active = workers.filter(w => w.active !== false && w.active !== 'FALSE');
+    workerSel.innerHTML = '<option value="">Select worker...</option>' + active.map(w => `<option value="${w.name}">${w.name}</option>`).join('');
+    document.getElementById('dae-job').innerHTML = '<option value="">Select worker first...</option>';
+  }
+}
+
+function populateDailyEntryJobDropdown() {
+  const selectedWorker = document.getElementById('dae-worker').value;
+  const jobSel = document.getElementById('dae-job');
+  if (!selectedWorker) { jobSel.innerHTML = '<option value="">Select worker first...</option>'; return; }
+  const openJobs = jobs.filter(j => j.open);
+  const assigned = openJobs.filter(j => expandAssignedTo(j.assignedTo).includes(selectedWorker));
+  const others = openJobs.filter(j => !expandAssignedTo(j.assignedTo).includes(selectedWorker));
+  const activeAbsTypes = absenceTypes.filter(a => a.active !== false && a.active !== 'FALSE');
+  const fmt = j => `<option value="${j.id}">${j.id} · ${j.property}${j.description ? ' · ' + (j.description.length > 40 ? j.description.slice(0,40) + '…' : j.description) : ''}</option>`;
+  let html = '<option value="">Select a job...</option>';
+  if (assigned.length) html += `<optgroup label="Assigned Jobs">${assigned.map(fmt).join('')}</optgroup>`;
+  if (others.length)   html += `<optgroup label="Other Jobs">${others.map(fmt).join('')}</optgroup>`;
+  if (activeAbsTypes.length) html += `<optgroup label="Absence / Leave">${activeAbsTypes.map(a => `<option value="${a.id}">${a.id} · ${a.name}</option>`).join('')}</optgroup>`;
+  jobSel.innerHTML = html;
+}
+
+async function submitDailyEntry() {
+  const worker   = document.getElementById('dae-worker').value;
+  const jobId    = document.getElementById('dae-job').value;
+  const date     = new Date().toISOString().slice(0,10);
+  const hours    = parseFloat(document.getElementById('dae-hours').value);
+  const comments = document.getElementById('dae-comments').value;
+  if (!worker || !jobId || isNaN(hours)) { alert('Please fill in all required fields.'); return; }
+  const allJobs = [...jobs, ...absenceTypes];
+  const jobObj = allJobs.find(j => j.id === jobId);
+  const amendment = { by: 'Office', at: new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }), note: 'Created by Office' };
+  const entry = { id: uid(), worker, jobId, date, hours, comments, amendments: [amendment], createdAt: new Date().toISOString(), property: jobObj ? jobObj.property : '', description: jobObj ? (jobObj.description || jobObj.name || '') : '' };
+  entries.push(entry);
+  localStorage.setItem('entries', JSON.stringify(entries));
+  document.getElementById('dae-worker').value = '';
+  document.getElementById('dae-job').innerHTML = '<option value="">Select worker first...</option>';
+  document.getElementById('dae-hours').value = '';
+  document.getElementById('dae-comments').value = '';
+  toggleDailyAddEntry();
+  renderDailyView();
+  const { synced } = await queueOrSend('addEntry', { entry: { ...entry, amendments: amendmentsToString(entry.amendments) } });
+  if (synced) setSyncStatus('office', 'synced', 'Entry saved to Sheets');
 }
 
 function switchOfficeTab(tab) {
