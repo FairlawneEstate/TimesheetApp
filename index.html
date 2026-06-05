@@ -598,11 +598,22 @@ function loadInitialData() {
       if (!entries.find(e => e.id === q.id)) entries.push(q);
     });
     absences = (data.absences || []).map(a => ({ ...a, date: String(a.date || '') }));
-    recurringJobs = (data.recurringJobs || []);
+    recurringJobs = (data.recurringJobs || []).map(j => ({ ...j, assignedTo: String(j.assignedTo || '') }));
     absenceTypes = (data.absenceTypes || []);
     localStorage.setItem('entries', JSON.stringify(entries));
     localStorage.setItem('recurringJobs', JSON.stringify(recurringJobs));
     localStorage.setItem('absenceTypes', JSON.stringify(absenceTypes));
+    const serverEntryIds = new Set(entries.map(e => String(e.id)));
+    syncQueue = syncQueue.filter(q => {
+      if ((q.action === 'addEntry' || q.action === 'updateEntry') && q.payload && q.payload.entry) {
+        return !serverEntryIds.has(String(q.payload.entry.id));
+      }
+      if (q.action === 'deleteEntry' && q.payload && q.payload.id) {
+        return serverEntryIds.has(String(q.payload.id));
+      }
+      return true;
+    });
+    localStorage.setItem('syncQueue', JSON.stringify(syncQueue));
     localStorage.setItem('workers', JSON.stringify(workers));
     localStorage.setItem('absences', JSON.stringify(absences));
     populateWorkerDropdown();
@@ -616,7 +627,7 @@ function loadInitialData() {
     entries = JSON.parse(localStorage.getItem('entries') || '[]');
     workers = JSON.parse(localStorage.getItem('workers') || '[]');
     absences = JSON.parse(localStorage.getItem('absences') || '[]');
-    recurringJobs = JSON.parse(localStorage.getItem('recurringJobs') || '[]');
+    recurringJobs = JSON.parse(localStorage.getItem('recurringJobs') || '[]').map(j => ({ ...j, assignedTo: String(j.assignedTo || '') }));
     absenceTypes = JSON.parse(localStorage.getItem('absenceTypes') || '[]');
     populateWorkerDropdown();
   });
