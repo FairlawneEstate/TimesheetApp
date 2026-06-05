@@ -1918,14 +1918,14 @@ function renderDailyView() {
         <p style="font-size:13px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem;">
           ${worker.name} ${statusBadge}
         </p>
-        <table class="week-table" style="table-layout:fixed;">
+        <table class="week-table" style="width:100%;">
           <thead>
             <tr>
               <th style="width:110px;">W/O Number</th>
               <th style="width:200px;">Property</th>
               <th style="width:30%;">Description</th>
               <th style="width:46px;text-align:center;">Hrs</th>
-              <th>Comments</th>
+              <th style="min-width:200px;">Comments</th>
             </tr>
           </thead>
           <tbody>${entryRows}</tbody>
