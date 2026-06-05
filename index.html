@@ -736,7 +736,7 @@ async function pollJobs() {
     }));
     syncQueue.forEach(q => { if (q.payload?.entry && !entries.find(e => e.id === q.payload.entry.id)) entries.push(q.payload.entry); });
     absences = (data.absences || absences).map(a => ({ ...a, date: String(a.date || '') }));
-    recurringJobs = data.recurringJobs || recurringJobs;
+    recurringJobs = (data.recurringJobs || recurringJobs).map(j => ({ ...j, assignedTo: String(j.assignedTo || '') }));
     absenceTypes = data.absenceTypes || absenceTypes;
     localStorage.setItem('jobs', JSON.stringify(jobs));
     localStorage.setItem('recurringJobs', JSON.stringify(recurringJobs));
@@ -1322,7 +1322,7 @@ async function refreshOffice() {
         amendments: amendmentsFromString(typeof e.amendments === 'string' ? e.amendments : JSON.stringify(e.amendments || []))
       }));
       absences = (data.absences || []).map(a => ({ ...a, date: String(a.date || '') }));
-      recurringJobs = data.recurringJobs || [];
+      recurringJobs = (data.recurringJobs || []).map(j => ({ ...j, assignedTo: String(j.assignedTo || '') }));
       absenceTypes = data.absenceTypes || [];
       localStorage.setItem('jobs', JSON.stringify(jobs));
       localStorage.setItem('recurringJobs', JSON.stringify(recurringJobs));
