@@ -122,6 +122,7 @@ textarea { height: 60px; resize: none; }
 .office-subnav button.active { background: var(--color-background-secondary); color: var(--color-text-primary); border-color: var(--color-border-primary); }
 .job-detail { display: none; margin-top: 12px; padding: 10px; background: var(--color-background-secondary); border-radius: var(--border-radius-md); }
 .app { padding: 0 1rem 2rem; max-width: 980px; margin: 0 auto; }
+.app.office-wide { max-width: 1400px; }
 .sync-status { font-size: 12px; color: var(--color-text-secondary); display: flex; align-items: center; gap: 6px; margin-top: 8px; }
 .sync-dot { width: 8px; height: 8px; border-radius: 50%; background: #ccc; display: inline-block; }
 .sync-dot.synced { background: #1a7a4a; }
@@ -639,6 +640,7 @@ function switchTab(tab) {
   );
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById('view-' + tab).classList.add('active');
+  document.querySelector('.app').classList.toggle('office-wide', tab === 'office');
 }
 
 // ── Worker helpers ────────────────────────────────────────────────
@@ -960,10 +962,10 @@ function renderWeek(wc) {
           ${amended ? `<span class="badge-amended-sm">Amended</span>` : ''}
           ${isPending ? `<span class="badge-amended-sm" style="background:var(--color-background-info);color:var(--color-text-info);">Pending</span>` : ''}
         </td>
-        <td style="padding:9px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:top;width:130px;">
+        <td style="padding:9px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:top;width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
           ${jobProperty}
         </td>
-        <td style="padding:9px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:top;">
+        <td style="padding:9px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:top;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
           ${jobDescription}
         </td>
         <td style="padding:9px 6px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-weight:500;text-align:center;vertical-align:top;white-space:nowrap;width:46px;">
@@ -1492,10 +1494,10 @@ function renderOfficeEntries() {
             ${amended ? `<span class="badge-amended-sm">Amended</span>` : ''}
             ${isPending ? `<span class="badge-amended-sm" style="background:var(--color-background-info);color:var(--color-text-info);">Pending</span>` : ''}
           </td>
-          <td style="padding:9px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:top;width:130px;">
+          <td style="padding:9px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:top;width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
             ${jobProperty}
           </td>
-          <td style="padding:9px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:top;">
+          <td style="padding:9px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:top;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
             ${jobDescription}
           </td>
           <td style="padding:9px 6px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-weight:500;text-align:center;vertical-align:top;white-space:nowrap;width:46px;">
@@ -1555,11 +1557,11 @@ function renderOfficeEntries() {
             <tr>
               <th style="width:100px;">Day</th>
               <th style="width:110px;">W/O Number</th>
-              <th style="width:130px;">Property</th>
-              <th>Description</th>
+              <th style="width:200px;">Property</th>
+              <th style="width:30%;">Description</th>
               <th style="width:46px;text-align:center;">Hrs</th>
               <th>Comments</th>
-              <th style="width:60px;"></th>
+              <th style="width:80px;"></th>
             </tr>
           </thead>
           <tbody>${workerRows}</tbody>
@@ -1896,21 +1898,22 @@ function renderDailyView() {
           const lastAmend = amended ? e.amendments[e.amendments.length - 1] : null;
           return `
           <tr class="day-row" ${idx === 0 ? 'style="border-top:1.5px solid var(--color-border-secondary);"' : ''}>
-            <td style="padding:9px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;vertical-align:top;width:110px;">
-              <div style="font-weight:600;">${e.jobId}</div>
+            <td style="padding:9px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+              <span style="font-weight:600;">${e.jobId}</span>
               ${amended ? `<span class="badge-amended-sm">${lastAmend.note === 'Created by Office' ? 'Office' : 'Amended'}</span>` : ''}
             </td>
-            <td style="padding:9px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:top;width:130px;">${jobProperty}</td>
-            <td style="padding:9px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:top;">${jobDescription}</td>
-            <td style="padding:9px 6px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-weight:500;text-align:center;vertical-align:top;white-space:nowrap;width:46px;">${e.hours}h</td>
-            <td style="padding:9px 10px;font-size:12px;font-style:italic;color:var(--color-text-secondary);vertical-align:top;">${e.comments || ''}${amended && lastAmend.note !== 'Created by Office' ? `<div class="audit-log-sm" style="font-style:normal;">Amended by ${lastAmend.by}</div>` : ''}</td>
+            <td style="padding:9px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${jobProperty}</td>
+            <td style="padding:9px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${jobDescription}</td>
+            <td style="padding:9px 6px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-weight:500;text-align:center;white-space:nowrap;width:46px;">${e.hours}h</td>
+            <td style="padding:9px 10px;font-size:12px;font-style:italic;color:var(--color-text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${e.comments || ''}${amended && lastAmend.note !== 'Created by Office' ? ` · Amended by ${lastAmend.by}` : ''}</td>
           </tr>`;
         }).join('') + `
           <tr style="background:var(--color-background-secondary);border-bottom:1.5px solid var(--color-border-secondary);">
+            <td style="padding:6px 10px;border-right:0.5px solid var(--color-border-tertiary);width:100px;"></td>
             <td style="padding:6px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-weight:600;width:110px;">Total</td>
             <td style="padding:6px 10px;border-right:0.5px solid var(--color-border-tertiary);width:130px;"></td>
             <td style="padding:6px 10px;border-right:0.5px solid var(--color-border-tertiary);"></td>
-            <td style="padding:6px 6px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-weight:600;text-align:center;width:46px;">${dayTotal}h</td>
+            <td style="padding:6px 6px;font-size:12px;font-weight:600;text-align:center;width:46px;">${dayTotal}h</td>
             <td></td>
           </tr>`;
 
@@ -1919,12 +1922,12 @@ function renderDailyView() {
         <p style="font-size:13px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem;">
           ${worker.name} ${statusBadge}
         </p>
-        <table class="week-table">
+        <table class="week-table" style="table-layout:fixed;">
           <thead>
             <tr>
               <th style="width:110px;">W/O Number</th>
-              <th style="width:130px;">Property</th>
-              <th>Description</th>
+              <th style="width:200px;">Property</th>
+              <th style="width:30%;">Description</th>
               <th style="width:46px;text-align:center;">Hrs</th>
               <th>Comments</th>
             </tr>
