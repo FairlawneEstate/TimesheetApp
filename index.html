@@ -1594,7 +1594,7 @@ function renderOfficeEntries() {
     }).join('');
 
     html += `
-      <div style="margin-bottom:1.5rem;">
+      <div style="margin-bottom:1.5rem;width:100%;">
         <p style="font-size:13px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem;">${worker.name}</p>
         <table class="week-table">
           <thead>
@@ -1968,7 +1968,7 @@ function renderDailyView() {
     const dayTotal = dayEntries.reduce((s, e) => s + parseFloat(e.hours || 0), 0);
 
     const entryRows = dayEntries.length === 0
-      ? `<tr><td colspan="5" style="padding:10px 12px;font-size:12px;color:var(--color-text-secondary);">No entries</td></tr>`
+      ? `<tr><td colspan="6" style="padding:10px 12px;font-size:12px;color:var(--color-text-secondary);width:100%;">No entries</td></tr>`
       : dayEntries.map((e, idx) => {
           const job = jobs.find(j => j.id === e.jobId);
           const jobProperty = job ? job.property : (e.property || '');
@@ -2033,7 +2033,7 @@ function renderDailyView() {
           </tr>`;
 
     html += `
-      <div style="margin-bottom:1.5rem;">
+      <div style="margin-bottom:1.5rem;width:100%;">
         <p style="font-size:13px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem;">
           ${worker.name} ${statusBadge}
         </p>
