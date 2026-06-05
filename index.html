@@ -2043,15 +2043,23 @@ function renderDailyView() {
         <p style="font-size:13px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem;">
           ${worker.name} ${statusBadge}
         </p>
-        <table class="week-table" style="width:100%;">
+        <table class="week-table" style="width:100%;table-layout:fixed;">
+          <colgroup>
+            <col style="width:110px;">
+            <col style="width:200px;">
+            <col>
+            <col style="width:46px;">
+            <col>
+            <col style="width:160px;">
+          </colgroup>
           <thead>
             <tr>
-              <th style="width:110px;">W/O Number</th>
-              <th style="width:200px;">Property</th>
+              <th>W/O Number</th>
+              <th>Property</th>
               <th>Description</th>
-              <th style="width:46px;text-align:center;">Hrs</th>
+              <th style="text-align:center;">Hrs</th>
               <th>Comments</th>
-              <th style="width:160px;"></th>
+              <th></th>
             </tr>
           </thead>
           <tbody>${entryRows}</tbody>
