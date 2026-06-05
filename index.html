@@ -520,7 +520,7 @@ textarea { height: 60px; resize: none; }
 <script>
 // ══════════════════════════════════════════════════════════════════
 // ══════════════════════════════════════════════════════════════════
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxju3K1xlO9ESUJLeyPLZYItZou5MAaZzft89H4UAlInhhFJ2b5vUIDsWlA6B8mA_sPxQ/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby-xWg-S67_nb24Kztsp-eE7A6boRuvfmAk3OSgo7J5qP7FzKujwZDZoWb7Y3iTPXaKuA/exec';
 const POLL_INTERVAL_MS = 60000;
 // ══════════════════════════════════════════════════════════════════
 
@@ -762,11 +762,16 @@ function expandAssignedTo(assignedTo) {
 function populateJobDropdown() {
   const sel = document.getElementById('job-select');
   const open = jobs.filter(j => j.open);
+  const assignedRecurring = recurringJobs.filter(j => j.active !== false && j.active !== 'FALSE' && expandAssignedTo(j.assignedTo || '').includes(currentWorker));
   const mine = open.filter(j => expandAssignedTo(j.assignedTo).includes(currentWorker));
   let html = '<option value="">Select a job...</option>';
-  if (mine.length) {
+  const mineAll = [
+    ...mine,
+    ...assignedRecurring.map(j => ({ ...j, _recurring: true }))
+  ];
+  if (mineAll.length) {
     html += `<optgroup label="Your assigned jobs">`;
-    html += mine.map(j => `<option value="${j.id}">${j.id} · ${j.property} · ${j.description && j.description.length > 40 ? j.description.slice(0, 40) + '…' : (j.description || '')}</option>`).join('');
+    html += mineAll.map(j => `<option value="${j.id}">${j.id} · ${j.property} · ${j.description && j.description.length > 40 ? j.description.slice(0, 40) + '…' : (j.description || '')}</option>`).join('');
     html += `</optgroup>`;
   }
 
@@ -1339,6 +1344,7 @@ function renderJobRow(j) {
         </div>
       </div>
       <p class="text-muted" style="margin-top:2px;font-size:12px;">${j.description || ''}</p>
+      ${j.assignedTo ? `<p style="margin-top:2px;font-size:11px;color:var(--color-text-secondary);">Assigned: ${j.assignedTo}</p>` : '<p style="margin-top:2px;font-size:11px;color:var(--color-text-secondary);">Unassigned</p>'}
     </div>`;
 }
 
@@ -1681,10 +1687,12 @@ function renderRecurringJobsList() {
         </div>
         <div style="display:flex;gap:8px;">
           <button class="btn btn-sm" onclick="toggleEditRecurring('${j.id}')">Edit</button>
+          <button class="btn btn-sm" onclick="toggleAssignRecurring('${j.id}')">Assign</button>
           <button class="btn btn-sm" onclick="toggleRecurringJob('${j.id}', ${active})">${active ? 'Deactivate' : 'Reactivate'}</button>
         </div>
       </div>
       <p class="text-muted" style="margin-top:2px;font-size:12px;">${j.description || ''}</p>
+      ${j.assignedTo ? `<p style="margin-top:2px;font-size:11px;color:var(--color-text-secondary);">Assigned: ${j.assignedTo}</p>` : '<p style="margin-top:2px;font-size:11px;color:var(--color-text-secondary);">Unassigned</p>'}
       <div class="entry-edit" id="rj-edit-${j.id}" style="display:none;">
         <div class="edit-grid">
           <div class="edit-field">
@@ -1701,8 +1709,41 @@ function renderRecurringJobsList() {
           <button class="btn btn-sm" onclick="toggleEditRecurring('${j.id}')">Cancel</button>
         </div>
       </div>
+      <div id="rj-assign-${j.id}" style="display:none;margin-top:0.75rem;padding:0.75rem;background:var(--color-background-secondary);border-radius:var(--border-radius-md);">
+        <p style="font-size:12px;font-weight:500;margin-bottom:0.5rem;">Assign workers</p>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:0.75rem;">
+          ${workers.filter(w => w.active !== false && w.active !== 'FALSE').map(w => `
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;">
+              <input type="checkbox" value="${w.name}" ${(j.assignedTo || '').split(',').map(s=>s.trim()).filter(Boolean).includes(w.name) ? 'checked' : ''}>
+              ${w.name}
+            </label>`).join('')}
+        </div>
+        <div class="edit-actions">
+          <button class="btn btn-primary btn-sm" onclick="saveAssignRecurring('${j.id}')">Save</button>
+          <button class="btn btn-sm" onclick="toggleAssignRecurring('${j.id}')">Cancel</button>
+        </div>
+      </div>
     </div>`;
   }).join('');
+}
+
+function toggleAssignRecurring(id) {
+  const el = document.getElementById('rj-assign-' + id);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+async function saveAssignRecurring(id) {
+  const j = recurringJobs.find(j => j.id === id);
+  if (!j) return;
+  const panel = document.getElementById('rj-assign-' + id);
+  const checked = Array.from(panel.querySelectorAll('input[type=checkbox]:checked')).map(cb => cb.value);
+  j.assignedTo = checked.join(', ');
+  localStorage.setItem('recurringJobs', JSON.stringify(recurringJobs));
+  toggleAssignRecurring(id);
+  renderRecurringJobsList();
+  populateJobDropdown();
+  const { synced } = await queueOrSend('saveRecurringJob', { job: j });
+  if (synced) setSyncStatus('office', 'synced', 'Assignments saved');
 }
 
 function toggleEditRecurring(id) {
