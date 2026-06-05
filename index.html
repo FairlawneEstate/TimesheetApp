@@ -744,7 +744,13 @@ async function pollJobs() {
     localStorage.setItem('entries', JSON.stringify(entries));
     localStorage.setItem('workers', JSON.stringify(workers));
     localStorage.setItem('absences', JSON.stringify(absences));
+    const currentJobSel = document.getElementById('job-select');
+    const savedJobId = currentJobSel ? currentJobSel.value : '';
     populateJobDropdown();
+    if (savedJobId && currentJobSel) {
+      currentJobSel.value = savedJobId;
+      if (!currentJobSel.value) currentJobSel.value = '';
+    }
     renderEntriesByDate();
     updateHoursPlaceholder();
     setSyncStatus('worker', 'synced', 'Updated ' + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }));
@@ -2037,23 +2043,15 @@ function renderDailyView() {
         <p style="font-size:13px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem;">
           ${worker.name} ${statusBadge}
         </p>
-        <table class="week-table" style="width:100%;table-layout:fixed;">
-          <colgroup>
-            <col style="width:110px;">
-            <col style="width:200px;">
-            <col>
-            <col style="width:46px;">
-            <col>
-            <col style="width:160px;">
-          </colgroup>
+        <table class="week-table" style="width:100%;">
           <thead>
             <tr>
-              <th>W/O Number</th>
-              <th>Property</th>
+              <th style="width:110px;">W/O Number</th>
+              <th style="width:200px;">Property</th>
               <th>Description</th>
-              <th style="text-align:center;">Hrs</th>
+              <th style="width:46px;text-align:center;">Hrs</th>
               <th>Comments</th>
-              <th></th>
+              <th style="width:160px;"></th>
             </tr>
           </thead>
           <tbody>${entryRows}</tbody>
