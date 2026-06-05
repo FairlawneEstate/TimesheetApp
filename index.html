@@ -957,25 +957,25 @@ function renderWeek(wc) {
           <div class="day-date">${fmtShortDate(dayStr)}</div>
           ${dayCellContent}
         </td>` : ''}
-        <td style="padding:9px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;vertical-align:top;width:110px;">
+        <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;vertical-align:middle;width:110px;">
           <div style="font-weight:600;">${e.jobId}</div>
           ${amended ? `<span class="badge-amended-sm">Amended</span>` : ''}
           ${isPending ? `<span class="badge-amended-sm" style="background:var(--color-background-info);color:var(--color-text-info);">Pending</span>` : ''}
         </td>
-        <td style="padding:9px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:top;width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+        <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:middle;width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
           ${jobProperty}
         </td>
-        <td style="padding:9px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:top;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+        <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:middle;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
           ${jobDescription}
         </td>
-        <td style="padding:9px 6px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-weight:500;text-align:center;vertical-align:top;white-space:nowrap;width:46px;">
+        <td style="padding:5px 6px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-weight:500;text-align:center;vertical-align:middle;white-space:nowrap;width:46px;">
           ${e.hours}h
         </td>
-        <td style="padding:9px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-style:italic;color:var(--color-text-secondary);vertical-align:top;">
+        <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-style:italic;color:var(--color-text-secondary);vertical-align:middle;">
           ${e.comments || ''}
           ${amended ? `<div class="audit-log-sm" style="font-style:normal;">${lastAmend.note === 'Created by Office' ? 'Created by' : 'Amended by'} ${lastAmend.by} · ${lastAmend.at}</div>` : ''}
         </td>
-        <td style="padding:6px 8px;text-align:center;vertical-align:top;width:80px;">
+        <td style="padding:4px 8px;text-align:center;vertical-align:middle;width:80px;">
           <div style="display:flex;flex-direction:column;gap:4px;">
             <button class="btn btn-sm" onclick="toggleEditWeek('${e.id}')">Edit</button>
             <button class="btn btn-sm" style="color:var(--color-text-error);border-color:var(--color-border-error);" onclick="deleteEntry('${e.id}', false)">Delete</button>
@@ -1458,7 +1458,7 @@ function renderOfficeEntries() {
         <tr style="background:var(--color-background-secondary);border-bottom:1.5px solid var(--color-border-secondary);">
           <td style="padding:6px 10px;border-right:0.5px solid var(--color-border-tertiary);width:100px;"></td>
           <td style="padding:6px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-weight:600;width:110px;">Total</td>
-          <td style="padding:6px 10px;border-right:0.5px solid var(--color-border-tertiary);width:130px;"></td>
+          <td style="padding:6px 10px;border-right:0.5px solid var(--color-border-tertiary);width:200px;"></td>
           <td style="padding:6px 10px;border-right:0.5px solid var(--color-border-tertiary);"></td>
           <td style="padding:6px 6px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-weight:600;text-align:center;width:46px;">${dayTotal}h</td>
           <td colspan="2"></td>
@@ -1494,20 +1494,20 @@ function renderOfficeEntries() {
             ${amended ? `<span class="badge-amended-sm">Amended</span>` : ''}
             ${isPending ? `<span class="badge-amended-sm" style="background:var(--color-background-info);color:var(--color-text-info);">Pending</span>` : ''}
           </td>
-          <td style="padding:9px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:top;width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+          <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:middle;width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
             ${jobProperty}
           </td>
-          <td style="padding:9px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:top;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+          <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:middle;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
             ${jobDescription}
           </td>
-          <td style="padding:9px 6px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-weight:500;text-align:center;vertical-align:top;white-space:nowrap;width:46px;">
+          <td style="padding:5px 6px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-weight:500;text-align:center;vertical-align:middle;white-space:nowrap;width:46px;">
             ${e.hours}h
           </td>
-          <td style="padding:9px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-style:italic;color:var(--color-text-secondary);vertical-align:top;">
+          <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-style:italic;color:var(--color-text-secondary);vertical-align:middle;">
             ${e.comments || ''}
             ${amended ? `<div class="audit-log-sm" style="font-style:normal;">${lastAmend.note === 'Created by Office' ? 'Created by' : 'Amended by'} ${lastAmend.by} · ${lastAmend.at}</div>` : ''}
           </td>
-          <td style="padding:6px 8px;text-align:center;vertical-align:top;width:80px;">
+          <td style="padding:4px 8px;text-align:center;vertical-align:middle;width:80px;">
             <div style="display:flex;flex-direction:column;gap:4px;">
               <button class="btn btn-sm" onclick="toggleEditOfficeEntries('${e.id}')">Edit</button>
               <button class="btn btn-sm" style="color:var(--color-text-error);border-color:var(--color-border-error);" onclick="deleteEntry('${e.id}', true)">Delete</button>
@@ -1889,7 +1889,7 @@ function renderDailyView() {
     const dayTotal = dayEntries.reduce((s, e) => s + parseFloat(e.hours || 0), 0);
 
     const entryRows = dayEntries.length === 0
-      ? `<tr><td colspan="7" style="padding:10px 12px;font-size:12px;color:var(--color-text-secondary);">No entries</td></tr>`
+      ? `<tr><td colspan="5" style="padding:10px 12px;font-size:12px;color:var(--color-text-secondary);">No entries</td></tr>`
       : dayEntries.map((e, idx) => {
           const job = jobs.find(j => j.id === e.jobId);
           const jobProperty = job ? job.property : (e.property || '');
@@ -1911,7 +1911,7 @@ function renderDailyView() {
           <tr style="background:var(--color-background-secondary);border-bottom:1.5px solid var(--color-border-secondary);">
             <td style="padding:6px 10px;border-right:0.5px solid var(--color-border-tertiary);width:100px;"></td>
             <td style="padding:6px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-weight:600;width:110px;">Total</td>
-            <td style="padding:6px 10px;border-right:0.5px solid var(--color-border-tertiary);width:130px;"></td>
+            <td style="padding:6px 10px;border-right:0.5px solid var(--color-border-tertiary);width:200px;"></td>
             <td style="padding:6px 10px;border-right:0.5px solid var(--color-border-tertiary);"></td>
             <td style="padding:6px 6px;font-size:12px;font-weight:600;text-align:center;width:46px;">${dayTotal}h</td>
             <td></td>
