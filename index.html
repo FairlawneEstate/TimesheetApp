@@ -1896,14 +1896,14 @@ function renderDailyView() {
           const lastAmend = amended ? e.amendments[e.amendments.length - 1] : null;
           return `
           <tr class="day-row" ${idx === 0 ? 'style="border-top:1.5px solid var(--color-border-secondary);"' : ''}>
-            <td style="padding:9px 10px;border-right:0.5px solid var(--color-border-tertiary);${idx === 0 ? '' : 'border-left:0.5px solid var(--color-border-tertiary);'}font-size:12px;vertical-align:top;width:110px;">
+            <td style="padding:9px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;vertical-align:middle;width:110px;height:38px;white-space:nowrap;overflow:hidden;">
               <div style="font-weight:600;">${e.jobId}</div>
               ${amended ? `<span class="badge-amended-sm">${lastAmend.note === 'Created by Office' ? 'Office' : 'Amended'}</span>` : ''}
             </td>
-            <td style="padding:9px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:top;width:130px;">${jobProperty}</td>
-            <td style="padding:9px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:top;">${jobDescription}</td>
-            <td style="padding:9px 6px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-weight:500;text-align:center;vertical-align:top;white-space:nowrap;width:46px;">${e.hours}h</td>
-            <td style="padding:9px 10px;font-size:12px;font-style:italic;color:var(--color-text-secondary);vertical-align:top;">${e.comments || ''}${amended && lastAmend.note !== 'Created by Office' ? `<div class="audit-log-sm" style="font-style:normal;">Amended by ${lastAmend.by} · ${lastAmend.at}</div>` : ''}</td>
+            <td style="padding:9px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:middle;width:130px;height:38px;white-space:nowrap;overflow:hidden;max-width:130px;"><div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${jobProperty}</div></td>
+            <td style="padding:9px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:middle;height:38px;overflow:hidden;"><div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${jobDescription}</div></td>
+            <td style="padding:9px 6px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-weight:500;text-align:center;vertical-align:middle;white-space:nowrap;width:46px;height:38px;">${e.hours}h</td>
+            <td style="padding:9px 10px;font-size:12px;font-style:italic;color:var(--color-text-secondary);vertical-align:middle;height:38px;overflow:hidden;"><div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${e.comments || ''}${amended && lastAmend.note !== 'Created by Office' ? ` · Amended by ${lastAmend.by}` : ''}</div></td>
           </tr>`;
         }).join('') + `
           <tr style="background:var(--color-background-secondary);border-bottom:1.5px solid var(--color-border-secondary);">
