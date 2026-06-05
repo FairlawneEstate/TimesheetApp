@@ -1245,6 +1245,7 @@ async function officeLogin() {
     if (result.success) {
       document.getElementById('office-login-screen').style.display = 'none';
       document.getElementById('office-screen').style.display = 'block';
+      document.querySelector('.app').classList.add('office-wide');
       refreshOffice();
     } else {
       alert('Incorrect password');
