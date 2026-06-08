@@ -412,28 +412,29 @@ textarea { height: 60px; resize: none; }
         </div>
         <div id="office-absences-list"><p class="text-muted">Loading...</p></div>
         <div style="margin-top:1rem;padding-top:1rem;border-top:0.5px solid var(--color-border-tertiary);">
-          <p style="font-size:13px;font-weight:500;margin-bottom:0.75rem;">Add absence</p>
+          <p style="font-size:13px;font-weight:500;margin-bottom:0.75rem;">Add absence entry</p>
           <div class="grid2">
             <div>
               <label style="margin-top:0;">Worker</label>
-              <select id="absence-worker-select"><option value="">Select worker...</option></select>
+              <select id="abs-entry-worker"></select>
             </div>
             <div>
-              <label style="margin-top:0;">Date</label>
-              <input type="date" id="absence-date-input">
+              <label style="margin-top:0;">Absence type</label>
+              <select id="abs-entry-job"></select>
             </div>
           </div>
-          <div style="margin-top:12px;">
-            <label style="margin-top:0;">Reason</label>
-            <select id="absence-reason-select">
-              <option value="Sick">Sick</option>
-              <option value="Annual Leave">Annual Leave</option>
-              <option value="Bank Holiday">Bank Holiday</option>
-              <option value="Other">Other</option>
-            </select>
+          <div class="grid2" style="margin-top:10px;">
+            <div>
+              <label style="margin-top:0;">Date</label>
+              <input type="date" id="abs-entry-date">
+            </div>
+            <div>
+              <label style="margin-top:0;">Hours</label>
+              <input type="number" id="abs-entry-hours" placeholder="e.g. 8" min="0.5" max="16" step="0.5">
+            </div>
           </div>
           <div class="form-footer">
-            <button class="btn btn-primary" onclick="officeAddAbsence()">Add absence</button>
+            <button class="btn btn-primary" onclick="submitAbsenceEntry()">Save entry</button>
           </div>
         </div>
       </div>
@@ -1140,6 +1141,42 @@ async function removeAbsence(dateStr) {
   await queueOrSend('removeAbsence', { worker, date: dateStr });
 }
 
+function populateAbsenceEntryForm() {
+  const workerSel = document.getElementById('abs-entry-worker');
+  const jobSel = document.getElementById('abs-entry-job');
+  if (!workerSel || !jobSel) return;
+  const active = workers.filter(w => w.active !== false && w.active !== 'FALSE');
+  workerSel.innerHTML = '<option value="">Select worker...</option>' + active.map(w => `<option value="${w.name}">${w.name}</option>`).join('');
+  const activeAbsTypes = absenceTypes.filter(a => a.active !== false && a.active !== 'FALSE');
+  jobSel.innerHTML = '<option value="">Select absence type...</option>' + activeAbsTypes.map(a => `<option value="${a.id}">${a.id} · ${a.name}</option>`).join('');
+  const dateEl = document.getElementById('abs-entry-date');
+  if (dateEl && !dateEl.value) dateEl.value = new Date().toISOString().slice(0,10);
+}
+
+async function submitAbsenceEntry() {
+  const worker  = document.getElementById('abs-entry-worker').value;
+  const jobId   = document.getElementById('abs-entry-job').value;
+  const date    = document.getElementById('abs-entry-date').value;
+  const hours   = parseFloat(document.getElementById('abs-entry-hours').value);
+  if (!worker || !jobId || !date || isNaN(hours)) { alert('Please fill in all required fields.'); return; }
+  const absType = absenceTypes.find(a => a.id === jobId);
+  const amendment = { by: 'Office', at: new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }), note: 'Created by Office' };
+  const entry = {
+    id: uid(), worker, jobId, date, hours, comments: '',
+    amendments: [amendment],
+    createdAt: new Date().toISOString(),
+    property: '',
+    description: absType ? absType.name : jobId
+  };
+  entries.push(entry);
+  localStorage.setItem('entries', JSON.stringify(entries));
+  document.getElementById('abs-entry-worker').value = '';
+  document.getElementById('abs-entry-job').value = '';
+  document.getElementById('abs-entry-hours').value = '';
+  const { synced } = await queueOrSend('addEntry', { entry: { ...entry, amendments: amendmentsToString(entry.amendments) } });
+  if (synced) setSyncStatus('office', 'synced', 'Absence entry saved');
+}
+
 function renderOfficeAbsences() {
   const el = document.getElementById('office-absences-list');
   if (!el) return;
@@ -1158,20 +1195,6 @@ function renderOfficeAbsences() {
     </div>`).join('');
 }
 
-async function officeAddAbsence() {
-  const worker = document.getElementById('absence-worker-select').value;
-  const date = document.getElementById('absence-date-input').value;
-  const reason = document.getElementById('absence-reason-select').value;
-  if (!worker || !date) { alert('Please select a worker and date.'); return; }
-  const norm = normaliseDate(date);
-  absences = absences.filter(a => !(a.worker === worker && normaliseDate(a.date) === norm));
-  absences.push({ worker, date: norm, reason });
-  localStorage.setItem('absences', JSON.stringify(absences));
-  document.getElementById('absence-date-input').value = '';
-  renderOfficeAbsences();
-  await queueOrSend('saveAbsence', { absence: { worker, date: norm, reason } });
-  setSyncStatus('office', 'synced', 'Absence saved');
-}
 
 async function officeRemoveAbsence(worker, date) {
   absences = absences.filter(a => !(a.worker === worker && normaliseDate(a.date) === date));
@@ -2132,6 +2155,7 @@ function switchOfficeTab(tab) {
     if (btn) btn.classList.toggle('active', t === tab);
   });
   if (tab === 'daily') renderDailyView();
+  if (tab === 'absences') populateAbsenceEntryForm();
   if (tab === 'entries') renderOfficeEntries();
   if (tab === 'recurring') renderRecurringJobsList();
 }
