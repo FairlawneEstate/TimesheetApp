@@ -624,6 +624,16 @@ function loadInitialData() {
     recurringJobs = (data.recurringJobs || []).map(j => ({ ...j, assignedTo: String(j.assignedTo || '') }));
     absenceTypes = (data.absenceTypes || []);
     overtimeRequests = (data.overtimeRequests || []);
+    overtimeRequests = overtimeRequests.map(o => {
+      if (o.property && o.description) return o;
+      const job = jobs.find(j => j.id === o.jobId) || recurringJobs.find(j => j.id === o.jobId);
+      return {
+        ...o,
+        property: o.property || (job ? job.property : '') || '',
+        description: o.description || (job ? (job.description || '') : '') || '',
+        reviewComment: String(o.reviewComment || '')
+      };
+    });
     localStorage.setItem('overtimeRequests', JSON.stringify(overtimeRequests));
     localStorage.setItem('entries', JSON.stringify(entries));
     localStorage.setItem('recurringJobs', JSON.stringify(recurringJobs));
@@ -765,6 +775,16 @@ async function pollJobs() {
     recurringJobs = (data.recurringJobs || recurringJobs).map(j => ({ ...j, assignedTo: String(j.assignedTo || '') }));
     absenceTypes = data.absenceTypes || absenceTypes;
     overtimeRequests = data.overtimeRequests || overtimeRequests;
+    overtimeRequests = overtimeRequests.map(o => {
+      if (o.property && o.description) return o;
+      const job = jobs.find(j => j.id === o.jobId) || recurringJobs.find(j => j.id === o.jobId);
+      return {
+        ...o,
+        property: o.property || (job ? job.property : '') || '',
+        description: o.description || (job ? (job.description || '') : '') || '',
+        reviewComment: String(o.reviewComment || '')
+      };
+    });
     localStorage.setItem('overtimeRequests', JSON.stringify(overtimeRequests));
     localStorage.setItem('jobs', JSON.stringify(jobs));
     localStorage.setItem('recurringJobs', JSON.stringify(recurringJobs));
@@ -1525,6 +1545,16 @@ async function refreshOffice() {
         recurringJobs = (data.recurringJobs || []).map(j => ({ ...j, assignedTo: String(j.assignedTo || '') }));
       absenceTypes = data.absenceTypes || [];
       overtimeRequests = data.overtimeRequests || [];
+    overtimeRequests = overtimeRequests.map(o => {
+      if (o.property && o.description) return o;
+      const job = jobs.find(j => j.id === o.jobId) || recurringJobs.find(j => j.id === o.jobId);
+      return {
+        ...o,
+        property: o.property || (job ? job.property : '') || '',
+        description: o.description || (job ? (job.description || '') : '') || '',
+        reviewComment: String(o.reviewComment || '')
+      };
+    });
       localStorage.setItem('overtimeRequests', JSON.stringify(overtimeRequests));
       localStorage.setItem('jobs', JSON.stringify(jobs));
       localStorage.setItem('recurringJobs', JSON.stringify(recurringJobs));
