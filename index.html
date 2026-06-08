@@ -280,6 +280,7 @@ textarea { height: 60px; resize: none; }
         <button onclick="switchOfficeTab('workers')" id="otab-workers">Workers</button>
         <button onclick="switchOfficeTab('absences')" id="otab-absences">Absence Types</button>
         <button onclick="switchOfficeTab('recurring')" id="otab-recurring">Recurring Jobs</button>
+        <button onclick="switchOfficeTab('overtime')" id="otab-overtime">Overtime</button>
       </div>
 
       <!-- Active Jobs tab -->
@@ -461,6 +462,14 @@ textarea { height: 60px; resize: none; }
             </div>
           </div>
           <div id="recurring-job-list"><p class="text-muted">Loading...</p></div>
+        </div>
+      </div>
+
+      <!-- Workers tab -->
+      <div id="office-tab-overtime" style="display:none;">
+        <div class="card">
+          <div class="card-header"><p class="section-heading">⏱ Overtime Requests</p></div>
+          <div id="overtime-tab-content"><p class="text-muted" style="padding:1rem;">Loading...</p></div>
         </div>
       </div>
 
@@ -1083,12 +1092,21 @@ function renderWeek(wc) {
 
   const today = new Date(); today.setHours(0,0,0,0);
   const prevMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-  const dayNames = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
-  const weekDays = Array.from({length: 5}, (_, i) => {
+  const allDayNames = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+  const allWeekDays = Array.from({length: 7}, (_, i) => {
     const parts = wc.split('-');
     const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]) + i);
     return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
   });
+  const weekendDaysWithData = new Set(
+    overtimeRequests
+      .filter(o => o.worker === currentWorker)
+      .map(o => normaliseDate(o.date))
+      .concat(Object.keys(byDay))
+      .filter(ds => { const dow = new Date(ds + 'T12:00:00').getDay(); return dow === 0 || dow === 6; })
+  );
+  const weekDays = allWeekDays.filter((ds, i) => i < 5 || weekendDaysWithData.has(ds));
+  const dayNames = weekDays.map((_, i) => allDayNames[allWeekDays.indexOf(weekDays[i])]);
 
   const rows = weekDays.map((dayStr, i) => {
     const dayEntries = byDay[dayStr] || [];
@@ -1215,7 +1233,7 @@ function renderWeek(wc) {
       return `
       <tr class="day-row" style="opacity:0.85;">
         <td class="day-cell" style="vertical-align:top;">
-          <div class="day-name">${['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'][i] || ''}</div>
+          <div class="day-name">${dayNames[i]}</div>
           <div class="day-date">${fmtShortDate(dayStr)}</div>
         </td>
         <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;vertical-align:middle;width:110px;">
@@ -1526,6 +1544,8 @@ function renderOfficeDashboard() {
   const toEl = document.getElementById('oe-date-to');
   if (fromEl && !fromEl.value) fromEl.value = prev7Str;
   if (toEl && !toEl.value) toEl.value = todayStr;
+  const overtimeTab = document.getElementById('office-tab-overtime');
+  if (overtimeTab && overtimeTab.style.display !== 'none') renderOvertimeTab();
   const dailyTab = document.getElementById('office-tab-daily');
   if (dailyTab && dailyTab.style.display !== 'none') renderDailyView();
   const entriesTab = document.getElementById('office-tab-entries');
@@ -2247,8 +2267,93 @@ async function submitDailyEntry() {
   if (synced) setSyncStatus('office', 'synced', 'Entry saved to Sheets');
 }
 
+function renderOvertimeTab() {
+  const el = document.getElementById('overtime-tab-content');
+  if (!el) return;
+  const pending  = overtimeRequests.filter(o => o.status === 'pending');
+  const approved = overtimeRequests.filter(o => o.status === 'approved');
+  const declined = overtimeRequests.filter(o => o.status === 'declined');
+
+  function otRow(o, showActions) {
+    const job = jobs.find(j => j.id === o.jobId) || recurringJobs.find(j => j.id === o.jobId);
+    const property = (job ? job.property : '') || o.property || '';
+    const desc     = (job ? (job.description || '') : '') || o.description || '';
+    return `<tr>
+      <td style="padding:6px 10px;font-size:12px;font-weight:500;">${o.worker}</td>
+      <td style="padding:6px 10px;font-size:12px;">${fmtShortDate(o.date)}</td>
+      <td style="padding:6px 10px;font-size:12px;font-weight:600;">${o.jobId}</td>
+      <td style="padding:6px 10px;font-size:12px;color:var(--color-text-secondary);">${property}</td>
+      <td style="padding:6px 10px;font-size:12px;color:var(--color-text-secondary);">${desc}</td>
+      <td style="padding:6px 10px;font-size:12px;font-weight:500;text-align:center;">${o.hours}h</td>
+      <td style="padding:6px 10px;font-size:12px;font-style:italic;">${o.timeRange || ''}</td>
+      <td style="padding:6px 10px;font-size:11px;color:var(--color-text-secondary);">${o.submittedAt ? new Date(o.submittedAt).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : ''}</td>
+      ${showActions === 'pending' ? `
+      <td style="padding:4px 8px;white-space:nowrap;">
+        <button class="btn btn-sm" style="background:var(--color-background-success);color:var(--color-text-success);border-color:var(--color-border-success);margin-right:4px;" onclick="officeReviewOvertime('${o.id}','approved')">Approve</button>
+        <button class="btn btn-sm" style="color:var(--color-text-error);border-color:var(--color-border-error);" onclick="officeReviewOvertime('${o.id}','declined')">Decline</button>
+      </td>` : showActions === 'approved' ? `
+      <td style="padding:6px 10px;font-size:11px;color:var(--color-text-secondary);">${o.reviewedBy || ''} · ${o.reviewedAt ? new Date(o.reviewedAt).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : ''}</td>` : `
+      <td style="padding:6px 10px;font-size:11px;color:var(--color-text-secondary);">${o.reviewedBy || ''} · ${o.reviewedAt ? new Date(o.reviewedAt).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : ''}</td>`}
+    </tr>`;
+  }
+
+  function otTable(list, showActions) {
+    if (!list.length) return '<p class="text-muted" style="padding:0.5rem 0;">None.</p>';
+    return `<table style="width:100%;border-collapse:collapse;">
+      <thead><tr style="border-bottom:1px solid var(--color-border-secondary);">
+        <th style="padding:6px 10px;font-size:11px;text-align:left;">Worker</th>
+        <th style="padding:6px 10px;font-size:11px;text-align:left;">Date</th>
+        <th style="padding:6px 10px;font-size:11px;text-align:left;">W/O</th>
+        <th style="padding:6px 10px;font-size:11px;text-align:left;">Property</th>
+        <th style="padding:6px 10px;font-size:11px;text-align:left;">Description</th>
+        <th style="padding:6px 10px;font-size:11px;text-align:center;">Hrs</th>
+        <th style="padding:6px 10px;font-size:11px;text-align:left;">Time Range</th>
+        <th style="padding:6px 10px;font-size:11px;text-align:left;">Submitted</th>
+        <th style="padding:6px 10px;font-size:11px;text-align:left;">${showActions === 'pending' ? 'Action' : 'Reviewed by'}</th>
+      </tr></thead>
+      <tbody>${list.map(o => otRow(o, showActions)).join('')}</tbody>
+    </table>`;
+  }
+
+  el.innerHTML = `
+    <div style="margin-bottom:1.5rem;">
+      <p style="font-size:13px;font-weight:600;margin-bottom:0.5rem;color:#856404;">⏳ Pending (${pending.length})</p>
+      ${otTable(pending, 'pending')}
+    </div>
+    <div style="margin-bottom:1.5rem;">
+      <p style="font-size:13px;font-weight:600;margin-bottom:0.5rem;color:var(--color-text-success);">✓ Approved (${approved.length})</p>
+      ${otTable(approved, 'approved')}
+    </div>
+    <div>
+      <p style="font-size:13px;font-weight:600;margin-bottom:0.5rem;color:var(--color-text-error);">✕ Declined (${declined.length})</p>
+      ${otTable(declined, 'declined')}
+    </div>`;
+}
+
+async function officeReviewOvertime(id, status) {
+  const reviewedBy = currentOfficeUser || 'Office';
+  setSyncStatus('office', 'pending', 'Updating overtime...');
+  const result = await api('reviewOvertimeRequest', { id, status, reviewedBy });
+  if (result.error) { alert('Error: ' + result.error); return; }
+
+  const idx = overtimeRequests.findIndex(o => o.id === id);
+  if (idx !== -1) {
+    overtimeRequests[idx].status = status;
+    overtimeRequests[idx].reviewedBy = reviewedBy;
+    overtimeRequests[idx].reviewedAt = new Date().toISOString();
+  }
+  localStorage.setItem('overtimeRequests', JSON.stringify(overtimeRequests));
+
+  if (status === 'approved') {
+    await refreshOfficeData();
+  }
+
+  setSyncStatus('office', 'synced', 'Overtime ' + status);
+  renderOvertimeTab();
+}
+
 function switchOfficeTab(tab) {
-  const tabs = ['daily','jobs','entries','absences','workers','recurring'];
+  const tabs = ['daily','jobs','entries','absences','workers','recurring','overtime'];
   tabs.forEach(t => {
     const el = document.getElementById('office-tab-' + t);
     const btn = document.getElementById('otab-' + t);
@@ -2259,6 +2364,7 @@ function switchOfficeTab(tab) {
   if (tab === 'absences') populateAbsenceEntryForm();
   if (tab === 'entries') renderOfficeEntries();
   if (tab === 'recurring') renderRecurringJobsList();
+  if (tab === 'overtime') renderOvertimeTab();
 }
 
 // ── Workers management ───────────────────────────────────────────
