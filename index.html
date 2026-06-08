@@ -905,14 +905,15 @@ async function confirmOvertime() {
   if (!entry.comments) entry.comments = 'Overtime: ' + timeRange;
   else entry.comments = entry.comments + ' (Overtime: ' + timeRange + ')';
 
+  const jobObj = jobs.find(j => j.id === entry.jobId) || recurringJobs.find(j => j.id === entry.jobId);
   const otRequest = {
     id: 'ot_' + uid(),
     entryId: entry.id,
     worker: entry.worker,
     date: entry.date,
     jobId: entry.jobId,
-    property: entry.property || '',
-    description: entry.description || '',
+    property: (jobObj ? jobObj.property : '') || entry.property || '',
+    description: (jobObj ? (jobObj.description || jobObj.name || '') : '') || entry.description || '',
     hours: otHours,
     timeRange,
     status: 'pending',
@@ -920,9 +921,6 @@ async function confirmOvertime() {
     reviewedAt: '',
     reviewedBy: ''
   };
-
-  overtimeRequests.push(otRequest);
-  localStorage.setItem('overtimeRequests', JSON.stringify(overtimeRequests));
 
   overtimeRequests.push(otRequest);
   localStorage.setItem('overtimeRequests', JSON.stringify(overtimeRequests));
