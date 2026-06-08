@@ -495,6 +495,29 @@ textarea { height: 60px; resize: none; }
 
 </div>
 
+<!-- ── OVERTIME MODAL ── -->
+<div id="overtime-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:100;display:none;align-items:center;justify-content:center;">
+  <div style="background:var(--color-background-primary);border-radius:var(--border-radius-lg);padding:1.5rem;max-width:420px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.18);">
+    <p style="font-size:15px;font-weight:500;margin-bottom:0.5rem;">⏱ Overtime request</p>
+    <p class="text-muted" style="font-size:13px;margin-bottom:1rem;" id="ot-message">You are about to log overtime. Please confirm the time range.</p>
+    <div class="grid2" style="margin-bottom:1rem;">
+      <div>
+        <label style="margin-top:0;">Start time</label>
+        <select id="ot-start"></select>
+      </div>
+      <div>
+        <label style="margin-top:0;">End time</label>
+        <select id="ot-end"></select>
+      </div>
+    </div>
+    <p id="ot-duration" style="font-size:13px;color:var(--color-text-secondary);margin-bottom:1rem;"></p>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-primary" onclick="confirmOvertime()">Submit overtime request</button>
+      <button class="btn" onclick="cancelOvertime()">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ══════════════════════════════════════════════════════════════════
 // ══════════════════════════════════════════════════════════════════
@@ -508,6 +531,8 @@ let workers = [];
 let recurringJobs = [];
 let absenceTypes = [];
 let currentOfficeUser = null;
+let overtimeRequests = [];
+let pendingOvertimeEntry = null;
 let currentWorker = null;
 let syncQueue = JSON.parse(localStorage.getItem('syncQueue') || '[]');
 let pollTimer = null;
@@ -577,6 +602,8 @@ function loadInitialData() {
     });
     recurringJobs = (data.recurringJobs || []).map(j => ({ ...j, assignedTo: String(j.assignedTo || '') }));
     absenceTypes = (data.absenceTypes || []);
+    overtimeRequests = (data.overtimeRequests || []);
+    localStorage.setItem('overtimeRequests', JSON.stringify(overtimeRequests));
     localStorage.setItem('entries', JSON.stringify(entries));
     localStorage.setItem('recurringJobs', JSON.stringify(recurringJobs));
     localStorage.setItem('absenceTypes', JSON.stringify(absenceTypes));
@@ -604,6 +631,7 @@ function loadInitialData() {
     workers = JSON.parse(localStorage.getItem('workers') || '[]');
     recurringJobs = JSON.parse(localStorage.getItem('recurringJobs') || '[]').map(j => ({ ...j, assignedTo: String(j.assignedTo || '') }));
     absenceTypes = JSON.parse(localStorage.getItem('absenceTypes') || '[]');
+    overtimeRequests = JSON.parse(localStorage.getItem('overtimeRequests') || '[]');
     populateWorkerDropdown();
   });
 }
@@ -712,6 +740,8 @@ async function pollJobs() {
     syncQueue.forEach(q => { if (q.payload?.entry && !entries.find(e => e.id === q.payload.entry.id)) entries.push(q.payload.entry); });
     recurringJobs = (data.recurringJobs || recurringJobs).map(j => ({ ...j, assignedTo: String(j.assignedTo || '') }));
     absenceTypes = data.absenceTypes || absenceTypes;
+    overtimeRequests = data.overtimeRequests || overtimeRequests;
+    localStorage.setItem('overtimeRequests', JSON.stringify(overtimeRequests));
     localStorage.setItem('jobs', JSON.stringify(jobs));
     localStorage.setItem('recurringJobs', JSON.stringify(recurringJobs));
     localStorage.setItem('absenceTypes', JSON.stringify(absenceTypes));
@@ -798,6 +828,122 @@ function updateHoursPlaceholder() {
   input.placeholder = remaining > 0 ? remaining + 'h remaining' : 'Day complete';
 }
 
+function generateTimeOptions() {
+  const opts = [];
+  for (let h = 0; h < 24; h++) {
+    for (let m = 0; m < 60; m += 15) {
+      const hh = String(h).padStart(2,'0');
+      const mm = String(m).padStart(2,'0');
+      opts.push(hh + ':' + mm);
+    }
+  }
+  return opts;
+}
+
+function showOvertimeModal(entry, isWeekend) {
+  pendingOvertimeEntry = entry;
+  const msg = isWeekend
+    ? 'Weekend hours are automatically logged as overtime. Please confirm the time range.'
+    : 'You are about to log overtime. Please confirm the time range.';
+  document.getElementById('ot-message').textContent = msg;
+
+  const times = generateTimeOptions();
+  const startSel = document.getElementById('ot-start');
+  const endSel = document.getElementById('ot-end');
+  startSel.innerHTML = times.map(t => `<option value="${t}">${t}</option>`).join('');
+  endSel.innerHTML = times.map(t => `<option value="${t}">${t}</option>`).join('');
+
+  const defaultStart = isWeekend ? '08:00' : '17:00';
+  const endHours = Math.round(entry.hours * 4) / 4;
+  const [sh, sm] = defaultStart.split(':').map(Number);
+  const endMins = sh * 60 + sm + endHours * 60;
+  const endH = String(Math.floor(endMins / 60) % 24).padStart(2,'0');
+  const endM = String(endMins % 60).padStart(2,'0');
+  startSel.value = defaultStart;
+  endSel.value = endH + ':' + endM;
+  updateOvertimeDuration();
+
+  startSel.onchange = updateOvertimeDuration;
+  endSel.onchange = updateOvertimeDuration;
+
+  const modal = document.getElementById('overtime-modal');
+  modal.style.display = 'flex';
+}
+
+function updateOvertimeDuration() {
+  const start = document.getElementById('ot-start').value;
+  const end = document.getElementById('ot-end').value;
+  const [sh, sm] = start.split(':').map(Number);
+  const [eh, em] = end.split(':').map(Number);
+  let diff = (eh * 60 + em) - (sh * 60 + sm);
+  if (diff <= 0) diff += 24 * 60;
+  const hrs = (diff / 60).toFixed(2).replace(/\.?0+$/, '');
+  document.getElementById('ot-duration').textContent = `Duration: ${start} – ${end} (${hrs}h)`;
+}
+
+function cancelOvertime() {
+  pendingOvertimeEntry = null;
+  document.getElementById('overtime-modal').style.display = 'none';
+}
+
+async function confirmOvertime() {
+  if (!pendingOvertimeEntry) return;
+  const start = document.getElementById('ot-start').value;
+  const end = document.getElementById('ot-end').value;
+  const [sh, sm] = start.split(':').map(Number);
+  const [eh, em] = end.split(':').map(Number);
+  let diff = (eh * 60 + em) - (sh * 60 + sm);
+  if (diff <= 0) diff += 24 * 60;
+  const otHours = parseFloat((diff / 60).toFixed(2));
+  const timeRange = start + ' – ' + end;
+
+  const entry = pendingOvertimeEntry;
+  entry.overtimeStatus = 'pending';
+  entry.overtimeTimeRange = timeRange;
+  entry.overtimeHours = otHours;
+  entry.overtimeSubmittedAt = new Date().toISOString();
+
+  const otRequest = {
+    id: 'ot_' + uid(),
+    entryId: entry.id,
+    worker: entry.worker,
+    date: entry.date,
+    jobId: entry.jobId,
+    property: entry.property || '',
+    description: entry.description || '',
+    hours: otHours,
+    timeRange,
+    status: 'pending',
+    submittedAt: entry.overtimeSubmittedAt,
+    reviewedAt: '',
+    reviewedBy: ''
+  };
+
+  overtimeRequests.push(otRequest);
+  localStorage.setItem('overtimeRequests', JSON.stringify(overtimeRequests));
+
+  entries.push(entry);
+  localStorage.setItem('entries', JSON.stringify(entries));
+
+  document.getElementById('overtime-modal').style.display = 'none';
+  pendingOvertimeEntry = null;
+  document.getElementById('job-select').value = '';
+  document.getElementById('job-detail').style.display = 'none';
+  document.getElementById('entry-hours').value = '';
+  document.getElementById('entry-comments').value = '';
+  renderEntriesByDate();
+
+  const { synced } = await queueOrSend('addEntry', { entry: { ...entry, amendments: amendmentsToString(entry.amendments) } });
+  await queueOrSend('saveOvertimeRequest', { request: otRequest });
+  if (synced) {
+    showToast('toast-worker');
+    setSyncStatus('worker', 'synced', 'Overtime request submitted');
+  } else {
+    showToast('toast-error');
+    setSyncStatus('worker', 'pending', syncQueue.length + ' entries pending sync');
+  }
+}
+
 async function submitEntry() {
   const jobId = document.getElementById('job-select').value;
   const date = document.getElementById('entry-date').value;
@@ -806,11 +952,17 @@ async function submitEntry() {
   if (!jobId || !date || isNaN(hours)) { alert('Please fill in job, date, and hours.'); return; }
 
   const norm = normaliseDate(date);
+  const dayOfWeek = new Date(date + 'T12:00:00').getDay();
+  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
   const alreadyLogged = entries
-    .filter(e => e.worker === currentWorker && normaliseDate(e.date) === norm)
+    .filter(e => e.worker === currentWorker && normaliseDate(e.date) === norm && !e.overtimeStatus)
     .reduce((sum, e) => sum + parseFloat(e.hours || 0), 0);
-  if (alreadyLogged + hours > 8) {
-    alert('Overtime has to be approved via manager.');
+  const isOvertime = isWeekend || (alreadyLogged + hours > 8);
+
+  if (isOvertime) {
+    const jobObj = jobs.find(j => j.id === jobId) || recurringJobs.find(j => j.id === jobId) || absenceTypes.find(a => a.id === jobId);
+    const entry = { id: uid(), worker: currentWorker, jobId, date, hours, comments, amendments: [], createdAt: new Date().toISOString(), property: jobObj ? jobObj.property : '', description: jobObj ? (jobObj.description || jobObj.name || '') : '' };
+    showOvertimeModal(entry, isWeekend);
     return;
   }
 
@@ -987,6 +1139,8 @@ function renderWeek(wc) {
           <div style="font-weight:600;">${e.jobId}</div>
           ${amended ? `<span class="badge-amended-sm">Amended</span>` : ''}
           ${isPending ? `<span class="badge-amended-sm" style="background:var(--color-background-info);color:var(--color-text-info);">Pending</span>` : ''}
+          ${e.overtimeStatus === 'pending' ? `<span class="badge-amended-sm" style="background:#fff3cd;color:#856404;">⏱ OT Pending</span>` : ''}
+          ${e.overtimeStatus === 'approved' ? `<span class="badge-amended-sm" style="background:var(--color-background-success);color:var(--color-text-success);">⏱ OT Approved</span>` : ''}
         </td>
         <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:middle;width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
           ${jobProperty}
@@ -1280,6 +1434,8 @@ async function refreshOffice() {
       }));
         recurringJobs = (data.recurringJobs || []).map(j => ({ ...j, assignedTo: String(j.assignedTo || '') }));
       absenceTypes = data.absenceTypes || [];
+      overtimeRequests = data.overtimeRequests || [];
+      localStorage.setItem('overtimeRequests', JSON.stringify(overtimeRequests));
       localStorage.setItem('jobs', JSON.stringify(jobs));
       localStorage.setItem('recurringJobs', JSON.stringify(recurringJobs));
       localStorage.setItem('absenceTypes', JSON.stringify(absenceTypes));
