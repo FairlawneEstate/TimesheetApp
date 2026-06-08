@@ -521,7 +521,7 @@ textarea { height: 60px; resize: none; }
 <script>
 // ══════════════════════════════════════════════════════════════════
 // ══════════════════════════════════════════════════════════════════
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxWd4xKkhSWD4A0KDEQk5pTUs9EKdkFIHgLYDse8iXeP7cGIOv8Hz8wwIiZeg_Vfr598w/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzpqUvuHFR1E6U5i_5-IgyzsR07QkalDZ-ozGw7RIr6nxHTIteYWwhA38lv0Kmxx0O9bw/exec';
 const POLL_INTERVAL_MS = 60000;
 // ══════════════════════════════════════════════════════════════════
 
@@ -924,8 +924,8 @@ async function confirmOvertime() {
   overtimeRequests.push(otRequest);
   localStorage.setItem('overtimeRequests', JSON.stringify(overtimeRequests));
 
-  entries.push(entry);
-  localStorage.setItem('entries', JSON.stringify(entries));
+  overtimeRequests.push(otRequest);
+  localStorage.setItem('overtimeRequests', JSON.stringify(overtimeRequests));
 
   document.getElementById('overtime-modal').style.display = 'none';
   pendingOvertimeEntry = null;
@@ -935,8 +935,7 @@ async function confirmOvertime() {
   document.getElementById('entry-comments').value = '';
   renderEntriesByDate();
 
-  const { synced } = await queueOrSend('addEntry', { entry: { ...entry, amendments: amendmentsToString(entry.amendments) } });
-  await queueOrSend('saveOvertimeRequest', { request: otRequest });
+  const { synced } = await queueOrSend('saveOvertimeRequest', { request: otRequest });
   if (synced) {
     showToast('toast-worker');
     setSyncStatus('worker', 'synced', 'Overtime request submitted');
@@ -1207,6 +1206,33 @@ function renderWeek(wc) {
     }).join('');
   }).join('');
 
+  const otRows = weekDays.map((dayStr, i) => {
+    const dayOT = overtimeRequests.filter(o => o.worker === currentWorker && normaliseDate(o.date) === dayStr && (o.status === 'pending' || o.status === 'declined'));
+    if (!dayOT.length) return '';
+    return dayOT.map(o => {
+      const statusStyle = o.status === 'pending'
+        ? 'background:#fff3cd;color:#856404;'
+        : 'background:#fdecea;color:var(--color-text-error);';
+      const statusLabel = o.status === 'pending' ? '⏱ OT Pending' : '⏱ OT Declined';
+      return `
+      <tr class="day-row" style="opacity:0.85;">
+        <td class="day-cell" style="vertical-align:top;">
+          <div class="day-name">${['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'][i] || ''}</div>
+          <div class="day-date">${fmtShortDate(dayStr)}</div>
+        </td>
+        <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;vertical-align:middle;width:110px;">
+          <div style="font-weight:600;">${o.jobId}</div>
+          <span class="badge-amended-sm" style="${statusStyle}">${statusLabel}</span>
+        </td>
+        <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:middle;width:200px;">${o.property || ''}</td>
+        <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:middle;">${o.description || ''}</td>
+        <td style="padding:5px 6px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-weight:500;text-align:center;vertical-align:middle;white-space:nowrap;width:46px;">${o.hours}h</td>
+        <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-style:italic;color:var(--color-text-secondary);vertical-align:middle;">${o.timeRange || ''}</td>
+        <td style="padding:4px 8px;vertical-align:middle;width:60px;"></td>
+      </tr>`;
+    }).join('');
+  }).join('');
+
   return `
     <div class="week-block">
       <p class="week-heading">W/C ${fmtDate(wc)}</p>
@@ -1222,7 +1248,7 @@ function renderWeek(wc) {
             <th style="width:60px;"></th>
           </tr>
         </thead>
-        <tbody>${rows}</tbody>
+        <tbody>${rows}${otRows}</tbody>
       </table>
     </div>`;
 }
