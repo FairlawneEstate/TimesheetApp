@@ -530,7 +530,7 @@ textarea { height: 60px; resize: none; }
 <script>
 // ══════════════════════════════════════════════════════════════════
 // ══════════════════════════════════════════════════════════════════
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxOLE8Np4U_NQW5mIt06PLrAdK28yJ0iU3XanHkyvmb08NI3pjLzI8PWuCHKm41NTylwQ/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbymLV00bzTkHWHNsxOKXfUT0wsLu-7OITsZzhGTQBS1jkwrwF4bMTMxSKscXvSOIHS1iQ/exec';
 const POLL_INTERVAL_MS = 60000;
 // ══════════════════════════════════════════════════════════════════
 
@@ -606,7 +606,8 @@ function loadInitialData() {
       description: String(e.description || ''),
       amendments: amendmentsFromString(typeof e.amendments === 'string' ? e.amendments : JSON.stringify(e.amendments || [])),
       isOvertime: e.isOvertime === true || e.isOvertime === 'TRUE' || e.isOvertime === 1,
-      overtimeTimeRange: String(e.overtimeTimeRange || '')
+      overtimeStart: String(e.overtimeStart || ''),
+      overtimeEnd: String(e.overtimeEnd || '')
     }));
     syncQueue.forEach(q => {
       if (!entries.find(e => e.id === q.id)) entries.push(q);
@@ -748,7 +749,8 @@ async function pollJobs() {
       description: String(e.description || ''),
       amendments: amendmentsFromString(typeof e.amendments === 'string' ? e.amendments : JSON.stringify(e.amendments || [])),
       isOvertime: e.isOvertime === true || e.isOvertime === 'TRUE' || e.isOvertime === 1,
-      overtimeTimeRange: String(e.overtimeTimeRange || '')
+      overtimeStart: String(e.overtimeStart || ''),
+      overtimeEnd: String(e.overtimeEnd || '')
     }));
     syncQueue.forEach(q => { if (q.payload?.entry && !entries.find(e => e.id === q.payload.entry.id)) entries.push(q.payload.entry); });
     recurringJobs = (data.recurringJobs || recurringJobs).map(j => ({ ...j, assignedTo: String(j.assignedTo || '') }));
@@ -1172,7 +1174,7 @@ function renderWeek(wc) {
           ${e.hours}h
         </td>
         <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-style:italic;color:var(--color-text-secondary);vertical-align:middle;">
-          ${e.isOvertime && e.overtimeTimeRange ? `<span style="font-style:normal;font-weight:500;color:var(--color-text-success);">${e.overtimeTimeRange}</span> ` : ''}
+          ${e.overtimeStart ? `<span style="font-style:normal;font-weight:500;color:var(--color-text-success);">${e.overtimeStart} – ${e.overtimeEnd}</span> ` : ''}
           ${e.comments || ''}
           ${amended ? `<div class="audit-log-sm" style="font-style:normal;">${lastAmend.note === 'Created by Office' ? 'Created by' : 'Amended by'} ${lastAmend.by} · ${lastAmend.at}</div>` : ''}
         </td>
@@ -1480,7 +1482,8 @@ async function refreshOffice() {
         comments: String(e.comments || ''),
         amendments: amendmentsFromString(typeof e.amendments === 'string' ? e.amendments : JSON.stringify(e.amendments || [])),
         isOvertime: e.isOvertime === true || e.isOvertime === 'TRUE' || e.isOvertime === 1,
-        overtimeTimeRange: String(e.overtimeTimeRange || '')
+        overtimeStart: String(e.overtimeStart || ''),
+        overtimeEnd: String(e.overtimeEnd || '')
       }));
         recurringJobs = (data.recurringJobs || []).map(j => ({ ...j, assignedTo: String(j.assignedTo || '') }));
       absenceTypes = data.absenceTypes || [];
@@ -2437,7 +2440,7 @@ async function toggleWorker(name, currentlyActive) {
 }
 
 function exportCSV() {
-  const headers = ['Worker', 'Job ID', 'Property', 'Description', 'Date', 'Hours', 'Is Overtime', 'Overtime Time Range', 'Comments', 'Reported Date', 'Assigned To', 'Amended', 'Amendment Count', 'Last Amended By', 'Last Amended At', 'Last Reason'];
+  const headers = ['Worker', 'Job ID', 'Property', 'Description', 'Date', 'Hours', 'Is Overtime', 'Overtime Start', 'Overtime End', 'Comments', 'Reported Date', 'Assigned To', 'Amended', 'Amendment Count', 'Last Amended By', 'Last Amended At', 'Last Reason'];
   const rows = entries.map(e => {
     const job = jobs.find(j => j.id === e.jobId);
     const last = e.amendments && e.amendments.length ? e.amendments[e.amendments.length - 1] : null;
@@ -2447,7 +2450,8 @@ function exportCSV() {
       job ? (job.description || '') : (e.description || ''),
       e.date, e.hours,
       e.isOvertime ? 'Yes' : 'No',
-      e.overtimeTimeRange || '',
+      e.overtimeStart || '',
+      e.overtimeEnd || '',
       e.comments || '',
       job ? (job.reportedDate || '') : '',
       job ? (job.assignedTo || '') : '',
