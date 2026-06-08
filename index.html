@@ -406,12 +406,6 @@ textarea { height: 60px; resize: none; }
 
       <!-- Absences tab -->
       <div id="office-tab-absences" style="display:none;">
-      <div class="card">
-        <div class="row-between card-header">
-          <p class="section-heading">Absences</p>
-        </div>
-        <div id="office-absences-list"><p class="text-muted">Loading...</p></div>
-      </div>
       <div class="card" style="margin-top:1rem;">
         <div class="row-between card-header">
           <p class="section-heading">Absence types</p>
@@ -502,7 +496,6 @@ const POLL_INTERVAL_MS = 60000;
 let jobs = [];
 let entries = [];
 let workers = [];
-let absences = [];
 let recurringJobs = [];
 let absenceTypes = [];
 let currentWorker = null;
@@ -572,7 +565,6 @@ function loadInitialData() {
     syncQueue.forEach(q => {
       if (!entries.find(e => e.id === q.id)) entries.push(q);
     });
-    absences = (data.absences || []).map(a => ({ ...a, date: String(a.date || '') }));
     recurringJobs = (data.recurringJobs || []).map(j => ({ ...j, assignedTo: String(j.assignedTo || '') }));
     absenceTypes = (data.absenceTypes || []);
     localStorage.setItem('entries', JSON.stringify(entries));
@@ -601,7 +593,6 @@ function loadInitialData() {
     jobs = JSON.parse(localStorage.getItem('jobs') || '[]');
     entries = JSON.parse(localStorage.getItem('entries') || '[]');
     workers = JSON.parse(localStorage.getItem('workers') || '[]');
-    absences = JSON.parse(localStorage.getItem('absences') || '[]');
     recurringJobs = JSON.parse(localStorage.getItem('recurringJobs') || '[]').map(j => ({ ...j, assignedTo: String(j.assignedTo || '') }));
     absenceTypes = JSON.parse(localStorage.getItem('absenceTypes') || '[]');
     populateWorkerDropdown();
@@ -1161,29 +1152,11 @@ async function submitAbsenceEntry() {
   if (synced) setSyncStatus('office', 'synced', 'Absence entry saved');
 }
 
-function renderOfficeAbsences() {
-  const el = document.getElementById('office-absences-list');
-  if (!el) return;
-  if (!absences.length) { el.innerHTML = '<p class="text-muted">No absences recorded.</p>'; return; }
-  const sorted = [...absences].sort((a, b) => b.date.localeCompare(a.date));
-  el.innerHTML = sorted.map(a => `
-    <div class="entry-row" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
-      <div>
-        <span style="font-size:13px;font-weight:500;">${a.worker}</span>
-        <span class="text-muted" style="margin-left:8px;font-size:12px;">${fmtDate(a.date)}</span>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px;">
-        <span style="font-size:12px;">${a.reason}</span>
-        <button class="btn btn-sm" onclick="officeRemoveAbsence('${a.worker}','${a.date}')">Remove</button>
-      </div>
-    </div>`).join('');
-}
 
 
 async function officeRemoveAbsence(worker, date) {
   absences = absences.filter(a => !(a.worker === worker && normaliseDate(a.date) === date));
   localStorage.setItem('absences', JSON.stringify(absences));
-  renderOfficeAbsences();
   await queueOrSend('removeAbsence', { worker, date });
   setSyncStatus('office', 'synced', 'Absence removed');
 }
@@ -1334,8 +1307,7 @@ async function refreshOffice() {
         comments: String(e.comments || ''),
         amendments: amendmentsFromString(typeof e.amendments === 'string' ? e.amendments : JSON.stringify(e.amendments || []))
       }));
-      absences = (data.absences || []).map(a => ({ ...a, date: String(a.date || '') }));
-      recurringJobs = (data.recurringJobs || []).map(j => ({ ...j, assignedTo: String(j.assignedTo || '') }));
+        recurringJobs = (data.recurringJobs || []).map(j => ({ ...j, assignedTo: String(j.assignedTo || '') }));
       absenceTypes = data.absenceTypes || [];
       localStorage.setItem('jobs', JSON.stringify(jobs));
       localStorage.setItem('recurringJobs', JSON.stringify(recurringJobs));
@@ -1351,7 +1323,6 @@ async function refreshOffice() {
     jobs = JSON.parse(localStorage.getItem('jobs') || '[]');
     entries = JSON.parse(localStorage.getItem('entries') || '[]');
     workers = JSON.parse(localStorage.getItem('workers') || '[]');
-    absences = JSON.parse(localStorage.getItem('absences') || '[]');
     setSyncStatus('office', 'error', 'Offline — cached data');
   }
   renderOfficeDashboard();
@@ -1382,7 +1353,6 @@ function renderOfficeDashboard() {
     : '<p class="text-muted">No open jobs.</p>';
 
   renderWorkersList();
-  renderOfficeAbsences();
   renderRecurringJobsList();
   renderAbsenceTypesList();
   const awSel = document.getElementById('absence-worker-select');
