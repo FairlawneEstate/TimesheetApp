@@ -1561,7 +1561,6 @@ function renderJobRow(j) {
 
 function renderOfficeDashboard() {
   document.getElementById('stat-open').textContent = jobs.filter(j => j.open).length;
-  document.getElementById('stat-entries').textContent = entries.length;
 
   const openJobs = jobs.filter(j => j.open);
   document.getElementById('job-list').innerHTML = openJobs.length
@@ -2175,7 +2174,7 @@ function renderDailyView() {
           const lastAmend = amended ? e.amendments[e.amendments.length - 1] : null;
           return `
           <tr class="day-row" ${idx === 0 ? 'style="border-top:1.5px solid var(--color-border-secondary);"' : ''}>
-            <td style="padding:9px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+            <td style="padding:9px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
               <span style="font-weight:600;">${e.jobId}</span>
               ${amended && !e.isOvertime ? `<span class="badge-amended-sm">${lastAmend.note === 'Created by Office' ? 'Office' : 'Amended'}</span>` : ''}
               ${e.isOvertime ? `<span class="badge-amended-sm" style="background:var(--color-background-success);color:var(--color-text-success);">⏱ Overtime</span>` : ''}
@@ -2183,7 +2182,10 @@ function renderDailyView() {
             <td style="padding:9px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${jobProperty}</td>
             <td style="padding:9px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${jobDescription}</td>
             <td style="padding:9px 6px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-weight:500;text-align:center;white-space:nowrap;width:46px;">${e.hours}h</td>
-            <td style="padding:9px 10px;font-size:12px;font-style:italic;color:var(--color-text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${e.isOvertime && e.overtimeStart ? `<span style="font-style:normal;font-weight:500;color:var(--color-text-success);">${e.overtimeStart} – ${e.overtimeEnd}</span> ` : ''}${e.comments || ''}${amended && !e.isOvertime && lastAmend.note !== 'Created by Office' ? ` · Amended by ${lastAmend.by}` : ''}</td>
+            <td style="padding:9px 10px;font-size:12px;font-style:italic;color:var(--color-text-secondary);overflow:hidden;text-overflow:ellipsis;">
+              ${e.isOvertime && e.overtimeStart ? `<span style="font-style:normal;font-weight:500;color:var(--color-text-success);">${e.overtimeStart} – ${e.overtimeEnd}</span> ` : ''}${e.comments || ''}${amended && !e.isOvertime && lastAmend.note !== 'Created by Office' ? ` · Amended by ${lastAmend.by}` : ''}
+              ${(() => { const otReq = e.isOvertime ? overtimeRequests.find(o => normaliseDate(o.date) === normaliseDate(e.date) && o.worker === e.worker && o.jobId === e.jobId && o.status === 'approved') : null; return otReq && otReq.reviewComment ? `<div style="font-size:10px;font-style:italic;margin-top:2px;color:var(--color-text-secondary);">${otReq.reviewComment}</div>` : ''; })()}
+            </td>
             <td style="padding:4px 8px;text-align:right;vertical-align:middle;width:160px;white-space:nowrap;">
               <button class="btn btn-sm" onclick="toggleEditOfficeEntries('${e.id}')">Edit</button>
               <button class="btn btn-sm" style="color:var(--color-text-error);border-color:var(--color-border-error);margin-left:4px;" onclick="deleteEntry('${e.id}', true)">Delete</button>
@@ -2249,7 +2251,7 @@ function renderDailyView() {
         </p>
         <table class="week-table" style="width:100%;table-layout:fixed;">
           <colgroup>
-            <col style="width:110px;">
+            <col style="width:160px;">
             <col style="width:200px;">
             <col>
             <col style="width:46px;">
