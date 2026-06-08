@@ -1,557 +1,2238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Timesheet App</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #111; }
+:root {
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --color-text-primary: #111;
+  --color-text-secondary: #666;
+  --color-text-error: #c0392b;
+  --color-text-info: #1a6fa8;
+  --color-text-success: #1a7a4a;
+  --color-text-warning: #8a5a00;
+  --color-background-primary: #fff;
+  --color-background-secondary: #f5f5f5;
+  --color-background-info: #e8f2fb;
+  --color-background-success: #e8f7ee;
+  --color-background-warning: #fff8e1;
+  --color-border-primary: #111;
+  --color-border-secondary: #ccc;
+  --color-border-tertiary: #e5e5e5;
+  --color-border-error: #c0392b;
+  --color-border-success: #a8d5bb;
+  --color-border-warning: #f0c040;
+  --border-radius-md: 6px;
+  --border-radius-lg: 10px;
+}
+.nav { display: flex; gap: 8px; padding: 1rem 0 1.5rem; border-bottom: 0.5px solid var(--color-border-tertiary); margin-bottom: 1.5rem; }
+.nav button { font-size: 13px; padding: 6px 16px; border-radius: var(--border-radius-md); border: 0.5px solid var(--color-border-secondary); background: transparent; color: var(--color-text-secondary); cursor: pointer; }
+.nav button.active { background: var(--color-background-secondary); color: var(--color-text-primary); font-weight: 500; border-color: var(--color-border-primary); }
+.view { display: none; }
+.view.active { display: block; }
+.card { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 1.25rem; margin-bottom: 1rem; }
+label { font-size: 13px; color: var(--color-text-secondary); display: block; margin-bottom: 6px; margin-top: 14px; }
+label:first-of-type { margin-top: 0; }
+select, input, textarea { width: 100%; font-size: 14px; padding: 8px 10px; border: 1px solid #ccc; border-radius: var(--border-radius-md); font-family: inherit; }
+select:focus, input:focus, textarea:focus { outline: 2px solid #111; outline-offset: 1px; }
+textarea { height: 60px; resize: none; }
+.btn { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; padding: 7px 14px; border-radius: var(--border-radius-md); border: 0.5px solid var(--color-border-secondary); background: transparent; color: var(--color-text-primary); cursor: pointer; font-weight: 500; min-height: 42px; font-family: inherit; }
+.btn-primary { background: var(--color-text-primary); color: #fff; border-color: var(--color-text-primary); }
+.btn-sm { font-size: 12px; padding: 4px 10px; min-height: 32px; }
+.btn:hover { opacity: 0.8; }
+.row-between { display: flex; justify-content: space-between; align-items: center; }
+.text-muted { font-size: 13px; color: var(--color-text-secondary); }
+.login-wrap { max-width: 560px; margin: 1.5rem auto; }
+.toast { font-size: 13px; padding: 10px 16px; border-radius: var(--border-radius-md); background: var(--color-background-success); color: var(--color-text-success); border: 0.5px solid var(--color-border-success); margin-bottom: 1rem; display: none; }
+.toast-warning { background: var(--color-background-warning); color: var(--color-text-warning); border-color: var(--color-border-warning); }
+.toast-error { background: #fdecea; color: var(--color-text-error); border-color: #f5c6cb; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.stat { background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 1rem; }
+.stat-val { font-size: 22px; font-weight: 500; margin-top: 4px; }
+.date-label { font-size: 12px; font-weight: 600; color: var(--color-text-secondary); margin: 1.25rem 0 0.5rem; text-transform: uppercase; letter-spacing: 0.05em; }
+.date-block { margin-bottom: 1.25rem; }
+.date-block .date-label { display: block; margin: 0 0 0.5rem 0; padding: 0; }
+.date-card { display: flex; flex-direction: column; gap: 8px; }
+.entry-row { padding: 12px 14px; border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); background: var(--color-background-primary); }
+/* ── Timesheet week view ── */
+.week-block { margin-bottom: 1.5rem; }
+.week-heading { font-size: 12px; font-weight: 600; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+.week-table { width: 100%; border-collapse: collapse; background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); overflow: hidden; }
+.week-table th { font-size: 11px; font-weight: 600; color: var(--color-text-secondary); text-align: left; padding: 8px 12px; background: var(--color-background-secondary); border-bottom: 0.5px solid var(--color-border-tertiary); }
+.week-table td { font-size: 12px; padding: 0; vertical-align: top; }
+.day-row { border-bottom: 0.5px solid var(--color-border-tertiary); }
+.day-row:last-child { border-bottom: none; }
+.day-cell { padding: 10px 12px; width: 100px; min-width: 90px; border-right: 0.5px solid var(--color-border-tertiary); background: var(--color-background-secondary); position: relative; }
+.day-name { font-size: 12px; font-weight: 600; color: var(--color-text-primary); }
+.day-date { font-size: 11px; color: var(--color-text-secondary); margin-top: 1px; }
+.day-entries { padding: 0; flex: 1; }
+.day-entry { padding: 9px 12px; border-bottom: 0.5px solid var(--color-border-tertiary); }
+.day-entry:last-child { border-bottom: none; }
+.day-entry-info { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.day-entry-main { flex: 1; }
+.day-entry-job { font-size: 12px; font-weight: 600; color: var(--color-text-primary); }
+.day-entry-desc { font-size: 12px; color: var(--color-text-secondary); margin-top: 1px; }
+.day-entry-comments { font-size: 11px; color: var(--color-text-secondary); margin-top: 2px; font-style: italic; }
+.day-entry-hours { font-size: 12px; font-weight: 500; color: var(--color-text-primary); white-space: nowrap; min-width: 36px; text-align: right; }
+.day-empty { padding: 10px 12px; color: var(--color-text-secondary); font-size: 12px; }
+.day-weekend { background: var(--color-background-secondary); opacity: 0.6; }
+.badge-amended-sm { font-size: 10px; padding: 1px 5px; border-radius: 10px; background: var(--color-background-warning); color: var(--color-text-warning); margin-left: 4px; font-weight: 500; }
+.audit-log-sm { font-size: 10px; color: var(--color-text-secondary); font-style: italic; margin-top: 2px; }
+.day-flag { font-size: 11px; color: #c0392b; margin-top: 3px; cursor: pointer; display: inline-flex; align-items: center; gap: 3px; }
+.day-flag:hover { text-decoration: underline; }
+.day-absence { font-size: 11px; color: var(--color-text-info); margin-top: 3px; cursor: pointer; }
+.day-absence:hover { text-decoration: underline; }
+.absence-picker { background: var(--color-background-primary); border: 0.5px solid var(--color-border-secondary); border-radius: var(--border-radius-md); padding: 10px; margin-top: 6px; display: none; position: absolute; z-index: 10; min-width: 180px; }
+.absence-picker select { margin-bottom: 8px; font-size: 12px; padding: 5px 8px; }
+.absence-picker-actions { display: flex; gap: 6px; }
+.entry-display { display: flex; justify-content: space-between; align-items: center; }
+.entry-info { flex: 1; }
+.entry-job { font-size: 13px; font-weight: 500; }
+.entry-meta { font-size: 12px; color: var(--color-text-secondary); margin-top: 2px; }
+.entry-edit { background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 12px; margin-top: 10px; display: none; }
+.edit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+.edit-field label { font-size: 12px; margin-bottom: 4px; margin-top: 0; }
+.edit-field input, .edit-field select, .edit-field textarea { font-size: 13px; }
+.edit-comments { margin-bottom: 10px; }
+.edit-comments label { font-size: 12px; margin-bottom: 4px; margin-top: 0; }
+.edit-actions { display: flex; gap: 8px; }
+.badge { font-size: 11px; padding: 2px 8px; border-radius: 20px; font-weight: 500; }
+.badge-open { background: var(--color-background-info); color: var(--color-text-info); }
+.badge-done { background: var(--color-background-success); color: var(--color-text-success); }
+.badge-amended { background: var(--color-background-warning); color: var(--color-text-warning); font-size: 10px; padding: 1px 6px; margin-left: 6px; }
+.badge-pending { background: #fff3cd; color: #856404; font-size: 10px; padding: 1px 6px; margin-left: 6px; }
+.audit-log { margin-top: 6px; font-size: 11px; color: var(--color-text-secondary); font-style: italic; }
+.screen-title { font-size: 15px; font-weight: 500; margin-bottom: 1rem; }
+.section-heading { font-size: 14px; font-weight: 500; }
+.job-title { font-size: 13px; font-weight: 500; margin: 0; }
+.full-width { width: 100%; }
+.form-footer { margin-top: 1rem; }
+.form-note { margin-top: 10px; font-size: 12px; }
+.form-section { margin-bottom: 1.5rem; }
+.pin-input { letter-spacing: 4px; }
+.section-label { font-size: 13px; font-weight: 500; color: var(--color-text-secondary); margin-bottom: 0.25rem; }
+.stat-label { font-size: 13px; }
+.card-header { margin-bottom: 1rem; }
+.office-subnav { display: flex; gap: 8px; margin-bottom: 1.5rem; border-bottom: 0.5px solid var(--color-border-tertiary); padding-bottom: 1rem; }
+.office-subnav button { font-size: 13px; padding: 6px 16px; border-radius: var(--border-radius-md); border: 0.5px solid var(--color-border-secondary); background: transparent; color: var(--color-text-secondary); cursor: pointer; font-weight: 500; }
+.office-subnav button.active { background: var(--color-background-secondary); color: var(--color-text-primary); border-color: var(--color-border-primary); }
+.job-detail { display: none; margin-top: 12px; padding: 10px; background: var(--color-background-secondary); border-radius: var(--border-radius-md); }
+.app { padding: 0 1rem 2rem; max-width: 980px; margin: 0 auto; }
+.app.office-wide { max-width: 1400px; }
+.sync-status { font-size: 12px; color: var(--color-text-secondary); display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+.sync-dot { width: 8px; height: 8px; border-radius: 50%; background: #ccc; display: inline-block; }
+.sync-dot.synced { background: #1a7a4a; }
+.sync-dot.pending { background: #f0c040; }
+.sync-dot.error { background: #c0392b; }
+.spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid #ccc; border-top-color: #111; border-radius: 50%; animation: spin 0.7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.config-banner { background: #fff8e1; border: 1px solid #f0c040; border-radius: var(--border-radius-md); padding: 12px 16px; margin-bottom: 1.5rem; font-size: 13px; color: #8a5a00; }
+.config-banner strong { display: block; margin-bottom: 4px; }
+@media (max-width: 840px) {
+  .grid2 { grid-template-columns: 1fr; }
+  .row-between { flex-direction: column; align-items: stretch; gap: 12px; }
+  .entry-display { flex-direction: column; align-items: stretch; gap: 10px; }
+  .entry-row { padding: 14px; }
+  .card { padding: 1.5rem; }
+}
+@media (min-width: 841px) {
+  .grid2 { gap: 16px; }
+  .card { padding: 1.5rem; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ── CONFIG BANNER ── -->
+  <div class="config-banner" id="config-banner">
+    <strong>⚙️ Setup required</strong>
+    Paste your Google Apps Script Web App URL into the <code>SCRIPT_URL</code> variable at the top of the &lt;script&gt; section, then save the file. See the included <em>SETUP_GUIDE.txt</em> for step-by-step instructions.
+  </div>
+
+  <div class="nav">
+    <button class="active" onclick="switchTab('worker')">Worker tablet</button>
+    <button onclick="switchTab('office')">Office view</button>
+  </div>
+
+  <!-- ════════════════════════════════ WORKER VIEW ════════════════════════════════ -->
+  <div class="view active" id="view-worker">
+    <div id="login-screen">
+      <div class="login-wrap">
+        <p class="screen-title">Sign in</p>
+        <div class="card">
+          <label>Your name</label>
+          <select id="worker-select">
+            <option value="">Select worker...</option>
+          </select>
+          <label>PIN</label>
+          <input type="password" id="worker-pin" placeholder="••••" maxlength="4" class="pin-input">
+          <div class="form-footer">
+            <button class="btn btn-primary full-width" onclick="workerLogin()">Sign in</button>
+          </div>
+          <div class="sync-status" id="login-sync-status">
+            <span class="sync-dot" id="login-sync-dot"></span>
+            <span id="login-sync-text">Connecting to Google Sheets...</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="timesheet-screen" style="display:none;">
+      <div class="row-between form-section">
+        <div>
+          <p class="screen-title" id="worker-greeting">Hello</p>
+          <p class="text-muted">Log time against a job</p>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div class="sync-status">
+            <span class="sync-dot" id="worker-sync-dot"></span>
+            <span id="worker-sync-text">—</span>
+          </div>
+          <button class="btn" onclick="workerLogout()">Sign out</button>
+        </div>
+      </div>
+
+      <div id="toast-worker" class="toast">✓ Entry saved</div>
+      <div id="toast-amended" class="toast toast-warning">✓ Entry amended</div>
+      <div id="toast-error" class="toast toast-error">⚠ Saved locally — will sync when online</div>
+
+      <div class="card">
+        <label>Job number</label>
+        <select id="job-select" onchange="fillJobDetails()">
+          <option value="">Select a job...</option>
+        </select>
+        <div id="job-detail" class="job-detail">
+          <p class="job-title" id="job-prop"></p>
+          <p class="text-muted" id="job-desc"></p>
+          <p class="text-muted" id="job-assigned" style="font-size:12px;margin-top:4px;"></p>
+        </div>
+        <div class="grid2">
+          <div>
+            <label>Date</label>
+            <input type="date" id="entry-date" onchange="renderEntriesByDate(); updateHoursPlaceholder()">
+          </div>
+          <div>
+            <label>Hours</label>
+            <input type="number" id="entry-hours" placeholder="e.g. 4" min="0.5" max="16" step="0.5" onfocus="updateHoursPlaceholder()">
+          </div>
+        </div>
+        <label>Comments (optional)</label>
+        <textarea id="entry-comments" placeholder="What was done..."></textarea>
+        <div class="form-footer">
+          <button class="btn btn-primary full-width" id="save-btn" onclick="submitEntry()">Save entry</button>
+        </div>
+      </div>
+
+      <p class="section-label">Your entries</p>
+      <div id="entries-by-date"></div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════ OFFICE VIEW ════════════════════════════════ -->
+  <div class="view" id="view-office">
+    <div id="office-login-screen">
+      <div class="login-wrap">
+        <p class="screen-title">Office access</p>
+        <div class="card">
+          <label>Password</label>
+          <input type="password" id="office-pin" placeholder="Enter password">
+          <div class="form-footer">
+            <button class="btn btn-primary full-width" onclick="officeLogin()">Sign in</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="office-screen" style="display:none;">
+      <div class="row-between form-section">
+        <div>
+          <p class="section-heading">Office dashboard</p>
+          <p class="text-muted">Manage jobs and export timesheets</p>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div class="sync-status">
+            <span class="sync-dot" id="office-sync-dot"></span>
+            <span id="office-sync-text">—</span>
+          </div>
+          <button class="btn" onclick="officeLogout()">Sign out</button>
+        </div>
+      </div>
+
+      <!-- Office sub-navigation -->
+      <div class="office-subnav">
+        <button class="active" onclick="switchOfficeTab('daily')" id="otab-daily">Daily View</button>
+        <button onclick="switchOfficeTab('entries')" id="otab-entries">Time Entries</button>
+        <button onclick="switchOfficeTab('jobs')" id="otab-jobs">Active Jobs</button>
+        <button onclick="switchOfficeTab('workers')" id="otab-workers">Workers</button>
+        <button onclick="switchOfficeTab('absences')" id="otab-absences">Absence Types</button>
+        <button onclick="switchOfficeTab('recurring')" id="otab-recurring">Recurring Jobs</button>
+      </div>
+
+      <!-- Active Jobs tab -->
+      <div id="office-tab-jobs" style="display:none;">
+        <div class="grid2 form-section">
+          <div class="stat">
+            <p class="text-muted stat-label">Open jobs</p>
+            <p class="stat-val" id="stat-open">—</p>
+          </div>
+          <div class="stat">
+            <p class="text-muted stat-label">Total entries</p>
+            <p class="stat-val" id="stat-entries">—</p>
+          </div>
+        </div>
+        <div class="card">
+          <div class="row-between card-header">
+            <p class="section-heading">Active jobs</p>
+            <div style="display:flex;gap:8px;">
+              <button class="btn btn-sm" onclick="refreshOffice()">↻ Refresh</button>
+              <button class="btn btn-sm" id="sync-arthur-btn" onclick="syncFromArthur()">⟳ Sync from Arthur</button>
+            </div>
+          </div>
+          <div id="job-list"><p class="text-muted">Loading...</p></div>
+        </div>
+      </div>
+
+      <!-- Daily View tab -->
+      <div id="office-tab-daily">
+        <div class="card">
+          <div class="row-between card-header">
+            <p class="section-heading" id="daily-view-heading">Today's entries</p>
+            <div style="display:flex;gap:8px;">
+              <button class="btn btn-sm" id="daily-add-entry-toggle" onclick="toggleDailyAddEntry()">+ Add entry</button>
+              <button class="btn btn-sm" onclick="refreshOffice().then(() => renderDailyView())">↻ Refresh</button>
+            </div>
+          </div>
+          <div id="daily-add-entry-form" style="display:none;margin-bottom:1rem;padding:1rem;background:var(--color-background-secondary);border-radius:var(--border-radius-md);">
+            <p style="font-size:13px;font-weight:500;margin-bottom:0.75rem;">Add time entry</p>
+            <div class="grid2">
+              <div>
+                <label style="margin-top:0;">Worker</label>
+                <select id="dae-worker" onchange="populateDailyEntryJobDropdown()"></select>
+              </div>
+              <div>
+                <label style="margin-top:0;">Job</label>
+                <select id="dae-job"></select>
+              </div>
+            </div>
+            <div class="grid2" style="margin-top:10px;">
+              <div>
+                <label style="margin-top:0;">Hours</label>
+                <input type="number" id="dae-hours" placeholder="e.g. 4" min="0.5" max="16" step="0.5">
+              </div>
+              <div>
+                <label style="margin-top:0;">Comments (optional)</label>
+                <input type="text" id="dae-comments" placeholder="What was done...">
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:0.75rem;">
+              <button class="btn btn-primary btn-sm" onclick="submitDailyEntry()">Save entry</button>
+              <button class="btn btn-sm" onclick="toggleDailyAddEntry()">Cancel</button>
+            </div>
+          </div>
+          <div id="daily-view-list"><p class="text-muted">Loading...</p></div>
+        </div>
+      </div>
+
+      <!-- Time Entries tab -->
+      <div id="office-tab-entries" style="display:none;">
+        <div class="card">
+          <div class="row-between card-header">
+            <p class="section-heading">Time entries &amp; audit trail</p>
+            <div style="display:flex;gap:8px;">
+              <button class="btn btn-sm" id="office-add-entry-toggle" onclick="toggleOfficeAddEntry()">+ Add entry</button>
+              <button class="btn btn-primary btn-sm" onclick="exportCSV()">↓ Export CSV</button>
+            </div>
+          </div>
+          <div id="office-add-entry-form" style="display:none;margin-bottom:1rem;padding:1rem;background:var(--color-background-secondary);border-radius:var(--border-radius-md);">
+            <p style="font-size:13px;font-weight:500;margin-bottom:0.75rem;">Add time entry</p>
+            <div class="grid2">
+              <div>
+                <label style="margin-top:0;">Worker</label>
+                <select id="oae-worker" onchange="populateOfficeEntryJobDropdown()"></select>
+              </div>
+              <div>
+                <label style="margin-top:0;">Job</label>
+                <select id="oae-job"></select>
+              </div>
+            </div>
+            <div class="grid2" style="margin-top:10px;">
+              <div>
+                <label style="margin-top:0;">Date</label>
+                <input type="date" id="oae-date">
+              </div>
+              <div>
+                <label style="margin-top:0;">Hours</label>
+                <input type="number" id="oae-hours" placeholder="e.g. 4" min="0.5" max="16" step="0.5">
+              </div>
+            </div>
+            <div style="margin-top:10px;">
+              <label style="margin-top:0;">Comments (optional)</label>
+              <textarea id="oae-comments" placeholder="What was done..."></textarea>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:0.75rem;">
+              <button class="btn btn-primary btn-sm" onclick="submitOfficeEntry()">Save entry</button>
+              <button class="btn btn-sm" onclick="toggleOfficeAddEntry()">Cancel</button>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:10px;align-items:end;margin-bottom:1rem;">
+            <div>
+              <label style="margin-top:0;">Worker</label>
+              <select id="oe-worker-filter">
+                <option value="">All workers</option>
+              </select>
+            </div>
+            <div>
+              <label style="margin-top:0;">From</label>
+              <input type="date" id="oe-date-from">
+            </div>
+            <div>
+              <label style="margin-top:0;">To</label>
+              <input type="date" id="oe-date-to">
+            </div>
+            <div>
+              <button class="btn btn-primary" onclick="renderOfficeEntries()" style="width:100%;margin-top:0;">Search</button>
+            </div>
+          </div>
+          <div id="office-entries-list"><p class="text-muted">Loading...</p></div>
+        </div>
+      </div>
+
+
+
+      <!-- Absences tab -->
+      <div id="office-tab-absences" style="display:none;">
+      <div class="card" style="margin-top:1rem;">
+        <div class="row-between card-header">
+          <p class="section-heading">Absence types</p>
+        </div>
+        <div id="absence-types-list"><p class="text-muted">Loading...</p></div>
+        <div style="margin-top:1rem;padding-top:1rem;border-top:0.5px solid var(--color-border-tertiary);">
+          <p style="font-size:13px;font-weight:500;margin-bottom:0.75rem;">Add absence type</p>
+          <div>
+            <label style="margin-top:0;">Name</label>
+            <input type="text" id="new-absence-type-name" placeholder="e.g. Training Day">
+          </div>
+          <div class="form-footer">
+            <button class="btn btn-primary" onclick="addAbsenceType()">Add type</button>
+          </div>
+        </div>
+      </div>
+
+      </div><!-- end absences tab -->
+
+      <!-- Recurring Jobs tab -->
+      <div id="office-tab-recurring" style="display:none;">
+        <div class="card">
+          <div class="row-between card-header">
+            <p class="section-heading">Recurring jobs</p>
+          </div>
+          <div style="margin-bottom:1rem;padding-bottom:1rem;border-bottom:0.5px solid var(--color-border-tertiary);">
+            <p style="font-size:13px;font-weight:500;margin-bottom:0.75rem;">Add recurring job</p>
+            <div class="grid2">
+              <div>
+                <label style="margin-top:0;">W/O Number</label>
+                <input type="text" id="rj-id" placeholder="e.g. WO1234">
+              </div>
+              <div>
+                <label style="margin-top:0;">Property</label>
+                <input type="text" id="rj-property" placeholder="Property name">
+              </div>
+            </div>
+            <div style="margin-top:12px;">
+              <label style="margin-top:0;">Description</label>
+              <input type="text" id="rj-description" placeholder="Job description">
+            </div>
+            <div class="form-footer">
+              <button class="btn btn-primary" onclick="addRecurringJob()">Add job</button>
+            </div>
+          </div>
+          <div id="recurring-job-list"><p class="text-muted">Loading...</p></div>
+        </div>
+      </div>
+
+      <!-- Workers tab -->
+      <div id="office-tab-workers" style="display:none;">
+      <div class="card">
+        <div class="row-between card-header">
+          <p class="section-heading">Workers</p>
+        </div>
+        <div id="workers-list"><p class="text-muted">Loading...</p></div>
+        <div style="margin-top:1rem;padding-top:1rem;border-top:0.5px solid var(--color-border-tertiary);">
+          <p style="font-size:13px;font-weight:500;margin-bottom:0.75rem;">Add new worker</p>
+          <div class="grid2">
+            <div>
+              <label style="margin-top:0;">Name</label>
+              <input type="text" id="new-worker-name" placeholder="e.g. Dave S">
+            </div>
+            <div>
+              <label style="margin-top:0;">PIN</label>
+              <input type="text" id="new-worker-pin" placeholder="4 digits" maxlength="4" style="letter-spacing:4px;">
+            </div>
+          </div>
+          <div class="form-footer">
+            <button class="btn btn-primary" onclick="addWorker()">Add worker</button>
+          </div>
+        </div>
+      </div>
+      </div><!-- end workers card -->
+      </div><!-- end workers tab -->
+    </div>
+  </div>
+
+</div>
+
+<script>
 // ══════════════════════════════════════════════════════════════════
-//  TIMESHEET APP — COMPLETE APPS SCRIPT
-//  Includes: Timesheet data, Arthur OAuth sync, hourly trigger
+// ══════════════════════════════════════════════════════════════════
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby-xWg-S67_nb24Kztsp-eE7A6boRuvfmAk3OSgo7J5qP7FzKujwZDZoWb7Y3iTPXaKuA/exec';
+const POLL_INTERVAL_MS = 60000;
 // ══════════════════════════════════════════════════════════════════
 
-const SHEET_ID = '1iZujfjg15KNAgTzpTjlbSlnlYoSjdh41E5m8FJtTuv8';
+let jobs = [];
+let entries = [];
+let workers = [];
+let recurringJobs = [];
+let absenceTypes = [];
+let currentWorker = null;
+let syncQueue = JSON.parse(localStorage.getItem('syncQueue') || '[]');
+let pollTimer = null;
 
-const ARTHUR_CLIENT_ID     = 'c80d5e92de81d0a80f308a524f019917bb3193a2aad85265249af30ab9da7c3e';
-const ARTHUR_CLIENT_SECRET = '4e2df41f3f74a75bdbba6a4b2bda654b207521dc84e0ca4798a2a246841fb914';
-const ARTHUR_ENTITY_ID     = '392037';
-const ARTHUR_BASE_URL      = 'https://api.arthuronline.co.uk/v2';
-const CALLBACK_URL         = 'https://script.google.com/macros/s/AKfycby-xWg-S67_nb24Kztsp-eE7A6boRuvfmAk3OSgo7J5qP7FzKujwZDZoWb7Y3iTPXaKuA/exec';
+// ── Startup ──────────────────────────────────────────────────────
 
-// ══════════════════════════════════════════════════════════════════
-//  HTTP HANDLERS
-// ══════════════════════════════════════════════════════════════════
+window.addEventListener('load', () => {
+  if (SCRIPT_URL) {
+    document.getElementById('config-banner').style.display = 'none';
+    loadInitialData();
+  } else {
+    setSyncStatus('login', 'error', 'Not connected — set SCRIPT_URL');
+    jobs = [
+      { id: 'JOB0001', property: 'Estate', description: 'Repair works at Estate', assignedTo: 'Chris R', open: true },
+      { id: 'JOB0002', property: 'Gardens', description: 'Repair works at Gardens', assignedTo: 'Alex A', open: true },
+      { id: 'JOB0003', property: 'Office', description: 'Repair works at Office', assignedTo: 'Les P', open: true },
+    ];
+    entries = JSON.parse(localStorage.getItem('entries') || '[]');
+    populateWorkerDropdown();
+  }
+});
 
-function doGet(e) {
-  if (e.parameter.code) {
-    try {
-      const tokens = exchangeCodeForTokens(e.parameter.code);
-      saveTokens(tokens);
-      return HtmlService.createHtmlOutput(
-        '<h2 style="font-family:sans-serif;color:#1a7a4a">✓ Arthur connected successfully!</h2>' +
-        '<p style="font-family:sans-serif">You can close this tab. Work orders will now sync automatically every hour.</p>' +
-        '<script>setTimeout(function(){window.close()},3000)</script>'
-      );
-    } catch (err) {
-      return HtmlService.createHtmlOutput('<h2 style="font-family:sans-serif;color:red">Error: ' + err.message + '</h2>');
+window.addEventListener('online', () => {
+  setSyncStatus('worker', 'pending', 'Back online — syncing...');
+  flushQueue();
+});
+
+// ── API helpers ───────────────────────────────────────────────────
+
+function api(action, payload = {}) {
+  return new Promise((resolve, reject) => {
+    if (!SCRIPT_URL) { reject(new Error('No SCRIPT_URL configured')); return; }
+    const cbName = 'cb_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+    const params = new URLSearchParams({ action, data: JSON.stringify(payload), callback: cbName });
+    const script = document.createElement('script');
+    const timer = setTimeout(() => { cleanup(); reject(new Error('Request timed out')); }, 15000);
+    function cleanup() {
+      clearTimeout(timer);
+      delete window[cbName];
+      if (script.parentNode) script.parentNode.removeChild(script);
     }
+    window[cbName] = function(data) {
+      cleanup();
+      if (data.error) reject(new Error(data.error));
+      else resolve(data);
+    };
+    script.src = SCRIPT_URL + '?' + params.toString();
+    script.onerror = function() { cleanup(); reject(new Error('Script load failed')); };
+    document.head.appendChild(script);
+  });
+}
+
+function loadInitialData() {
+  setSyncStatus('login', 'pending', 'Connecting...');
+  api('getData').then(function(data) {
+    jobs = data.jobs || [];
+    workers = data.workers || [];
+    entries = (data.entries || []).map(e => ({
+      ...e,
+      comments: String(e.comments || ''),
+      property: String(e.property || ''),
+      description: String(e.description || ''),
+      amendments: amendmentsFromString(typeof e.amendments === 'string' ? e.amendments : JSON.stringify(e.amendments || []))
+    }));
+    syncQueue.forEach(q => {
+      if (!entries.find(e => e.id === q.id)) entries.push(q);
+    });
+    recurringJobs = (data.recurringJobs || []).map(j => ({ ...j, assignedTo: String(j.assignedTo || '') }));
+    absenceTypes = (data.absenceTypes || []);
+    localStorage.setItem('entries', JSON.stringify(entries));
+    localStorage.setItem('recurringJobs', JSON.stringify(recurringJobs));
+    localStorage.setItem('absenceTypes', JSON.stringify(absenceTypes));
+    const serverEntryIds = new Set(entries.map(e => String(e.id)));
+    syncQueue = syncQueue.filter(q => {
+      if ((q.action === 'addEntry' || q.action === 'updateEntry') && q.payload && q.payload.entry) {
+        return !serverEntryIds.has(String(q.payload.entry.id));
+      }
+      if (q.action === 'deleteEntry' && q.payload && q.payload.id) {
+        return serverEntryIds.has(String(q.payload.id));
+      }
+      return true;
+    });
+    localStorage.setItem('syncQueue', JSON.stringify(syncQueue));
+    localStorage.setItem('workers', JSON.stringify(workers));
+    localStorage.setItem('absences', JSON.stringify(absences));
+    populateWorkerDropdown();
+    setSyncStatus('login', 'synced', 'Connected to Google Sheets');
+    updateHoursPlaceholder();
+    flushQueue();
+  }).catch(function(err) {
+    console.error('loadInitialData failed:', err);
+    setSyncStatus('login', 'error', 'Offline — using local data');
+    jobs = JSON.parse(localStorage.getItem('jobs') || '[]');
+    entries = JSON.parse(localStorage.getItem('entries') || '[]');
+    workers = JSON.parse(localStorage.getItem('workers') || '[]');
+    recurringJobs = JSON.parse(localStorage.getItem('recurringJobs') || '[]').map(j => ({ ...j, assignedTo: String(j.assignedTo || '') }));
+    absenceTypes = JSON.parse(localStorage.getItem('absenceTypes') || '[]');
+    populateWorkerDropdown();
+  });
+}
+
+async function flushQueue() {
+  if (!syncQueue.length || !SCRIPT_URL || !navigator.onLine) return;
+  const toSync = [...syncQueue];
+  for (const item of toSync) {
+    try {
+      await api(item.action, item.payload);
+      syncQueue = syncQueue.filter(q => q._qid !== item._qid);
+      localStorage.setItem('syncQueue', JSON.stringify(syncQueue));
+    } catch (e) { break; }
   }
+  setSyncStatus('worker', 'synced', 'All entries synced');
+  renderEntriesByDate();
+}
+
+function queueOrSend(action, payload) {
+  return new Promise(async (resolve) => {
+    if (SCRIPT_URL && navigator.onLine) {
+      try {
+        const result = await api(action, payload);
+        resolve({ synced: true, result });
+        return;
+      } catch (e) { /* fall through to queue */ }
+    }
+    const item = { action, payload, _qid: Date.now() + Math.random() };
+    syncQueue.push(item);
+    localStorage.setItem('syncQueue', JSON.stringify(syncQueue));
+    resolve({ synced: false });
+  });
+}
+
+// ── Sync status indicator ─────────────────────────────────────────
+
+function setSyncStatus(scope, state, text) {
+  const dot = document.getElementById(scope + '-sync-dot');
+  const txt = document.getElementById(scope + '-sync-text');
+  if (!dot || !txt) return;
+  dot.className = 'sync-dot ' + state;
+  txt.textContent = text;
+}
+
+// ── Navigation ────────────────────────────────────────────────────
+
+function switchTab(tab) {
+  document.querySelectorAll('.nav button').forEach((b, i) =>
+    b.classList.toggle('active', (tab === 'worker' && i === 0) || (tab === 'office' && i === 1))
+  );
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-' + tab).classList.add('active');
+  document.querySelector('.app').classList.toggle('office-wide', tab === 'office');
+}
+
+// ── Worker helpers ────────────────────────────────────────────────
+
+function populateWorkerDropdown() {
+  const sel = document.getElementById('worker-select');
+  const active = workers.filter(w => w.active !== false && w.active !== 'FALSE');
+  sel.innerHTML = '<option value="">Select worker...</option>' +
+    active.map(w => `<option value="${w.name}">${w.name}</option>`).join('');
+}
+
+function workerLogin() {
+  const w = document.getElementById('worker-select').value;
+  const p = document.getElementById('worker-pin').value;
+  if (!w || p.length < 4) { alert('Please select your name and enter a 4-digit PIN.'); return; }
+  const worker = workers.find(x => x.name === w);
+  if (worker && String(worker.pin) !== String(p)) { alert('Incorrect PIN. Please try again.'); return; }
+  currentWorker = w;
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('timesheet-screen').style.display = 'block';
+  document.getElementById('worker-greeting').textContent = 'Hello, ' + w;
+  document.getElementById('entry-date').value = new Date().toISOString().split('T')[0];
+  populateJobDropdown();
+  renderEntriesByDate();
+  setSyncStatus('worker', syncQueue.length ? 'pending' : 'synced',
+    syncQueue.length ? syncQueue.length + ' entries pending sync' : 'Synced');
+    if (pollTimer) clearInterval(pollTimer);
+  	pollTimer = setInterval(pollJobs, POLL_INTERVAL_MS);
+  	setTimeout(updateHoursPlaceholder, 500);
+}
+
+function workerLogout() {
+  currentWorker = null;
+  if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  document.getElementById('login-screen').style.display = 'block';
+  document.getElementById('timesheet-screen').style.display = 'none';
+  document.getElementById('worker-pin').value = '';
+}
+
+async function pollJobs() {
+  if (!SCRIPT_URL || !navigator.onLine) return;
   try {
-    const action   = e.parameter.action;
-    const payload  = e.parameter.data ? JSON.parse(e.parameter.data) : {};
-    const callback = e.parameter.callback;
-    let result;
-    if (!action)                           result = { status: 'Timesheet App script is running OK' };
-    else if (action === 'getData')         result = getData();
-    else if (action === 'addEntry')        result = addEntry(payload.entry);
-    else if (action === 'updateEntry')     result = updateEntry(payload.entry);
-    else if (action === 'addWorker')       result = addWorker(payload.worker);
-    else if (action === 'updateWorker')    result = updateWorker(payload.worker);
-    else if (action === 'saveAbsence')     result = saveAbsence(payload.absence);
-    else if (action === 'removeAbsence')   result = removeAbsence(payload.worker, payload.date);
-    else if (action === 'syncArthur')      result = syncArthurNow();
-    else if (action === 'officeLogin')     result = officeLogin(payload.password);
-    else if (action === 'saveRecurringJob')  result = saveRecurringJob(payload.job);
-    else if (action === 'deleteEntry')       result = deleteEntry(payload.id);
-    else if (action === 'saveAbsenceType')   result = saveAbsenceType(payload.absenceType);
-    else result = { error: 'Unknown action: ' + action };
-    return respond(result, callback);
-  } catch (err) {
-    return respond({ error: err.toString() }, e.parameter.callback);
+    const data = await api('getData');
+    jobs = data.jobs || [];
+    workers = data.workers || workers;
+    entries = (data.entries || []).map(e => ({
+      ...e,
+      comments: String(e.comments || ''),
+      property: String(e.property || ''),
+      description: String(e.description || ''),
+      amendments: amendmentsFromString(typeof e.amendments === 'string' ? e.amendments : JSON.stringify(e.amendments || []))
+    }));
+    syncQueue.forEach(q => { if (q.payload?.entry && !entries.find(e => e.id === q.payload.entry.id)) entries.push(q.payload.entry); });
+    absences = (data.absences || absences).map(a => ({ ...a, date: String(a.date || '') }));
+    recurringJobs = (data.recurringJobs || recurringJobs).map(j => ({ ...j, assignedTo: String(j.assignedTo || '') }));
+    absenceTypes = data.absenceTypes || absenceTypes;
+    localStorage.setItem('jobs', JSON.stringify(jobs));
+    localStorage.setItem('recurringJobs', JSON.stringify(recurringJobs));
+    localStorage.setItem('absenceTypes', JSON.stringify(absenceTypes));
+    localStorage.setItem('entries', JSON.stringify(entries));
+    localStorage.setItem('workers', JSON.stringify(workers));
+    localStorage.setItem('absences', JSON.stringify(absences));
+    const currentJobSel = document.getElementById('job-select');
+    const savedJobId = currentJobSel ? currentJobSel.value : '';
+    populateJobDropdown();
+    if (savedJobId && currentJobSel) {
+      currentJobSel.value = savedJobId;
+      if (!currentJobSel.value) currentJobSel.value = '';
+    }
+    renderEntriesByDate();
+    updateHoursPlaceholder();
+    setSyncStatus('worker', 'synced', 'Updated ' + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }));
+  } catch (e) { setSyncStatus('worker', 'error', 'Could not refresh'); }
+}
+
+// ── Team alias map — expand shortcodes to individual worker names ──
+const TEAM_ALIASES = {
+  'DICKADAM': ['Adam Hazeldine', 'Henry Sparks'],
+};
+
+function expandAssignedTo(assignedTo) {
+  if (!assignedTo) return [];
+  const names = assignedTo.split(',').map(s => s.trim());
+  const expanded = [];
+  names.forEach(name => {
+    if (TEAM_ALIASES[name]) {
+      TEAM_ALIASES[name].forEach(n => { if (!expanded.includes(n)) expanded.push(n); });
+    } else {
+      if (!expanded.includes(name)) expanded.push(name);
+    }
+  });
+  return expanded;
+}
+
+function populateJobDropdown() {
+  const sel = document.getElementById('job-select');
+  const open = jobs.filter(j => j.open);
+  const assignedRecurring = recurringJobs.filter(j => j.active !== false && j.active !== 'FALSE' && expandAssignedTo(j.assignedTo || '').includes(currentWorker));
+  const mine = open.filter(j => expandAssignedTo(j.assignedTo).includes(currentWorker));
+  let html = '<option value="">Select a job...</option>';
+  const mineAll = [
+    ...mine,
+    ...assignedRecurring.map(j => ({ ...j, _recurring: true }))
+  ];
+  if (mineAll.length) {
+    html += `<optgroup label="Your assigned jobs">`;
+    html += mineAll.map(j => `<option value="${j.id}">${j.id} · ${j.property} · ${j.description && j.description.length > 40 ? j.description.slice(0, 40) + '…' : (j.description || '')}</option>`).join('');
+    html += `</optgroup>`;
+  }
+
+  const activeAbsenceTypes = absenceTypes.filter(a => a.active !== false && a.active !== 'FALSE');
+  if (activeAbsenceTypes.length) {
+    html += `<optgroup label="Absence / Leave">`;
+    html += activeAbsenceTypes.map(a => `<option value="${a.id}">${a.id} · ${a.name}</option>`).join('');
+    html += `</optgroup>`;
+  }
+  sel.innerHTML = html;
+}
+
+function fillJobDetails() {
+  const id = document.getElementById('job-select').value;
+  const detail = document.getElementById('job-detail');
+  if (!id) { detail.style.display = 'none'; return; }
+  const job = jobs.find(j => j.id === id) || recurringJobs.find(j => j.id === id) || absenceTypes.find(a => a.id === id);
+  if (!job) { detail.style.display = 'none'; return; }
+  detail.style.display = 'block';
+  document.getElementById('job-prop').textContent = job.property || '';
+  document.getElementById('job-desc').textContent = job.description || job.name || '';
+  document.getElementById('job-assigned').textContent = job.assignedTo ? 'Assigned to: ' + job.assignedTo : '';
+}
+
+function updateHoursPlaceholder() {
+  const dateEl = document.getElementById('entry-date');
+  const input = document.getElementById('entry-hours');
+  if (!dateEl || !input || !currentWorker) return;
+  const norm = normaliseDate(dateEl.value || new Date().toISOString().slice(0, 10));
+  const logged = entries
+    .filter(e => e.worker === currentWorker && normaliseDate(e.date) === norm)
+    .reduce((sum, e) => sum + parseFloat(e.hours || 0), 0);
+  const remaining = Math.max(0, 8 - logged);
+  input.placeholder = remaining > 0 ? remaining + 'h remaining' : 'Day complete';
+}
+
+async function submitEntry() {
+  const jobId = document.getElementById('job-select').value;
+  const date = document.getElementById('entry-date').value;
+  const hours = parseFloat(document.getElementById('entry-hours').value);
+  const comments = document.getElementById('entry-comments').value;
+  if (!jobId || !date || isNaN(hours)) { alert('Please fill in job, date, and hours.'); return; }
+
+  const norm = normaliseDate(date);
+  const alreadyLogged = entries
+    .filter(e => e.worker === currentWorker && normaliseDate(e.date) === norm)
+    .reduce((sum, e) => sum + parseFloat(e.hours || 0), 0);
+  if (alreadyLogged + hours > 8) {
+    alert('Overtime has to be approved via manager.');
+    return;
+  }
+
+  const jobObj = jobs.find(j => j.id === jobId) || recurringJobs.find(j => j.id === jobId) || absenceTypes.find(a => a.id === jobId);
+  const entry = { id: uid(), worker: currentWorker, jobId, date, hours, comments, amendments: [], createdAt: new Date().toISOString(), property: jobObj ? jobObj.property : '', description: jobObj ? jobObj.description : '' };
+  entries.push(entry);
+  localStorage.setItem('entries', JSON.stringify(entries));
+
+  document.getElementById('job-select').value = '';
+  document.getElementById('job-detail').style.display = 'none';
+  document.getElementById('entry-hours').value = '';
+  document.getElementById('entry-comments').value = '';
+
+  renderEntriesByDate();
+
+  const { synced } = await queueOrSend('addEntry', { entry: { ...entry, amendments: amendmentsToString(entry.amendments) } });
+  if (synced) {
+    showToast('toast-worker');
+    setSyncStatus('worker', 'synced', 'Synced');
+  } else {
+    showToast('toast-error');
+    setSyncStatus('worker', 'pending', syncQueue.length + ' entries pending sync');
   }
 }
 
-function doPost(e) {
+// ── Amendment serialisation ───────────────────────────────────────
+
+function amendmentsToString(amendments) {
+  if (!amendments || !amendments.length) return '';
+  return amendments.map(a => {
+    let s = a.by + ' · ' + a.at;
+    if (a.note) s += ' — ' + a.note;
+    return s;
+  }).join(' | ');
+}
+
+function amendmentsFromString(str) {
+  if (!str) return [];
   try {
-    const body   = JSON.parse(e.postData.contents);
-    const action = body.action;
-    if (action === 'getData')         return respond(getData());
-    if (action === 'addEntry')        return respond(addEntry(body.entry));
-    if (action === 'updateEntry')     return respond(updateEntry(body.entry));
-    if (action === 'addWorker')       return respond(addWorker(body.worker));
-    if (action === 'updateWorker')    return respond(updateWorker(body.worker));
-    if (action === 'saveAbsence')     return respond(saveAbsence(body.absence));
-    if (action === 'removeAbsence')   return respond(removeAbsence(body.worker, body.date));
-    if (action === 'syncArthur')      return respond(syncArthurNow());
-    if (action === 'officeLogin')     return respond(officeLogin(body.password));
-    if (action === 'saveRecurringJob')  return respond(saveRecurringJob(body.job));
-    if (action === 'deleteEntry')       return respond(deleteEntry(body.id));
-    if (action === 'saveAbsenceType')   return respond(saveAbsenceType(body.absenceType));
-    return respond({ error: 'Unknown action' });
-  } catch (err) {
-    return respond({ error: err.toString() });
-  }
+    const parsed = JSON.parse(str);
+    if (Array.isArray(parsed)) {
+      return parsed.map(a => ({ by: a.by || '', at: a.at || '', note: a.note || '' }));
+    }
+  } catch(e) { /* not JSON, parse as string */ }
+  return str.split(' | ').map(part => {
+    const dashIdx = part.indexOf(' — ');
+    const meta = dashIdx > -1 ? part.slice(0, dashIdx) : part;
+    const note = dashIdx > -1 ? part.slice(dashIdx + 3) : '';
+    const dotIdx = meta.indexOf(' · ');
+    return {
+      by: dotIdx > -1 ? meta.slice(0, dotIdx) : meta,
+      at: dotIdx > -1 ? meta.slice(dotIdx + 3) : '',
+      note
+    };
+  });
 }
 
-function respond(data, callback) {
-  const json = JSON.stringify(data);
-  if (callback) {
-    return ContentService.createTextOutput(callback + '(' + json + ')')
-      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+// ── Entry rendering ───────────────────────────────────────────────
+
+function uid() { return 'e' + Date.now() + Math.random().toString(36).slice(2, 6); }
+
+function fmtDate(d) {
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  if (!d) return 'Unknown date';
+  const s = String(d).trim();
+  let dt;
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+    dt = new Date(s.slice(0, 10) + 'T00:00:00');
+  } else if (/^\d{2}\/\d{2}\/\d{4}/.test(s)) {
+    const parts = s.split('/');
+    dt = new Date(parts[2] + '-' + parts[1] + '-' + parts[0] + 'T00:00:00');
+  } else {
+    dt = new Date(s);
   }
-  return ContentService.createTextOutput(json).setMimeType(ContentService.MimeType.JSON);
+  if (isNaN(dt.getTime())) return s;
+  return days[dt.getDay()] + ' ' + dt.getDate() + ' ' + months[dt.getMonth()] + ' ' + dt.getFullYear();
 }
 
-// ══════════════════════════════════════════════════════════════════
-//  SHEET HELPERS
-// ══════════════════════════════════════════════════════════════════
-
-function getSheets() {
-  const ss = SpreadsheetApp.openById(SHEET_ID);
-  return {
-    jobs:          ss.getSheetByName('Jobs'),
-    entries:       ss.getSheetByName('Entries'),
-    workers:       ss.getSheetByName('Workers'),
-    recurringJobs: ss.getSheetByName('RecurringJobs'),
-    absenceTypes:  ss.getSheetByName('AbsenceTypes')
-  };
-}
-
-function toDateString(val) {
-  if (!val) return '';
-  if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}/.test(val)) return val.slice(0, 10);
-  if (val instanceof Date) {
-    const y = val.getFullYear();
-    const m = String(val.getMonth() + 1).padStart(2, '0');
-    const d = String(val.getDate()).padStart(2, '0');
-    return y + '-' + m + '-' + d;
-  }
-  const s = String(val).trim();
+function normaliseDate(d) {
+  if (!d) return '';
+  const s = String(d).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
   if (/^\d{2}\/\d{2}\/\d{4}/.test(s)) {
     const parts = s.split('/');
     return parts[2] + '-' + parts[1] + '-' + parts[0];
   }
   const dt = new Date(s);
-  if (!isNaN(dt.getTime())) {
-    return dt.getFullYear() + '-' + String(dt.getMonth()+1).padStart(2,'0') + '-' + String(dt.getDate()).padStart(2,'0');
-  }
+  if (!isNaN(dt.getTime())) return dt.toISOString().slice(0, 10);
   return s;
 }
 
-// ══════════════════════════════════════════════════════════════════
-//  TIMESHEET DATA FUNCTIONS
-// ══════════════════════════════════════════════════════════════════
-
-function getData() {
-  const { jobs: jSheet, entries: eSheet, workers: wSheet, recurringJobs: rjSheet, absenceTypes: atSheet } = getSheets();
-
-  const jData = jSheet.getDataRange().getValues();
-  const jHeaders = jData[0];
-  const jobs = jData.slice(1).map(row => {
-    const obj = {};
-    jHeaders.forEach((h, i) => obj[h] = row[i]);
-    obj.open = obj.open === true || obj.open === 'TRUE' || obj.open === 1;
-    if (obj.reportedDate) obj.reportedDate = toDateString(obj.reportedDate);
-    return obj;
-  }).filter(j => j.id);
-
-  const eData = eSheet.getDataRange().getValues();
-  const eHeaders = eData[0];
-  const entries = eData.slice(1).map(row => {
-    const obj = {};
-    eHeaders.forEach((h, i) => obj[h] = row[i]);
-    obj.amendments = obj.amendments || '';
-    obj.date = toDateString(obj.date);
-    obj.property = String(obj.property || '');
-    obj.description = String(obj.description || '');
-    return obj;
-  }).filter(e => e.id);
-
-  const wData = wSheet.getDataRange().getValues();
-  const wHeaders = wData[0];
-  const workers = wData.slice(1).map(row => {
-    const obj = {};
-    wHeaders.forEach((h, i) => obj[h] = row[i]);
-    obj.active = obj.active === true || obj.active === 'TRUE' || obj.active === 1;
-    return obj;
-  }).filter(w => w.name);
-
-  let recurringJobsList = [];
-  if (rjSheet) {
-    const rjData = rjSheet.getDataRange().getValues();
-    const rjHeaders = rjData[0];
-    recurringJobsList = rjData.slice(1).map(row => {
-      const obj = {};
-      rjHeaders.forEach((h, i) => obj[h] = row[i]);
-      obj.active = obj.active === true || obj.active === 'TRUE' || obj.active === 1;
-      obj.assignedTo = String(obj.assignedTo || '');
-      return obj;
-    }).filter(j => j.id);
-  }
-
-  let absenceTypesList = [];
-  if (atSheet) {
-    const atData = atSheet.getDataRange().getValues();
-    const atHeaders = atData[0];
-    absenceTypesList = atData.slice(1).map(row => {
-      const obj = {};
-      atHeaders.forEach((h, i) => obj[h] = row[i]);
-      obj.active = obj.active === true || obj.active === 'TRUE' || obj.active === 1;
-      return obj;
-    }).filter(a => a.id);
-  }
-
-  return { jobs, entries, workers, recurringJobs: recurringJobsList, absenceTypes: absenceTypesList };
+function getWeekCommencing(dateStr) {
+  const parts = String(dateStr).slice(0, 10).split('-');
+  const dt = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+  const day = dt.getDay();
+  const diff = (day === 0) ? -6 : 1 - day;
+  dt.setDate(dt.getDate() + diff);
+  const y = dt.getFullYear();
+  const m = String(dt.getMonth() + 1).padStart(2, '0');
+  const d = String(dt.getDate()).padStart(2, '0');
+  return y + '-' + m + '-' + d;
 }
 
-function addEntry(entry) {
-  const { entries: eSheet } = getSheets();
-  eSheet.appendRow([
-    entry.id, entry.worker, entry.jobId,
-    "'" + toDateString(entry.date),
-    entry.hours, entry.comments || '',
-    entry.createdAt || new Date().toISOString(),
-    entry.amendments || '',
-    entry.property || '',
-    entry.description || ''
-  ]);
-  return { success: true };
+function fmtShortDate(dateStr) {
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const parts = String(dateStr).slice(0, 10).split('-');
+  return parseInt(parts[2]) + ' ' + months[parseInt(parts[1]) - 1];
 }
 
-function updateEntry(entry) {
-  const { entries: eSheet } = getSheets();
-  const data = eSheet.getDataRange().getValues();
-  for (let i = 1; i < data.length; i++) {
-    if (String(data[i][0]) === String(entry.id)) {
-      const existingProperty    = data[i][8] || '';
-      const existingDescription = data[i][9] || '';
-      eSheet.getRange(i + 1, 1, 1, 10).setValues([[
-        entry.id, entry.worker, entry.jobId,
-        "'" + toDateString(entry.date),
-        entry.hours, entry.comments || '',
-        entry.createdAt || '',
-        entry.amendments || '',
-        entry.property || existingProperty,
-        entry.description || existingDescription
-      ]]);
-      return { success: true };
+function renderWeek(wc) {
+  const mine = entries.filter(e => e.worker === currentWorker);
+  const byDay = {};
+  mine.forEach(e => {
+    const norm = normaliseDate(e.date);
+    if (!byDay[norm]) byDay[norm] = [];
+    byDay[norm].push(e);
+  });
+
+  const today = new Date(); today.setHours(0,0,0,0);
+  const prevMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+  const dayNames = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
+  const weekDays = Array.from({length: 5}, (_, i) => {
+    const parts = wc.split('-');
+    const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]) + i);
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  });
+
+  const rows = weekDays.map((dayStr, i) => {
+    const dayEntries = byDay[dayStr] || [];
+    const isEmpty = dayEntries.length === 0;
+    const dayDate = new Date(dayStr + 'T00:00:00');
+    const isPast = dayDate < today;
+    const inFlagRange = isPast && dayDate >= prevMonthStart;
+    const hoursLogged = dayEntries.reduce((s, e) => s + parseFloat(e.hours || 0), 0);
+    const absence = absences.find(a => a.worker === currentWorker && normaliseDate(a.date) === dayStr);
+    const isBankHoliday = BANK_HOLIDAYS.includes(dayStr);
+    const shouldFlag = inFlagRange && !isBankHoliday && !absence && hoursLogged < 8;
+
+    const dayCellContent = isBankHoliday
+      ? `<div class="day-absence">Bank Holiday</div>`
+      : absence
+        ? `<div class="day-absence">${absence.reason}</div>`
+        : shouldFlag
+          ? `<div class="day-flag">⚠ ${hoursLogged > 0 ? hoursLogged + 'h logged' : 'No hours'}</div>`
+          : '';
+
+    if (isEmpty) {
+      return `
+      <tr class="day-row">
+        <td class="day-cell">
+          <div class="day-name">${dayNames[i]}</div>
+          <div class="day-date">${fmtShortDate(dayStr)}</div>
+          ${dayCellContent}
+        </td>
+        <td colspan="6" style="padding:10px 12px;font-size:12px;color:var(--color-text-secondary);">—</td>
+      </tr>`;
     }
-  }
-  return addEntry(entry);
+
+    return dayEntries.map((e, idx) => {
+      const job = jobs.find(j => j.id === e.jobId); const jobProperty = job ? job.property : (e.property || ''); const jobDescription = job ? job.description : (e.description || '');
+      const amended = e.amendments && e.amendments.length > 0;
+      const lastAmend = amended ? e.amendments[e.amendments.length - 1] : null;
+      const isPending = syncQueue.some(q => q.payload?.entry?.id === e.id);
+      return `
+      <tr class="day-row" id="row-w-${e.id}">
+        ${idx === 0 ? `
+        <td class="day-cell" rowspan="${dayEntries.length}" style="vertical-align:top;">
+          <div class="day-name">${dayNames[i]}</div>
+          <div class="day-date">${fmtShortDate(dayStr)}</div>
+          ${dayCellContent}
+        </td>` : ''}
+        <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;vertical-align:middle;width:110px;">
+          <div style="font-weight:600;">${e.jobId}</div>
+          ${amended ? `<span class="badge-amended-sm">Amended</span>` : ''}
+          ${isPending ? `<span class="badge-amended-sm" style="background:var(--color-background-info);color:var(--color-text-info);">Pending</span>` : ''}
+        </td>
+        <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:middle;width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+          ${jobProperty}
+        </td>
+        <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:middle;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+          ${jobDescription}
+        </td>
+        <td style="padding:5px 6px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-weight:500;text-align:center;vertical-align:middle;white-space:nowrap;width:46px;">
+          ${e.hours}h
+        </td>
+        <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-style:italic;color:var(--color-text-secondary);vertical-align:middle;">
+          ${e.comments || ''}
+          ${amended ? `<div class="audit-log-sm" style="font-style:normal;">${lastAmend.note === 'Created by Office' ? 'Created by' : 'Amended by'} ${lastAmend.by} · ${lastAmend.at}</div>` : ''}
+        </td>
+        <td style="padding:4px 8px;text-align:right;vertical-align:middle;width:160px;white-space:nowrap;">
+          <button class="btn btn-sm" onclick="toggleEditWeek('${e.id}')">Edit</button>
+            <button class="btn btn-sm" style="color:var(--color-text-error);border-color:var(--color-border-error);margin-left:4px;" onclick="deleteEntry('${e.id}', false)">Delete</button>
+        </td>
+      </tr>
+      <tr id="editrow-w-${e.id}" style="display:none;">
+        <td colspan="7" style="padding:0;">
+          <div class="entry-edit" style="display:block;margin:0;border-radius:0;">
+            <div class="edit-grid">
+              <div class="edit-field">
+                <label>Job</label>
+                <select id="ej-w-${e.id}">
+                  ${(() => {
+                    const openJobs = jobs.filter(j => j.open || j.id === e.jobId);
+                    const assigned = openJobs.filter(j => expandAssignedTo(j.assignedTo).includes(currentWorker));
+                    const recurr   = recurringJobs.filter(j => (j.active !== false && j.active !== 'FALSE') || j.id === e.jobId).filter(j => expandAssignedTo(j.assignedTo || '').includes(currentWorker));
+                    const absTypes = absenceTypes.filter(a => a.active !== false && a.active !== 'FALSE');
+                    const fmt = j => `<option value="${j.id}" ${j.id === e.jobId ? 'selected' : ''}>${j.id} · ${j.property || j.name || ''} · ${(j.description || j.name || '').slice(0,40)}</option>`;
+                    let html = '';
+                    if (assigned.length) html += `<optgroup label="Assigned Jobs">${assigned.map(fmt).join('')}</optgroup>`;
+                    if (recurr.length)   html += `<optgroup label="Recurring Jobs">${recurr.map(fmt).join('')}</optgroup>`;
+                    if (absTypes.length) html += `<optgroup label="Absence / Leave">${absTypes.map(fmt).join('')}</optgroup>`;
+                    return html;
+                  })()}
+                </select>
+              </div>
+              <div class="edit-field">
+                <label>Hours</label>
+                <input type="number" id="eh-w-${e.id}" value="${e.hours}" min="0.5" max="16" step="0.5">
+              </div>
+            </div>
+            <div class="edit-comments">
+              <label>Comments</label>
+              <textarea id="en-w-${e.id}">${e.comments || ''}</textarea>
+            </div>
+            <div class="edit-comments">
+              <label>Reason for amendment</label>
+              <input type="text" id="er-w-${e.id}" placeholder="e.g. Entered wrong hours">
+            </div>
+            <div class="edit-actions">
+              <button class="btn btn-primary btn-sm" onclick="saveEdit('${e.id}', false)">Save changes</button>
+              <button class="btn btn-sm" onclick="toggleEditWeek('${e.id}')">Cancel</button>
+            </div>
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+  }).join('');
+
+  return `
+    <div class="week-block">
+      <p class="week-heading">W/C ${fmtDate(wc)}</p>
+      <table class="week-table">
+        <thead>
+          <tr>
+            <th style="width:100px;">Day</th>
+            <th style="width:110px;">W/O Number</th>
+            <th style="width:130px;">Property</th>
+            <th>Description</th>
+            <th style="width:46px;text-align:center;">Hrs</th>
+            <th>Comments</th>
+            <th style="width:60px;"></th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
 }
 
-function deleteEntry(id) {
-  const { entries: eSheet } = getSheets();
-  const data = eSheet.getDataRange().getValues();
-  for (let i = 1; i < data.length; i++) {
-    if (String(data[i][0]) === String(id)) {
-      eSheet.deleteRow(i + 1);
-      return { success: true };
-    }
-  }
-  return { error: 'Entry not found' };
+function toggleEditWeek(id) {
+  const row = document.getElementById('editrow-w-' + id);
+  if (row) row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
 }
 
-function addWorker(worker) {
-  const { workers: wSheet } = getSheets();
-  wSheet.appendRow([worker.name, worker.pin, true]);
-  return { success: true };
+// ── Bank Holidays (England & Wales 2026-2027) ─────────────────────
+const BANK_HOLIDAYS = [
+  '2026-01-01','2026-04-03','2026-04-06','2026-05-04','2026-05-25',
+  '2026-08-31','2026-12-25','2026-12-28',
+  '2027-01-01','2027-03-26','2027-03-29','2027-05-03','2027-05-31',
+  '2027-08-30','2027-12-27','2027-12-28'
+];
+
+function absencePickerHTML(dateStr, current) {
+  const opts = ['Sick','Annual Leave','Bank Holiday','Other'];
+  return `
+    <select id="asel-${dateStr}" style="margin-bottom:6px;font-size:12px;padding:5px 8px;width:100%;">
+      ${opts.map(o => `<option value="${o}" ${o===current?'selected':''}>${o}</option>`).join('')}
+    </select>
+    <div class="absence-picker-actions">
+      <button class="btn btn-primary btn-sm" onclick="saveAbsence('${dateStr}')">Save</button>
+      ${current ? `<button class="btn btn-sm" onclick="removeAbsence('${dateStr}')">Remove</button>` : ''}
+      <button class="btn btn-sm" onclick="toggleAbsencePicker('${dateStr}')">Cancel</button>
+    </div>`;
 }
 
-function updateWorker(worker) {
-  const { workers: wSheet } = getSheets();
-  const data = wSheet.getDataRange().getValues();
-  const headers   = data[0];
-  const nameCol   = headers.indexOf('name');
-  const pinCol    = headers.indexOf('pin');
-  const activeCol = headers.indexOf('active');
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][nameCol] === worker.name) {
-      wSheet.getRange(i + 1, pinCol + 1).setValue(worker.pin);
-      wSheet.getRange(i + 1, activeCol + 1).setValue(worker.active);
-      return { success: true };
-    }
-  }
-  return { error: 'Worker not found' };
+function toggleAbsencePicker(dateStr) {
+  const el = document.getElementById('ap-' + dateStr);
+  if (el) el.style.display = el.style.display === 'block' ? 'none' : 'block';
+}
+
+async function saveAbsence(dateStr) {
+  const sel = document.getElementById('asel-' + dateStr);
+  if (!sel) return;
+  const reason = sel.value;
+  const worker = currentWorker;
+  if (!worker) return;
+  absences = absences.filter(a => !(a.worker === worker && normaliseDate(a.date) === dateStr));
+  absences.push({ worker, date: dateStr, reason });
+  localStorage.setItem('absences', JSON.stringify(absences));
+  renderEntriesByDate();
+  await queueOrSend('saveAbsence', { absence: { worker, date: dateStr, reason } });
+}
+
+async function removeAbsence(dateStr) {
+  const worker = currentWorker;
+  if (!worker) return;
+  absences = absences.filter(a => !(a.worker === worker && normaliseDate(a.date) === dateStr));
+  localStorage.setItem('absences', JSON.stringify(absences));
+  renderEntriesByDate();
+  await queueOrSend('removeAbsence', { worker, date: dateStr });
+}
+
+function populateAbsenceEntryForm() {
+  const workerSel = document.getElementById('abs-entry-worker');
+  const jobSel = document.getElementById('abs-entry-job');
+  if (!workerSel || !jobSel) return;
+  const active = workers.filter(w => w.active !== false && w.active !== 'FALSE');
+  workerSel.innerHTML = '<option value="">Select worker...</option>' + active.map(w => `<option value="${w.name}">${w.name}</option>`).join('');
+  const activeAbsTypes = absenceTypes.filter(a => a.active !== false && a.active !== 'FALSE');
+  jobSel.innerHTML = '<option value="">Select absence type...</option>' + activeAbsTypes.map(a => `<option value="${a.id}">${a.id} · ${a.name}</option>`).join('');
+  const dateEl = document.getElementById('abs-entry-date');
+  if (dateEl && !dateEl.value) dateEl.value = new Date().toISOString().slice(0,10);
+}
+
+async function submitAbsenceEntry() {
+  const worker  = document.getElementById('abs-entry-worker').value;
+  const jobId   = document.getElementById('abs-entry-job').value;
+  const date    = document.getElementById('abs-entry-date').value;
+  const hours   = parseFloat(document.getElementById('abs-entry-hours').value);
+  if (!worker || !jobId || !date || isNaN(hours)) { alert('Please fill in all required fields.'); return; }
+  const absType = absenceTypes.find(a => a.id === jobId);
+  const amendment = { by: 'Office', at: new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }), note: 'Created by Office' };
+  const entry = {
+    id: uid(), worker, jobId, date, hours, comments: '',
+    amendments: [amendment],
+    createdAt: new Date().toISOString(),
+    property: '',
+    description: absType ? absType.name : jobId
+  };
+  entries.push(entry);
+  localStorage.setItem('entries', JSON.stringify(entries));
+  document.getElementById('abs-entry-worker').value = '';
+  document.getElementById('abs-entry-job').value = '';
+  document.getElementById('abs-entry-hours').value = '';
+  const { synced } = await queueOrSend('addEntry', { entry: { ...entry, amendments: amendmentsToString(entry.amendments) } });
+  if (synced) setSyncStatus('office', 'synced', 'Absence entry saved');
 }
 
 
 
-function saveRecurringJob(job) {
-  const { recurringJobs: rjSheet } = getSheets();
-  if (!rjSheet) return { error: 'RecurringJobs sheet not found' };
-  const data = rjSheet.getDataRange().getValues();
-  const headers = data[0];
-  const idCol = headers.indexOf('id');
-  for (let i = 1; i < data.length; i++) {
-    if (String(data[i][idCol]) === String(job.id)) {
-      rjSheet.getRange(i + 1, 1, 1, 5).setValues([[job.id, job.property, job.description || '', job.active, job.assignedTo || '']]);
-      return { success: true };
-    }
-  }
-  rjSheet.appendRow([job.id, job.property, job.description || '', job.active !== false, job.assignedTo || '']);
-  return { success: true };
+async function officeRemoveAbsence(worker, date) {
+  absences = absences.filter(a => !(a.worker === worker && normaliseDate(a.date) === date));
+  localStorage.setItem('absences', JSON.stringify(absences));
+  await queueOrSend('removeAbsence', { worker, date });
+  setSyncStatus('office', 'synced', 'Absence removed');
 }
 
-function saveAbsenceType(absenceType) {
-  const { absenceTypes: atSheet } = getSheets();
-  if (!atSheet) return { error: 'AbsenceTypes sheet not found' };
-  const data = atSheet.getDataRange().getValues();
-  const headers = data[0];
-  const idCol = headers.indexOf('id');
-  for (let i = 1; i < data.length; i++) {
-    if (String(data[i][idCol]) === String(absenceType.id)) {
-      atSheet.getRange(i + 1, 1, 1, 3).setValues([[absenceType.id, absenceType.name, absenceType.active]]);
-      return { success: true };
-    }
-  }
-  atSheet.appendRow([absenceType.id, absenceType.name, absenceType.active !== false]);
-  return { success: true };
+function renderEntriesByDate() {
+  const container = document.getElementById('entries-by-date');
+  const dateVal = document.getElementById('entry-date') ? document.getElementById('entry-date').value : '';
+  const wc = getWeekCommencing(dateVal || new Date().toISOString().slice(0, 10));
+  container.innerHTML = renderWeek(wc);
+}
+function groupByDate(arr) {
+  return arr.reduce((g, e) => {
+    const key = normaliseDate(e.date);
+    (g[key] = g[key] || []).push(e);
+    return g;
+  }, {});
 }
 
-// ══════════════════════════════════════════════════════════════════
-//  OFFICE PASSWORD
-// ══════════════════════════════════════════════════════════════════
-
-function setOfficePassword() {
-  PropertiesService.getScriptProperties().setProperty('OFFICE_PASSWORD', 'your-password-here');
-  Logger.log('Office password set successfully');
+function renderEntryRow(e, isOffice) {
+  const job = jobs.find(j => j.id === e.jobId); const jobProperty = job ? job.property : (e.property || ''); const jobDescription = job ? job.description : (e.description || '');
+  const amended = e.amendments && e.amendments.length > 0;
+  const lastAmend = amended ? e.amendments[e.amendments.length - 1] : null;
+  const isPending = syncQueue.some(q => q.payload?.entry?.id === e.id);
+  const p = isOffice ? 'o' : 'w';
+  return `
+    <div class="entry-row" id="row-${p}-${e.id}">
+      <div class="entry-display">
+        <div class="entry-info">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+            <span class="entry-job">${e.jobId} — ${job ? job.property : e.jobId}</span>
+            ${amended ? `<span class="badge badge-amended">Amended</span>` : ''}
+            ${isPending ? `<span class="badge badge-pending">Pending sync</span>` : ''}
+          </div>
+          <p class="entry-meta">${e.hours}hrs${e.comments ? ' · ' + e.comments : ''}${isOffice ? ' · <strong>' + e.worker + '</strong>' : ''}</p>
+          ${amended ? `<p class="audit-log">${lastAmend.note === 'Created by Office' ? 'Created by' : 'Amended by'} ${lastAmend.by} · ${lastAmend.at}${lastAmend.note && lastAmend.note !== 'Created by Office' ? ' — ' + lastAmend.note : ''}</p>` : ''}
+        </div>
+        <button class="btn btn-sm" onclick="toggleEdit('${e.id}', ${isOffice})">Edit</button>
+      </div>
+      <div class="entry-edit" id="edit-${p}-${e.id}">
+        <div class="edit-grid">
+          <div class="edit-field">
+            <label>Job</label>
+            <select id="ej-${p}-${e.id}">
+              ${[...jobs.filter(j => j.open || j.id === e.jobId), ...recurringJobs.filter(j => j.active !== false && j.active !== 'FALSE')].filter((j,i,a) => a.findIndex(x=>x.id===j.id)===i).map(j =>
+                `<option value="${j.id}" ${j.id === e.jobId ? 'selected' : ''}>${j.id} — ${j.property}</option>`
+              ).join('')}
+            </select>
+          </div>
+          <div class="edit-field">
+            <label>Hours</label>
+            <input type="number" id="eh-${p}-${e.id}" value="${e.hours}" min="0.5" max="16" step="0.5">
+          </div>
+        </div>
+        <div class="edit-comments">
+          <label>Comments</label>
+          <textarea id="en-${p}-${e.id}">${e.comments || ''}</textarea>
+        </div>
+        <div class="edit-comments">
+          <label>Reason for amendment</label>
+          <input type="text" id="er-${p}-${e.id}" placeholder="e.g. Entered wrong hours">
+        </div>
+        <div class="edit-actions">
+          <button class="btn btn-primary btn-sm" onclick="saveEdit('${e.id}', ${isOffice})">Save changes</button>
+          <button class="btn btn-sm" onclick="toggleEdit('${e.id}', ${isOffice})">Cancel</button>
+        </div>
+      </div>
+    </div>`;
 }
 
-function officeLogin(password) {
-  const stored = PropertiesService.getScriptProperties().getProperty('OFFICE_PASSWORD');
-  if (!stored) return { error: 'Office password not configured — run setOfficePassword() in Apps Script' };
-  if (password === stored) return { success: true };
-  return { success: false };
+function toggleEdit(id, isOffice) {
+  const el = document.getElementById(`edit-${isOffice ? 'o' : 'w'}-${id}`);
+  if (el) el.style.display = el.style.display === 'block' ? 'none' : 'block';
 }
 
-// ══════════════════════════════════════════════════════════════════
-//  ARTHUR OAUTH
-// ══════════════════════════════════════════════════════════════════
+async function saveEdit(id, isOffice) {
+  const p = isOffice ? 'o' : 'w';
+  const entry = entries.find(e => e.id === id);
+  if (!entry) return;
+  const newJob = document.getElementById(`ej-${p}-${id}`).value;
+  const newHours = parseFloat(document.getElementById(`eh-${p}-${id}`).value);
+  const newComments = document.getElementById(`en-${p}-${id}`).value;
+  const reason = document.getElementById(`er-${p}-${id}`).value;
+  if (isNaN(newHours)) { alert('Please enter valid hours.'); return; }
 
-function authoriseArthur() {
-  const authUrl = 'https://auth.arthuronline.co.uk/oauth/authorize'
-    + '?client_id='     + ARTHUR_CLIENT_ID
-    + '&redirect_uri='  + encodeURIComponent(CALLBACK_URL)
-    + '&response_type=code'
-    + '&scope=read'
-    + '&state=timesheet123';
-  Logger.log('Open this URL in your browser:\n\n' + authUrl);
+  const amendment = {
+    by: isOffice ? 'Office' : currentWorker,
+    at: new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+    note: reason
+  };
+  entry.amendments.push(amendment);
+  entry.jobId = newJob;
+  entry.hours = newHours;
+  entry.comments = newComments;
+  localStorage.setItem('entries', JSON.stringify(entries));
+
+  if (isOffice) { renderOfficeDashboard(); }
+  else { renderEntriesByDate(); showToast('toast-amended'); }
+
+  const { synced } = await queueOrSend('updateEntry', { entry: { ...entry, amendments: amendmentsToString(entry.amendments) } });
+  if (synced && isOffice) setSyncStatus('office', 'synced', 'Saved to Sheets');
+}
+
+function showToast(id) {
+  const t = document.getElementById(id);
+  t.style.display = 'block';
+  setTimeout(() => t.style.display = 'none', 3000);
+}
+
+// ── Office ────────────────────────────────────────────────────────
+
+async function officeLogin() {
+  const p = document.getElementById('office-pin').value;
+  if (!p) { alert('Enter a password'); return; }
+  const btn = document.querySelector('#office-login-screen .btn-primary');
+  if (btn) { btn.textContent = 'Signing in...'; btn.disabled = true; }
   try {
-    SpreadsheetApp.getUi().alert('Arthur Authorisation', 'Open this URL in your browser:\n\n' + authUrl, SpreadsheetApp.getUi().ButtonSet.OK);
-  } catch(e) {}
-}
-
-function exchangeCodeForTokens(code) {
-  const response = UrlFetchApp.fetch('https://auth.arthuronline.co.uk/oauth/token', {
-    method: 'POST',
-    contentType: 'application/x-www-form-urlencoded',
-    payload: {
-      grant_type:    'authorization_code',
-      code:          code,
-      client_id:     ARTHUR_CLIENT_ID,
-      client_secret: ARTHUR_CLIENT_SECRET,
-      redirect_uri:  CALLBACK_URL
-    },
-    muteHttpExceptions: true
-  });
-  const data = JSON.parse(response.getContentText());
-  if (data.error) throw new Error(data.error + ': ' + (data.error_description || ''));
-  return data;
-}
-
-function refreshAccessToken() {
-  const props        = PropertiesService.getScriptProperties();
-  const refreshToken = props.getProperty('ARTHUR_REFRESH_TOKEN');
-  if (!refreshToken) throw new Error('No refresh token — run authoriseArthur() first');
-  const response = UrlFetchApp.fetch('https://auth.arthuronline.co.uk/oauth/token', {
-    method: 'POST',
-    contentType: 'application/x-www-form-urlencoded',
-    payload: {
-      grant_type:    'refresh_token',
-      refresh_token: refreshToken,
-      client_id:     ARTHUR_CLIENT_ID,
-      client_secret: ARTHUR_CLIENT_SECRET
-    },
-    muteHttpExceptions: true
-  });
-  const data = JSON.parse(response.getContentText());
-  if (data.error) throw new Error('Token refresh failed: ' + data.error);
-  saveTokens(data);
-  return data.access_token;
-}
-
-function saveTokens(tokens) {
-  const props = PropertiesService.getScriptProperties();
-  props.setProperty('ARTHUR_ACCESS_TOKEN', tokens.access_token);
-  if (tokens.refresh_token) props.setProperty('ARTHUR_REFRESH_TOKEN', tokens.refresh_token);
-  props.setProperty('ARTHUR_TOKEN_EXPIRY', String(Date.now() + (tokens.expires_in * 1000)));
-  Logger.log('Arthur tokens saved successfully');
-}
-
-function getAccessToken() {
-  const props  = PropertiesService.getScriptProperties();
-  const expiry = parseInt(props.getProperty('ARTHUR_TOKEN_EXPIRY') || '0');
-  if (Date.now() > expiry - 300000) return refreshAccessToken();
-  return props.getProperty('ARTHUR_ACCESS_TOKEN');
-}
-
-// ══════════════════════════════════════════════════════════════════
-//  ARTHUR WORK ORDER SYNC
-// ══════════════════════════════════════════════════════════════════
-
-function arthurGet(endpoint, params) {
-  const token = getAccessToken();
-  let url = ARTHUR_BASE_URL + endpoint;
-  if (params) url += '?' + Object.keys(params).map(k => k + '=' + encodeURIComponent(params[k])).join('&');
-  const response = UrlFetchApp.fetch(url, {
-    method: 'GET',
-    headers: {
-      'Content-Type':  'application/json',
-      'Authorization': 'Bearer ' + token,
-      'X-EntityID':    ARTHUR_ENTITY_ID
-    },
-    muteHttpExceptions: true
-  });
-  const data = JSON.parse(response.getContentText());
-  if (data.status === 'error') throw new Error('Arthur API error: ' + JSON.stringify(data));
-  return data;
-}
-
-function testArthurConnection() {
-  try {
-    const token = getAccessToken();
-    Logger.log('Token OK: ' + token.slice(0, 10) + '...');
-    const result = arthurGet('/workorders', { per_page: 3 });
-    Logger.log('Raw API response (first 3 work orders):');
-    Logger.log(JSON.stringify(result, null, 2));
+    const result = await api('officeLogin', { password: p });
+    if (result.success) {
+      document.getElementById('office-login-screen').style.display = 'none';
+      document.getElementById('office-screen').style.display = 'block';
+      document.querySelector('.app').classList.add('office-wide');
+      refreshOffice();
+    } else {
+      alert('Incorrect password');
+    }
   } catch (err) {
-    Logger.log('ERROR: ' + err.message);
+    alert('Could not connect — check your internet connection');
+  } finally {
+    if (btn) { btn.textContent = 'Sign in'; btn.disabled = false; }
   }
 }
 
-function syncArthurNow() {
-  try {
-    ScriptApp.getProjectTriggers().forEach(t => {
-      if (t.getHandlerFunction() === 'syncWorkOrdersFromArthur_background') {
-        ScriptApp.deleteTrigger(t);
-      }
-    });
-    ScriptApp.newTrigger('syncWorkOrdersFromArthur_background')
-      .timeBased()
-      .after(1000)
-      .create();
-    return { success: true, message: 'Sync scheduled' };
-  } catch (err) {
-    return { error: err.message };
-  }
+function officeLogout() {
+  document.getElementById('office-login-screen').style.display = 'block';
+  document.getElementById('office-screen').style.display = 'none';
+  document.getElementById('office-pin').value = '';
 }
 
-function syncWorkOrdersFromArthur_background() {
-  ScriptApp.getProjectTriggers().forEach(t => {
-    if (t.getHandlerFunction() === 'syncWorkOrdersFromArthur_background') {
-      ScriptApp.deleteTrigger(t);
+async function refreshOffice() {
+  setSyncStatus('office', 'pending', 'Loading...');
+  if (SCRIPT_URL && navigator.onLine) {
+    try {
+      const data = await api('getData');
+      jobs = data.jobs || [];
+      workers = data.workers || [];
+      entries = (data.entries || []).map(e => ({
+        ...e,
+        comments: String(e.comments || ''),
+        amendments: amendmentsFromString(typeof e.amendments === 'string' ? e.amendments : JSON.stringify(e.amendments || []))
+      }));
+        recurringJobs = (data.recurringJobs || []).map(j => ({ ...j, assignedTo: String(j.assignedTo || '') }));
+      absenceTypes = data.absenceTypes || [];
+      localStorage.setItem('jobs', JSON.stringify(jobs));
+      localStorage.setItem('recurringJobs', JSON.stringify(recurringJobs));
+      localStorage.setItem('absenceTypes', JSON.stringify(absenceTypes));
+      localStorage.setItem('entries', JSON.stringify(entries));
+      localStorage.setItem('workers', JSON.stringify(workers));
+      localStorage.setItem('absences', JSON.stringify(absences));
+      setSyncStatus('office', 'synced', 'Live from Google Sheets');
+    } catch (e) {
+      setSyncStatus('office', 'error', 'Using cached data');
     }
+  } else {
+    jobs = JSON.parse(localStorage.getItem('jobs') || '[]');
+    entries = JSON.parse(localStorage.getItem('entries') || '[]');
+    workers = JSON.parse(localStorage.getItem('workers') || '[]');
+    setSyncStatus('office', 'error', 'Offline — cached data');
+  }
+  renderOfficeDashboard();
+}
+
+function renderJobRow(j) {
+  return `
+    <div class="entry-row">
+      <div class="row-between">
+        <div>
+          <span style="font-size:13px;font-weight:500;">${j.id}</span>
+          <span class="text-muted" style="font-size:12px;margin-left:8px;">${j.property}</span>
+          ${j.assignedTo ? `<span class="text-muted" style="font-size:12px;margin-left:8px;">· ${j.assignedTo}</span>` : ''}
+        </div>
+      </div>
+      <p class="text-muted" style="margin-top:2px;font-size:12px;">${j.description || ''}</p>
+      ${j.assignedTo ? `<p style="margin-top:2px;font-size:11px;color:var(--color-text-secondary);">Assigned: ${j.assignedTo}</p>` : '<p style="margin-top:2px;font-size:11px;color:var(--color-text-secondary);">Unassigned</p>'}
+    </div>`;
+}
+
+function renderOfficeDashboard() {
+  document.getElementById('stat-open').textContent = jobs.filter(j => j.open).length;
+  document.getElementById('stat-entries').textContent = entries.length;
+
+  const openJobs = jobs.filter(j => j.open);
+  document.getElementById('job-list').innerHTML = openJobs.length
+    ? openJobs.map(j => renderJobRow(j)).join('')
+    : '<p class="text-muted">No open jobs.</p>';
+
+  renderWorkersList();
+  renderRecurringJobsList();
+  renderAbsenceTypesList();
+  const awSel = document.getElementById('absence-worker-select');
+  if (awSel) {
+    const active = workers.filter(w => w.active !== false && w.active !== 'FALSE');
+    awSel.innerHTML = '<option value="">Select worker...</option>' + active.map(w => `<option value="${w.name}">${w.name}</option>`).join('');
+  }
+  const owSel = document.getElementById('oe-worker-filter');
+  if (owSel) {
+    const active = workers.filter(w => w.active !== false && w.active !== 'FALSE');
+    owSel.innerHTML = '<option value="">All workers</option>' + active.map(w => `<option value="${w.name}">${w.name}</option>`).join('');
+  }
+  const today = new Date();
+  const todayStr = today.toISOString().slice(0,10);
+  const prev7 = new Date(today); prev7.setDate(today.getDate() - 7);
+  const prev7Str = prev7.toISOString().slice(0,10);
+  const fromEl = document.getElementById('oe-date-from');
+  const toEl = document.getElementById('oe-date-to');
+  if (fromEl && !fromEl.value) fromEl.value = prev7Str;
+  if (toEl && !toEl.value) toEl.value = todayStr;
+  const dailyTab = document.getElementById('office-tab-daily');
+  if (dailyTab && dailyTab.style.display !== 'none') renderDailyView();
+  const entriesTab = document.getElementById('office-tab-entries');
+  if (entriesTab && entriesTab.style.display !== 'none') renderOfficeEntries();
+}
+
+function toggleOfficeAbsencePicker(pickerId) {
+  const el = document.getElementById(pickerId);
+  if (el) el.style.display = el.style.display === 'block' ? 'none' : 'block';
+}
+
+function officeAbsencePickerHTML(pickerId, workerName, dateStr, current) {
+  const opts = ['Sick','Annual Leave','Bank Holiday','Other'];
+  return `
+    <select id="oasel-${pickerId}" style="margin-bottom:6px;font-size:12px;padding:5px 8px;width:100%;">
+      ${opts.map(o => `<option value="${o}" ${o===current?'selected':''}>${o}</option>`).join('')}
+    </select>
+    <div class="absence-picker-actions">
+      <button class="btn btn-primary btn-sm" onclick="saveOfficeAbsence('${pickerId}','${workerName}','${dateStr}')">Save</button>
+      ${current ? `<button class="btn btn-sm" onclick="removeOfficeAbsence('${workerName}','${dateStr}')">Remove</button>` : ''}
+      <button class="btn btn-sm" onclick="toggleOfficeAbsencePicker('${pickerId}')">Cancel</button>
+    </div>`;
+}
+
+async function saveOfficeAbsence(pickerId, workerName, dateStr) {
+  const sel = document.getElementById('oasel-' + pickerId);
+  if (!sel) return;
+  const reason = sel.value;
+  absences = absences.filter(a => !(a.worker === workerName && normaliseDate(a.date) === dateStr));
+  absences.push({ worker: workerName, date: dateStr, reason });
+  localStorage.setItem('absences', JSON.stringify(absences));
+  renderOfficeEntries();
+  await queueOrSend('saveAbsence', { absence: { worker: workerName, date: dateStr, reason } });
+  setSyncStatus('office', 'synced', 'Absence saved');
+}
+
+async function removeOfficeAbsence(workerName, dateStr) {
+  absences = absences.filter(a => !(a.worker === workerName && normaliseDate(a.date) === dateStr));
+  localStorage.setItem('absences', JSON.stringify(absences));
+  renderOfficeEntries();
+  await queueOrSend('removeAbsence', { worker: workerName, date: dateStr });
+  setSyncStatus('office', 'synced', 'Absence removed');
+}
+
+function renderOfficeEntries() {
+  const el = document.getElementById('office-entries-list');
+  if (!el) return;
+
+  const workerFilter = document.getElementById('oe-worker-filter')?.value || '';
+  const fromVal = document.getElementById('oe-date-from')?.value || '';
+  const toVal = document.getElementById('oe-date-to')?.value || '';
+
+  const today = new Date(); today.setHours(0,0,0,0);
+  const prevMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+
+  const fromDate = fromVal ? new Date(fromVal + 'T00:00:00') : (() => { const d = new Date(); d.setDate(d.getDate()-4); return d; })();
+  const toDate = toVal ? new Date(toVal + 'T00:00:00') : new Date();
+
+  const allDays = [];
+  const cursor = new Date(fromDate);
+  while (cursor <= toDate) {
+    const y = cursor.getFullYear();
+    const m = String(cursor.getMonth()+1).padStart(2,'0');
+    const d = String(cursor.getDate()).padStart(2,'0');
+    const dayStr = y + '-' + m + '-' + d;
+    const dow = new Date(dayStr + 'T12:00:00').getDay();
+    if (dow !== 0 && dow !== 6) {
+      allDays.push(dayStr);
+    }
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  const activeWorkers = workers.filter(w => w.active !== false && w.active !== 'FALSE');
+  const displayWorkers = workerFilter ? activeWorkers.filter(w => w.name === workerFilter) : activeWorkers;
+
+  if (!displayWorkers.length) {
+    el.innerHTML = '<p class="text-muted">No workers found.</p>';
+    return;
+  }
+
+  let html = '';
+
+  displayWorkers.forEach(worker => {
+    const workerEntries = entries.filter(e => e.worker === worker.name);
+
+    const workerRows = allDays.map(dayStr => {
+      const dayEntries = workerEntries.filter(e => normaliseDate(e.date) === dayStr).sort((a, b) => String(a.jobId).localeCompare(String(b.jobId), undefined, { numeric: true }));
+      const isEmpty = dayEntries.length === 0;
+      const dayDate = new Date(dayStr + 'T00:00:00');
+      const isPast = dayDate < today;
+      const inFlagRange = isPast && dayDate >= prevMonthStart;
+      const hoursLogged = dayEntries.reduce((s, e) => s + parseFloat(e.hours || 0), 0);
+      const absence = absences.find(a => a.worker === worker.name && normaliseDate(a.date) === dayStr);
+      const isBankHoliday = BANK_HOLIDAYS.includes(dayStr);
+      const shouldFlag = inFlagRange && !isBankHoliday && !absence && hoursLogged < 8;
+
+      const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+      const dayDate2 = new Date(dayStr + 'T00:00:00');
+      const dayName = dayNames[dayDate2.getDay()];
+      const oPickerId = 'oap-' + worker.name.replace(/\s/g,'_') + '-' + dayStr;
+
+      const dayCellContent = isBankHoliday
+        ? `<div class="day-absence">Bank Holiday</div>`
+        : absence
+          ? `<div class="day-absence">${absence.reason}</div>`
+          : shouldFlag
+            ? `<div class="day-flag">⚠ ${hoursLogged > 0 ? hoursLogged + 'h logged' : 'No hours'}</div>`
+            : '';
+
+      const dayTotal = dayEntries.reduce((s, e) => s + parseFloat(e.hours || 0), 0);
+      const totalRow = `
+        <tr style="background:var(--color-background-secondary);border-bottom:1.5px solid var(--color-border-secondary);">
+          <td style="padding:6px 10px;border-right:0.5px solid var(--color-border-tertiary);width:100px;"></td>
+          <td style="padding:6px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-weight:600;width:110px;">Total</td>
+          <td style="padding:6px 10px;border-right:0.5px solid var(--color-border-tertiary);width:200px;"></td>
+          <td style="padding:6px 10px;border-right:0.5px solid var(--color-border-tertiary);"></td>
+          <td style="padding:6px 6px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-weight:600;text-align:center;width:46px;">${dayTotal}h</td>
+          <td colspan="2"></td>
+        </tr>`;
+
+      if (isEmpty) {
+        return `
+        <tr class="day-row" style="border-top:1.5px solid var(--color-border-secondary);border-bottom:1.5px solid var(--color-border-secondary);">
+          <td class="day-cell">
+            <div class="day-name">${dayName}</div>
+            <div class="day-date">${fmtShortDate(dayStr)}</div>
+            ${dayCellContent}
+          </td>
+          <td colspan="6" style="padding:10px 12px;font-size:12px;color:var(--color-text-secondary);">—</td>
+        </tr>`;
+      }
+
+      return dayEntries.map((e, idx) => {
+        const job = jobs.find(j => j.id === e.jobId); const jobProperty = job ? job.property : (e.property || ''); const jobDescription = job ? job.description : (e.description || '');
+        const amended = e.amendments && e.amendments.length > 0;
+        const lastAmend = amended ? e.amendments[e.amendments.length - 1] : null;
+        const isPending = syncQueue.some(q => q.payload?.entry?.id === e.id);
+        return `
+        <tr class="day-row" id="row-o-${e.id}" ${idx === 0 ? 'style="border-top:1.5px solid var(--color-border-secondary);"' : ''}>
+          ${idx === 0 ? `
+          <td class="day-cell" rowspan="${dayEntries.length}" style="vertical-align:top;">
+            <div class="day-name">${dayName}</div>
+            <div class="day-date">${fmtShortDate(dayStr)}</div>
+            ${dayCellContent}
+          </td>` : ''}
+          <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);${idx === 0 ? '' : 'border-left:0.5px solid var(--color-border-tertiary);'}font-size:12px;vertical-align:middle;width:110px;">
+            <div style="font-weight:600;">${e.jobId}</div>
+            ${amended ? `<span class="badge-amended-sm">Amended</span>` : ''}
+            ${isPending ? `<span class="badge-amended-sm" style="background:var(--color-background-info);color:var(--color-text-info);">Pending</span>` : ''}
+          </td>
+          <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:middle;width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+            ${jobProperty}
+          </td>
+          <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:middle;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+            ${jobDescription}
+          </td>
+          <td style="padding:5px 6px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-weight:500;text-align:center;vertical-align:middle;white-space:nowrap;width:46px;">
+            ${e.hours}h
+          </td>
+          <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-style:italic;color:var(--color-text-secondary);vertical-align:middle;">
+            ${e.comments || ''}
+            ${amended ? `<div class="audit-log-sm" style="font-style:normal;">${lastAmend.note === 'Created by Office' ? 'Created by' : 'Amended by'} ${lastAmend.by} · ${lastAmend.at}</div>` : ''}
+          </td>
+          <td style="padding:4px 8px;text-align:right;vertical-align:middle;width:160px;white-space:nowrap;">
+            <button class="btn btn-sm" onclick="toggleEditOfficeEntries('${e.id}')">Edit</button>
+              <button class="btn btn-sm" style="color:var(--color-text-error);border-color:var(--color-border-error);margin-left:4px;" onclick="deleteEntry('${e.id}', true)">Delete</button>
+          </td>
+        </tr>
+        <tr id="editrow-o-${e.id}" style="display:none;">
+          <td colspan="7" style="padding:0;">
+            <div class="entry-edit" style="display:block;margin:0;border-radius:0;">
+              <div class="edit-grid">
+                <div class="edit-field">
+                  <label>Job</label>
+                  <select id="ej-o-${e.id}">
+                    ${(() => {
+                      const openJobs = jobs.filter(j => j.open || j.id === e.jobId);
+                      const assigned = openJobs.filter(j => expandAssignedTo(j.assignedTo).includes(e.worker));
+                      const others   = openJobs.filter(j => !expandAssignedTo(j.assignedTo).includes(e.worker));
+                      const recurr   = recurringJobs.filter(j => j.active !== false && j.active !== 'FALSE' || j.id === e.jobId);
+                      const absTypes = absenceTypes.filter(a => a.active !== false && a.active !== 'FALSE');
+                      const fmt = j => `<option value="${j.id}" ${j.id === e.jobId ? 'selected' : ''}>${j.id} · ${j.property || j.name || ''} · ${(j.description || j.name || '').slice(0,40)}</option>`;
+                      let html = '';
+                      if (assigned.length) html += `<optgroup label="Assigned Jobs">${assigned.map(fmt).join('')}</optgroup>`;
+                      if (others.length)   html += `<optgroup label="Other Jobs">${others.map(fmt).join('')}</optgroup>`;
+                      if (recurr.length)   html += `<optgroup label="Recurring Jobs">${recurr.map(fmt).join('')}</optgroup>`;
+                      if (absTypes.length) html += `<optgroup label="Absence / Leave">${absTypes.map(fmt).join('')}</optgroup>`;
+                      return html;
+                    })()}
+                  </select>
+                </div>
+                <div class="edit-field">
+                  <label>Hours</label>
+                  <input type="number" id="eh-o-${e.id}" value="${e.hours}" min="0.5" max="16" step="0.5">
+                </div>
+              </div>
+              <div class="edit-comments">
+                <label>Comments</label>
+                <textarea id="en-o-${e.id}">${e.comments || ''}</textarea>
+              </div>
+              <div class="edit-comments">
+                <label>Reason for amendment</label>
+                <input type="text" id="er-o-${e.id}" placeholder="e.g. Entered wrong hours">
+              </div>
+              <div class="edit-actions">
+                <button class="btn btn-primary btn-sm" onclick="saveEditOfficeEntries('${e.id}')">Save changes</button>
+                <button class="btn btn-sm" onclick="toggleEditOfficeEntries('${e.id}')">Cancel</button>
+              </div>
+            </div>
+          </td>
+        </tr>`;
+      }).join('') + totalRow;
+    }).join('');
+
+    html += `
+      <div style="margin-bottom:1.5rem;width:100%;">
+        <p style="font-size:13px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem;">${worker.name}</p>
+        <table class="week-table">
+          <thead>
+            <tr>
+              <th style="width:100px;">Day</th>
+              <th style="width:110px;">W/O Number</th>
+              <th style="width:200px;">Property</th>
+              <th>Description</th>
+              <th style="width:46px;text-align:center;">Hrs</th>
+              <th>Comments</th>
+              <th style="width:80px;"></th>
+            </tr>
+          </thead>
+          <tbody>${workerRows}</tbody>
+        </table>
+      </div>`;
   });
-  syncWorkOrdersFromArthur();
+
+  el.innerHTML = html;
 }
 
-function syncWorkOrdersFromArthur() {
-  Logger.log('Arthur sync started: ' + new Date().toISOString());
-  try {
-    const { jobs: jobsSheet } = getSheets();
-    const existingData = jobsSheet.getDataRange().getValues();
-    const headers = existingData[0];
-    const idCol          = headers.indexOf('id');
-    const propertyCol    = headers.indexOf('property');
-    const descriptionCol = headers.indexOf('description');
-    const reportedCol    = headers.indexOf('reportedDate');
-    const assignedCol    = headers.indexOf('assignedTo');
+function toggleEditOfficeEntries(id) {
+  const row = document.getElementById('editrow-o-' + id);
+  if (row) row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
+}
 
-    let allWorkOrders = [];
-    let page = 1;
-    while (true) {
-      const response = arthurGet('/workorders', { page: page, per_page: 100 });
-      const items = Array.isArray(response.data) ? response.data : [];
-      Logger.log('Page ' + page + ': ' + items.length + ' items');
-      if (!items.length) break;
-      allWorkOrders = allWorkOrders.concat(items);
-      if (items.length < 20) break;
-      page++;
-    }
+async function saveEditOfficeEntries(id) {
+  const entry = entries.find(e => e.id === id);
+  if (!entry) return;
+  const newJob = document.getElementById(`ej-o-${id}`).value;
+  const newHours = parseFloat(document.getElementById(`eh-o-${id}`).value);
+  const newComments = document.getElementById(`en-o-${id}`).value;
+  const reason = document.getElementById(`er-o-${id}`).value;
+  if (isNaN(newHours)) { alert('Please enter valid hours.'); return; }
+  const amendment = {
+    by: 'Office',
+    at: new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+    note: reason
+  };
+  entry.amendments.push(amendment);
+  entry.jobId = newJob;
+  entry.hours = newHours;
+  entry.comments = newComments;
+  localStorage.setItem('entries', JSON.stringify(entries));
+  renderOfficeEntries();
+  const { synced } = await queueOrSend('updateEntry', { entry: { ...entry, amendments: amendmentsToString(entry.amendments) } });
+  if (synced) setSyncStatus('office', 'synced', 'Saved to Sheets');
+}
 
-    Logger.log('Fetched ' + allWorkOrders.length + ' work orders from Arthur');
+async function syncFromArthur() {
+  const btn = document.getElementById('sync-arthur-btn');
+  if (btn) { btn.textContent = '⟳ Syncing...'; btn.disabled = true; }
+  setSyncStatus('office', 'pending', 'Syncing from Arthur...');
+  const cbName = 'cb_sync_' + Date.now();
+  const params = new URLSearchParams({ action: 'syncArthur', data: '{}', callback: cbName });
+  const script = document.createElement('script');
+  const timer = setTimeout(() => {
+    delete window[cbName];
+    if (script.parentNode) script.parentNode.removeChild(script);
+    setSyncStatus('office', 'pending', 'Syncing from Arthur...');
+    setTimeout(async () => {
+      await refreshOffice();
+      setSyncStatus('office', 'synced', 'Sync complete');
+      if (btn) { btn.textContent = '⟳ Sync from Arthur'; btn.disabled = false; }
+    }, 300000);
+  }, 15000);
+  window[cbName] = function(data) {
+    clearTimeout(timer);
+    delete window[cbName];
+    if (script.parentNode) script.parentNode.removeChild(script);
+    setSyncStatus('office', 'pending', 'Syncing from Arthur...');
+    setTimeout(async () => {
+      await refreshOffice();
+      setSyncStatus('office', 'synced', 'Arthur sync complete');
+      if (btn) { btn.textContent = '⟳ Sync from Arthur'; btn.disabled = false; }
+    }, 300000);
+  };
+  script.src = SCRIPT_URL + '?' + params.toString();
+  script.onerror = function() {
+    clearTimeout(timer);
+    delete window[cbName];
+    setSyncStatus('office', 'error', 'Sync failed — try again');
+    if (btn) { btn.textContent = '⟳ Sync from Arthur'; btn.disabled = false; }
+  };
+  document.head.appendChild(script);
+}
 
-    const liveWOs = {};
-    for (const wo of allWorkOrders) {
-      const status = String(wo.status || '').toLowerCase().trim();
-      if (status !== 'live') continue;
-      const woId = String(wo.ref || '').trim();
-      if (!woId) continue;
-      const fullLoc      = String(wo.location || '').trim();
-      const property     = fullLoc.includes(',') ? fullLoc.split(',')[0].trim() : fullLoc;
-      const description  = String(wo.description || wo.title || '').trim();
-      const reportedDate = toDateString(wo.start_date || '');
-      const assignedTo   = extractAssignedTo(wo);
-      liveWOs[woId] = { woId, property, description, reportedDate, assignedTo };
-    }
+function renderRecurringJobsList() {
+  const el = document.getElementById('recurring-job-list');
+  if (!el) return;
+  if (!recurringJobs.length) { el.innerHTML = '<p class="text-muted">No recurring jobs yet.</p>'; return; }
+  el.innerHTML = recurringJobs.map(j => {
+    const active = j.active !== false && j.active !== 'FALSE';
+    return `
+    <div class="entry-row" id="rj-row-${j.id}">
+      <div class="row-between">
+        <div>
+          <span style="font-size:13px;font-weight:500;">${j.id}</span>
+          <span class="text-muted" style="font-size:12px;margin-left:8px;">${j.property}</span>
+          <span class="badge ${active ? 'badge-open' : 'badge-done'}" style="margin-left:8px;">${active ? 'Active' : 'Inactive'}</span>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-sm" onclick="toggleEditRecurring('${j.id}')">Edit</button>
+          <button class="btn btn-sm" onclick="toggleAssignRecurring('${j.id}')">Assign</button>
+          <button class="btn btn-sm" onclick="toggleRecurringJob('${j.id}', ${active})">${active ? 'Deactivate' : 'Reactivate'}</button>
+        </div>
+      </div>
+      <p class="text-muted" style="margin-top:2px;font-size:12px;">${j.description || ''}</p>
+      ${j.assignedTo ? `<p style="margin-top:2px;font-size:11px;color:var(--color-text-secondary);">Assigned: ${j.assignedTo}</p>` : '<p style="margin-top:2px;font-size:11px;color:var(--color-text-secondary);">Unassigned</p>'}
+      <div class="entry-edit" id="rj-edit-${j.id}" style="display:none;">
+        <div class="edit-grid">
+          <div class="edit-field">
+            <label>Property</label>
+            <input type="text" id="rj-ep-${j.id}" value="${j.property || ''}">
+          </div>
+          <div class="edit-field">
+            <label>Description</label>
+            <input type="text" id="rj-ed-${j.id}" value="${j.description || ''}">
+          </div>
+        </div>
+        <div class="edit-actions">
+          <button class="btn btn-primary btn-sm" onclick="saveEditRecurring('${j.id}')">Save</button>
+          <button class="btn btn-sm" onclick="toggleEditRecurring('${j.id}')">Cancel</button>
+        </div>
+      </div>
+      <div id="rj-assign-${j.id}" style="display:none;margin-top:0.75rem;padding:0.75rem;background:var(--color-background-secondary);border-radius:var(--border-radius-md);">
+        <p style="font-size:12px;font-weight:500;margin-bottom:0.5rem;">Assign workers</p>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:0.75rem;">
+          ${workers.filter(w => w.active !== false && w.active !== 'FALSE').map(w => `
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;">
+              <input type="checkbox" value="${w.name}" ${(j.assignedTo || '').split(',').map(s=>s.trim()).filter(Boolean).includes(w.name) ? 'checked' : ''}>
+              ${w.name}
+            </label>`).join('')}
+        </div>
+        <div class="edit-actions">
+          <button class="btn btn-primary btn-sm" onclick="saveAssignRecurring('${j.id}')">Save</button>
+          <button class="btn btn-sm" onclick="toggleAssignRecurring('${j.id}')">Cancel</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
 
-    Logger.log('Live WOs from Arthur: ' + Object.keys(liveWOs).length);
+function toggleAssignRecurring(id) {
+  const el = document.getElementById('rj-assign-' + id);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
 
-    let added = 0, updated = 0, removed = 0;
+async function saveAssignRecurring(id) {
+  const j = recurringJobs.find(j => j.id === id);
+  if (!j) return;
+  const panel = document.getElementById('rj-assign-' + id);
+  const checked = Array.from(panel.querySelectorAll('input[type=checkbox]:checked')).map(cb => cb.value);
+  j.assignedTo = checked.join(', ');
+  localStorage.setItem('recurringJobs', JSON.stringify(recurringJobs));
+  toggleAssignRecurring(id);
+  renderRecurringJobsList();
+  populateJobDropdown();
+  const { synced } = await queueOrSend('saveRecurringJob', { job: j });
+  if (synced) setSyncStatus('office', 'synced', 'Assignments saved');
+}
 
-    // Remove rows no longer live, update existing ones
-    const currentData = jobsSheet.getDataRange().getValues();
-    for (let i = currentData.length - 1; i >= 1; i--) {
-      const woId = String(currentData[i][idCol]);
-      if (!woId) continue;
-      if (!liveWOs[woId]) {
-        jobsSheet.deleteRow(i + 1);
-        removed++;
-      } else {
-        // Update property, description, reportedDate, assignedTo if changed
-        const wo = liveWOs[woId];
-        const currentProperty    = String(currentData[i][propertyCol] || '');
-        const currentDescription = String(currentData[i][descriptionCol] || '');
-        const currentReported    = toDateString(currentData[i][reportedCol]);
-        const currentAssigned    = String(currentData[i][assignedCol] || '');
-        if (currentProperty !== wo.property || currentDescription !== wo.description ||
-            currentReported !== wo.reportedDate || currentAssigned !== wo.assignedTo) {
-          jobsSheet.getRange(i + 1, propertyCol + 1).setValue(wo.property);
-          jobsSheet.getRange(i + 1, descriptionCol + 1).setValue(wo.description);
-          jobsSheet.getRange(i + 1, reportedCol + 1).setValue("'" + wo.reportedDate);
-          jobsSheet.getRange(i + 1, assignedCol + 1).setValue(wo.assignedTo);
-          updated++;
-        }
-      }
-    }
+function toggleEditRecurring(id) {
+  const el = document.getElementById('rj-edit-' + id);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
 
-    // Refresh after deletions/updates
-    const freshData = jobsSheet.getDataRange().getValues();
-    const freshIds = {};
-    for (let i = 1; i < freshData.length; i++) {
-      freshIds[String(freshData[i][idCol])] = i + 1;
-    }
+async function saveEditRecurring(id) {
+  const j = recurringJobs.find(j => j.id === id);
+  if (!j) return;
+  j.property = document.getElementById('rj-ep-' + id).value.trim();
+  j.description = document.getElementById('rj-ed-' + id).value.trim();
+  localStorage.setItem('recurringJobs', JSON.stringify(recurringJobs));
+  renderRecurringJobsList();
+  populateJobDropdown();
+  const { synced } = await queueOrSend('saveRecurringJob', { job: j });
+  if (synced) setSyncStatus('office', 'synced', 'Recurring job updated');
+}
 
-    // Add new live WOs
-    for (const woId in liveWOs) {
-      if (!freshIds[woId]) {
-        const wo = liveWOs[woId];
-        jobsSheet.appendRow([woId, wo.property, wo.description, "'" + wo.reportedDate, wo.assignedTo, true]);
-        added++;
-      }
-    }
+async function toggleRecurringJob(id, currentlyActive) {
+  const j = recurringJobs.find(j => j.id === id);
+  if (!j) return;
+  j.active = !currentlyActive;
+  localStorage.setItem('recurringJobs', JSON.stringify(recurringJobs));
+  renderRecurringJobsList();
+  populateJobDropdown();
+  const { synced } = await queueOrSend('saveRecurringJob', { job: j });
+  if (synced) setSyncStatus('office', 'synced', 'Recurring job updated');
+}
 
-    Logger.log('Sync complete — Added: ' + added + ', Updated: ' + updated + ', Removed: ' + removed);
+async function addRecurringJob() {
+  const id = document.getElementById('rj-id').value.trim();
+  const property = document.getElementById('rj-property').value.trim();
+  const description = document.getElementById('rj-description').value.trim();
+  if (!id || !property) { alert('Please enter a W/O number and property.'); return; }
+  if (recurringJobs.find(j => j.id.toLowerCase() === id.toLowerCase())) { alert('A recurring job with that ID already exists.'); return; }
+  const job = { id, property, description, active: true };
+  recurringJobs.push(job);
+  localStorage.setItem('recurringJobs', JSON.stringify(recurringJobs));
+  document.getElementById('rj-id').value = '';
+  document.getElementById('rj-property').value = '';
+  document.getElementById('rj-description').value = '';
+  renderRecurringJobsList();
+  populateJobDropdown();
+  const { synced } = await queueOrSend('saveRecurringJob', { job });
+  if (synced) setSyncStatus('office', 'synced', 'Recurring job saved');
+}
 
-  } catch (err) {
-    Logger.log('Sync error: ' + err.message);
+function toggleOfficeAddEntry() {
+  const form = document.getElementById('office-add-entry-form');
+  const btn = document.getElementById('office-add-entry-toggle');
+  const open = form.style.display === 'none';
+  form.style.display = open ? 'block' : 'none';
+  btn.textContent = open ? '✕ Cancel' : '+ Add entry';
+  if (open) {
+    document.getElementById('oae-date').value = new Date().toISOString().slice(0,10);
+    const workerSel = document.getElementById('oae-worker');
+    const active = workers.filter(w => w.active !== false && w.active !== 'FALSE');
+    workerSel.innerHTML = '<option value="">Select worker...</option>' + active.map(w => `<option value="${w.name}">${w.name}</option>`).join('');
+    document.getElementById('oae-job').innerHTML = '<option value="">Select worker first...</option>';
   }
 }
 
-function extractAssignedTo(wo) {
-  const contractors = wo.contractors || wo.invited_contractors || wo.assigned_contractors || wo.contractor || [];
-  if (Array.isArray(contractors) && contractors.length) {
-    return contractors.map(c => {
-      if (typeof c === 'string') return c.trim();
-      return String(c.full_name || ((c.first_name || '') + ' ' + (c.last_name || '')).trim()).trim();
-    }).filter(Boolean).join(', ');
+function populateOfficeEntryJobDropdown() {
+  const selectedWorker = document.getElementById('oae-worker').value;
+  const jobSel = document.getElementById('oae-job');
+  if (!selectedWorker) {
+    jobSel.innerHTML = '<option value="">Select worker first...</option>';
+    return;
   }
-  if (typeof contractors === 'string' && contractors.trim()) return contractors.trim();
-  if (wo.contractor_name) return String(wo.contractor_name).trim();
-  return '';
+  const openJobs = jobs.filter(j => j.open);
+  const assigned = openJobs.filter(j => expandAssignedTo(j.assignedTo).includes(selectedWorker));
+  const others = openJobs.filter(j => !expandAssignedTo(j.assignedTo).includes(selectedWorker));
+  const activeRecurring = recurringJobs.filter(j => j.active !== false && j.active !== 'FALSE');
+  const fmt = j => `<option value="${j.id}">${j.id} · ${j.property}${j.description ? ' · ' + (j.description.length > 40 ? j.description.slice(0,40) + '…' : j.description) : ''}</option>`;
+  let html = '<option value="">Select a job...</option>';
+  if (assigned.length) html += `<optgroup label="Assigned Jobs">${assigned.map(fmt).join('')}</optgroup>`;
+  if (others.length)   html += `<optgroup label="Other Jobs">${others.map(fmt).join('')}</optgroup>`;
+  const activeRecurring2 = recurringJobs.filter(j => j.active !== false && j.active !== 'FALSE');
+  if (activeRecurring2.length) html += `<optgroup label="Recurring Jobs">${activeRecurring2.map(fmt).join('')}</optgroup>`;
+  const activeAbsTypes = absenceTypes.filter(a => a.active !== false && a.active !== 'FALSE');
+  if (activeAbsTypes.length) html += `<optgroup label="Absence / Leave">${activeAbsTypes.map(a => `<option value="${a.id}">${a.id} · ${a.name}</option>`).join('')}</optgroup>`;
+  jobSel.innerHTML = html;
 }
 
-function setupHourlyTrigger() {
-  ScriptApp.getProjectTriggers().forEach(t => {
-    if (t.getHandlerFunction() === 'syncWorkOrdersFromArthur') ScriptApp.deleteTrigger(t);
+async function submitOfficeEntry() {
+  const worker   = document.getElementById('oae-worker').value;
+  const jobId    = document.getElementById('oae-job').value;
+  const date     = document.getElementById('oae-date').value;
+  const hours    = parseFloat(document.getElementById('oae-hours').value);
+  const comments = document.getElementById('oae-comments').value;
+  if (!worker || !jobId || !date || isNaN(hours)) { alert('Please fill in all required fields.'); return; }
+  const alreadyLogged = entries.filter(e => e.worker === worker && normaliseDate(e.date) === date).reduce((s, e) => s + parseFloat(e.hours || 0), 0);
+  if (alreadyLogged + hours > 8) { alert('Overtime has to be approved via manager.'); return; }
+  const allJobs = [...jobs];
+  const jobObj = allJobs.find(j => j.id === jobId);
+  const amendment = {
+    by: 'Office',
+    at: new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+    note: 'Created by Office'
+  };
+  const entry = {
+    id: uid(), worker, jobId, date, hours, comments,
+    amendments: [amendment],
+    createdAt: new Date().toISOString(),
+    property: jobObj ? jobObj.property : '',
+    description: jobObj ? jobObj.description : ''
+  };
+  entries.push(entry);
+  localStorage.setItem('entries', JSON.stringify(entries));
+  document.getElementById('oae-worker').value = '';
+  document.getElementById('oae-job').innerHTML = '<option value="">Select worker first...</option>';
+  document.getElementById('oae-hours').value = '';
+  document.getElementById('oae-comments').value = '';
+  toggleOfficeAddEntry();
+  renderOfficeEntries();
+  const { synced } = await queueOrSend('addEntry', { entry: { ...entry, amendments: amendmentsToString(entry.amendments) } });
+  if (synced) setSyncStatus('office', 'synced', 'Entry saved to Sheets');
+}
+
+async function deleteEntry(id, isOffice) {
+  if (!confirm('Are you sure you want to delete this entry? This cannot be undone.')) return;
+  entries = entries.filter(e => e.id !== id);
+  localStorage.setItem('entries', JSON.stringify(entries));
+  if (isOffice) {
+    renderOfficeEntries();
+    setSyncStatus('office', 'pending', 'Deleting...');
+  } else {
+    renderEntriesByDate();
+  }
+  const { synced } = await queueOrSend('deleteEntry', { id });
+  if (synced) setSyncStatus(isOffice ? 'office' : 'worker', 'synced', 'Entry deleted');
+}
+
+function renderAbsenceTypesList() {
+  const el = document.getElementById('absence-types-list');
+  if (!el) return;
+  if (!absenceTypes.length) { el.innerHTML = '<p class="text-muted">No absence types yet.</p>'; return; }
+  el.innerHTML = absenceTypes.map(a => {
+    const active = a.active !== false && a.active !== 'FALSE';
+    return `
+    <div class="entry-row" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+      <div style="flex:1;">
+        <span style="font-size:13px;font-weight:500;">${a.id}</span>
+        <span class="badge ${active ? 'badge-open' : 'badge-done'}" style="margin-left:8px;">${active ? 'Active' : 'Inactive'}</span>
+      </div>
+      <button class="btn btn-sm" onclick="toggleAbsenceType('${a.id}', ${active})">${active ? 'Deactivate' : 'Reactivate'}</button>
+    </div>`;
+  }).join('');
+}
+
+async function addAbsenceType() {
+  const name = document.getElementById('new-absence-type-name').value.trim();
+  if (!name) { alert('Please enter a name.'); return; }
+  const id = name.toUpperCase().replace(/\s+/g, '_');
+  if (absenceTypes.find(a => a.id === id)) { alert('An absence type with that name already exists.'); return; }
+  const absType = { id, name, active: true };
+  absenceTypes.push(absType);
+  localStorage.setItem('absenceTypes', JSON.stringify(absenceTypes));
+  document.getElementById('new-absence-type-name').value = '';
+  renderAbsenceTypesList();
+  populateJobDropdown();
+  const { synced } = await queueOrSend('saveAbsenceType', { absenceType: absType });
+  if (synced) setSyncStatus('office', 'synced', 'Absence type saved');
+}
+
+async function toggleAbsenceType(id, currentlyActive) {
+  const a = absenceTypes.find(a => a.id === id);
+  if (!a) return;
+  a.active = !currentlyActive;
+  localStorage.setItem('absenceTypes', JSON.stringify(absenceTypes));
+  renderAbsenceTypesList();
+  populateJobDropdown();
+  const { synced } = await queueOrSend('saveAbsenceType', { absenceType: a });
+  if (synced) setSyncStatus('office', 'synced', 'Absence type updated');
+}
+
+function renderDailyView() {
+  const el = document.getElementById('daily-view-list');
+  const heading = document.getElementById('daily-view-heading');
+  if (!el) return;
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayFmt = fmtDate(todayStr);
+  if (heading) heading.textContent = todayFmt;
+
+  const today = new Date(); today.setHours(0,0,0,0);
+  const prevMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+  const activeWorkers = workers.filter(w => w.active !== false && w.active !== 'FALSE');
+
+  if (!activeWorkers.length) { el.innerHTML = '<p class="text-muted">No workers found.</p>'; return; }
+
+  let html = '';
+
+  activeWorkers.forEach(worker => {
+    const dayEntries = entries
+      .filter(e => e.worker === worker.name && normaliseDate(e.date) === todayStr)
+      .sort((a, b) => String(a.jobId).localeCompare(String(b.jobId), undefined, { numeric: true }));
+
+    const hoursLogged = dayEntries.reduce((s, e) => s + parseFloat(e.hours || 0), 0);
+    const absence = absences.find(a => a.worker === worker.name && normaliseDate(a.date) === todayStr);
+    const isBankHoliday = BANK_HOLIDAYS.includes(todayStr);
+    const shouldFlag = !isBankHoliday && !absence && hoursLogged < 8;
+
+    const statusBadge = isBankHoliday
+      ? `<span class="badge badge-done" style="margin-left:8px;">Bank Holiday</span>`
+      : absence
+        ? `<span class="badge badge-open" style="margin-left:8px;">${absence.reason}</span>`
+        : shouldFlag && hoursLogged === 0
+          ? `<span class="badge" style="margin-left:8px;background:#fdecea;color:var(--color-text-error);">No hours</span>`
+          : shouldFlag
+            ? `<span class="badge" style="margin-left:8px;background:#fff8e1;color:var(--color-text-warning);">${hoursLogged}h logged</span>`
+            : `<span class="badge badge-done" style="margin-left:8px;">Complete</span>`;
+
+    const dayTotal = dayEntries.reduce((s, e) => s + parseFloat(e.hours || 0), 0);
+
+    const entryRows = dayEntries.length === 0
+      ? `<tr><td colspan="6" style="padding:10px 12px;font-size:12px;color:var(--color-text-secondary);width:100%;">No entries</td></tr>`
+      : dayEntries.map((e, idx) => {
+          const job = jobs.find(j => j.id === e.jobId);
+          const jobProperty = job ? job.property : (e.property || '');
+          const jobDescription = job ? job.description : (e.description || '');
+          const amended = e.amendments && e.amendments.length > 0;
+          const lastAmend = amended ? e.amendments[e.amendments.length - 1] : null;
+          return `
+          <tr class="day-row" ${idx === 0 ? 'style="border-top:1.5px solid var(--color-border-secondary);"' : ''}>
+            <td style="padding:9px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+              <span style="font-weight:600;">${e.jobId}</span>
+              ${amended ? `<span class="badge-amended-sm">${lastAmend.note === 'Created by Office' ? 'Office' : 'Amended'}</span>` : ''}
+            </td>
+            <td style="padding:9px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${jobProperty}</td>
+            <td style="padding:9px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${jobDescription}</td>
+            <td style="padding:9px 6px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-weight:500;text-align:center;white-space:nowrap;width:46px;">${e.hours}h</td>
+            <td style="padding:9px 10px;font-size:12px;font-style:italic;color:var(--color-text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${e.comments || ''}${amended && lastAmend.note !== 'Created by Office' ? ` · Amended by ${lastAmend.by}` : ''}</td>
+            <td style="padding:4px 8px;text-align:right;vertical-align:middle;width:160px;white-space:nowrap;">
+              <button class="btn btn-sm" onclick="toggleEditOfficeEntries('${e.id}')">Edit</button>
+              <button class="btn btn-sm" style="color:var(--color-text-error);border-color:var(--color-border-error);margin-left:4px;" onclick="deleteEntry('${e.id}', true)">Delete</button>
+            </td>
+          </tr>
+          <tr id="editrow-o-${e.id}" style="display:none;">
+            <td colspan="6" style="padding:0;">
+              <div class="entry-edit" style="display:block;margin:0;border-radius:0;">
+                <div class="edit-grid">
+                  <div class="edit-field">
+                    <label>Job</label>
+                    <select id="ej-o-${e.id}">
+                      ${(() => {
+                        const openJobs = jobs.filter(j => j.open || j.id === e.jobId);
+                        const assigned = openJobs.filter(j => expandAssignedTo(j.assignedTo).includes(e.worker));
+                        const others   = openJobs.filter(j => !expandAssignedTo(j.assignedTo).includes(e.worker));
+                        const recurr   = recurringJobs.filter(j => j.active !== false && j.active !== 'FALSE' || j.id === e.jobId);
+                        const absTypes = absenceTypes.filter(a => a.active !== false && a.active !== 'FALSE');
+                        const fmt = j => `<option value="${j.id}" ${j.id === e.jobId ? 'selected' : ''}>${j.id} · ${j.property || j.name || ''} · ${(j.description || j.name || '').slice(0,40)}</option>`;
+                        let html = '';
+                        if (assigned.length) html += `<optgroup label="Assigned Jobs">${assigned.map(fmt).join('')}</optgroup>`;
+                        if (others.length)   html += `<optgroup label="Other Jobs">${others.map(fmt).join('')}</optgroup>`;
+                        if (recurr.length)   html += `<optgroup label="Recurring Jobs">${recurr.map(fmt).join('')}</optgroup>`;
+                        if (absTypes.length) html += `<optgroup label="Absence / Leave">${absTypes.map(fmt).join('')}</optgroup>`;
+                        return html;
+                      })()}
+                    </select>
+                  </div>
+                  <div class="edit-field">
+                    <label>Hours</label>
+                    <input type="number" id="eh-o-${e.id}" value="${e.hours}" min="0.5" max="16" step="0.5">
+                  </div>
+                </div>
+                <div class="edit-comments">
+                  <label>Comments</label>
+                  <textarea id="en-o-${e.id}">${e.comments || ''}</textarea>
+                </div>
+                <div class="edit-comments">
+                  <label>Reason for amendment</label>
+                  <input type="text" id="er-o-${e.id}" placeholder="e.g. Entered wrong hours">
+                </div>
+                <div class="edit-actions">
+                  <button class="btn btn-primary btn-sm" onclick="saveEditOfficeEntries('${e.id}')">Save changes</button>
+                  <button class="btn btn-sm" onclick="toggleEditOfficeEntries('${e.id}')">Cancel</button>
+                </div>
+              </div>
+            </td>
+          </tr>`;
+        }).join('') + `
+          <tr style="background:var(--color-background-secondary);border-bottom:1.5px solid var(--color-border-secondary);">
+            <td style="padding:6px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-weight:600;width:110px;">Total</td>
+            <td style="padding:6px 10px;border-right:0.5px solid var(--color-border-tertiary);width:200px;"></td>
+            <td style="padding:6px 10px;border-right:0.5px solid var(--color-border-tertiary);"></td>
+            <td style="padding:6px 6px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-weight:600;text-align:center;width:46px;">${dayTotal}h</td>
+            <td></td>
+            <td style="width:160px;"></td>
+          </tr>`;
+
+    html += `
+      <div style="margin-bottom:1.5rem;width:100%;">
+        <p style="font-size:13px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem;">
+          ${worker.name} ${statusBadge}
+        </p>
+        <table class="week-table" style="width:100%;table-layout:fixed;">
+          <colgroup>
+            <col style="width:110px;">
+            <col style="width:200px;">
+            <col>
+            <col style="width:46px;">
+            <col>
+            <col style="width:160px;">
+          </colgroup>
+          <thead>
+            <tr>
+              <th>W/O Number</th>
+              <th>Property</th>
+              <th>Description</th>
+              <th style="text-align:center;">Hrs</th>
+              <th>Comments</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>${entryRows}</tbody>
+        </table>
+      </div>`;
   });
-  ScriptApp.newTrigger('syncWorkOrdersFromArthur')
-    .timeBased()
-    .everyHours(1)
-    .create();
-  Logger.log('Hourly trigger created for syncWorkOrdersFromArthur');
+
+  el.innerHTML = html;
 }
+
+function toggleDailyAddEntry() {
+  const form = document.getElementById('daily-add-entry-form');
+  const btn = document.getElementById('daily-add-entry-toggle');
+  const open = form.style.display === 'none';
+  form.style.display = open ? 'block' : 'none';
+  btn.textContent = open ? '✕ Cancel' : '+ Add entry';
+  if (open) {
+    const workerSel = document.getElementById('dae-worker');
+    const active = workers.filter(w => w.active !== false && w.active !== 'FALSE');
+    workerSel.innerHTML = '<option value="">Select worker...</option>' + active.map(w => `<option value="${w.name}">${w.name}</option>`).join('');
+    document.getElementById('dae-job').innerHTML = '<option value="">Select worker first...</option>';
+  }
+}
+
+function populateDailyEntryJobDropdown() {
+  const selectedWorker = document.getElementById('dae-worker').value;
+  const jobSel = document.getElementById('dae-job');
+  if (!selectedWorker) { jobSel.innerHTML = '<option value="">Select worker first...</option>'; return; }
+  const openJobs = jobs.filter(j => j.open);
+  const assigned = openJobs.filter(j => expandAssignedTo(j.assignedTo).includes(selectedWorker));
+  const others = openJobs.filter(j => !expandAssignedTo(j.assignedTo).includes(selectedWorker));
+  const activeAbsTypes = absenceTypes.filter(a => a.active !== false && a.active !== 'FALSE');
+  const fmt = j => `<option value="${j.id}">${j.id} · ${j.property}${j.description ? ' · ' + (j.description.length > 40 ? j.description.slice(0,40) + '…' : j.description) : ''}</option>`;
+  let html = '<option value="">Select a job...</option>';
+  if (assigned.length) html += `<optgroup label="Assigned Jobs">${assigned.map(fmt).join('')}</optgroup>`;
+  if (others.length)   html += `<optgroup label="Other Jobs">${others.map(fmt).join('')}</optgroup>`;
+  if (activeAbsTypes.length) html += `<optgroup label="Absence / Leave">${activeAbsTypes.map(a => `<option value="${a.id}">${a.id} · ${a.name}</option>`).join('')}</optgroup>`;
+  jobSel.innerHTML = html;
+}
+
+async function submitDailyEntry() {
+  const worker   = document.getElementById('dae-worker').value;
+  const jobId    = document.getElementById('dae-job').value;
+  const date     = new Date().toISOString().slice(0,10);
+  const hours    = parseFloat(document.getElementById('dae-hours').value);
+  const comments = document.getElementById('dae-comments').value;
+  if (!worker || !jobId || isNaN(hours)) { alert('Please fill in all required fields.'); return; }
+  const alreadyLogged = entries.filter(e => e.worker === worker && normaliseDate(e.date) === date).reduce((s, e) => s + parseFloat(e.hours || 0), 0);
+  if (alreadyLogged + hours > 8) { alert('Overtime has to be approved via manager.'); return; }
+  const allJobs = [...jobs, ...absenceTypes];
+  const jobObj = allJobs.find(j => j.id === jobId);
+  const amendment = { by: 'Office', at: new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }), note: 'Created by Office' };
+  const entry = { id: uid(), worker, jobId, date, hours, comments, amendments: [amendment], createdAt: new Date().toISOString(), property: jobObj ? jobObj.property : '', description: jobObj ? (jobObj.description || jobObj.name || '') : '' };
+  entries.push(entry);
+  localStorage.setItem('entries', JSON.stringify(entries));
+  document.getElementById('dae-worker').value = '';
+  document.getElementById('dae-job').innerHTML = '<option value="">Select worker first...</option>';
+  document.getElementById('dae-hours').value = '';
+  document.getElementById('dae-comments').value = '';
+  toggleDailyAddEntry();
+  renderDailyView();
+  const { synced } = await queueOrSend('addEntry', { entry: { ...entry, amendments: amendmentsToString(entry.amendments) } });
+  if (synced) setSyncStatus('office', 'synced', 'Entry saved to Sheets');
+}
+
+function switchOfficeTab(tab) {
+  const tabs = ['daily','jobs','entries','absences','workers','recurring'];
+  tabs.forEach(t => {
+    const el = document.getElementById('office-tab-' + t);
+    const btn = document.getElementById('otab-' + t);
+    if (el) el.style.display = t === tab ? 'block' : 'none';
+    if (btn) btn.classList.toggle('active', t === tab);
+  });
+  if (tab === 'daily') renderDailyView();
+  if (tab === 'absences') populateAbsenceEntryForm();
+  if (tab === 'entries') renderOfficeEntries();
+  if (tab === 'recurring') renderRecurringJobsList();
+}
+
+// ── Workers management ───────────────────────────────────────────
+
+function renderWorkersList() {
+  const el = document.getElementById('workers-list');
+  if (!workers.length) { el.innerHTML = '<p class="text-muted">No workers yet.</p>'; return; }
+  el.innerHTML = workers.map(w => {
+    const active = w.active !== false && w.active !== 'FALSE';
+    return `
+    <div class="entry-row" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+      <div style="flex:1;">
+        <span style="font-size:13px;font-weight:500;">${w.name}</span>
+        <span class="badge ${active ? 'badge-open' : 'badge-done'}" style="margin-left:8px;">${active ? 'Active' : 'Inactive'}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <span class="text-muted" style="font-size:12px;">PIN: <strong>${w.pin}</strong></span>
+        <input type="text" id="pin-reset-${w.name.replace(/\s/g,'_')}" placeholder="New PIN" maxlength="4"
+          style="width:80px;letter-spacing:3px;font-size:12px;padding:4px 8px;">
+        <button class="btn btn-sm" onclick="resetPin('${w.name}')">Reset PIN</button>
+        <button class="btn btn-sm" onclick="toggleWorker('${w.name}', ${active})">${active ? 'Deactivate' : 'Reactivate'}</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function addWorker() {
+  const name = document.getElementById('new-worker-name').value.trim();
+  const pin = document.getElementById('new-worker-pin').value.trim();
+  if (!name) { alert('Please enter a name.'); return; }
+  if (pin.length !== 4 || isNaN(pin)) { alert('PIN must be exactly 4 digits.'); return; }
+  if (workers.find(w => w.name.toLowerCase() === name.toLowerCase())) { alert('A worker with that name already exists.'); return; }
+  const worker = { name, pin, active: true };
+  workers.push(worker);
+  localStorage.setItem('workers', JSON.stringify(workers));
+  document.getElementById('new-worker-name').value = '';
+  document.getElementById('new-worker-pin').value = '';
+  renderWorkersList();
+  const { synced } = await queueOrSend('addWorker', { worker });
+  if (synced) setSyncStatus('office', 'synced', 'Worker saved to Sheets');
+}
+
+async function resetPin(name) {
+  const inputId = 'pin-reset-' + name.replace(/\s/g, '_');
+  const newPin = document.getElementById(inputId).value.trim();
+  if (newPin.length !== 4 || isNaN(newPin)) { alert('New PIN must be exactly 4 digits.'); return; }
+  const worker = workers.find(w => w.name === name);
+  if (!worker) return;
+  worker.pin = newPin;
+  localStorage.setItem('workers', JSON.stringify(workers));
+  renderWorkersList();
+  const { synced } = await queueOrSend('updateWorker', { worker });
+  if (synced) setSyncStatus('office', 'synced', 'PIN updated in Sheets');
+}
+
+async function toggleWorker(name, currentlyActive) {
+  const worker = workers.find(w => w.name === name);
+  if (!worker) return;
+  worker.active = !currentlyActive;
+  localStorage.setItem('workers', JSON.stringify(workers));
+  renderWorkersList();
+  const { synced } = await queueOrSend('updateWorker', { worker });
+  if (synced) setSyncStatus('office', 'synced', 'Worker updated in Sheets');
+}
+
+function exportCSV() {
+  const headers = ['Worker', 'Job ID', 'Property', 'Date', 'Hours', 'Comments', 'Reported Date', 'Assigned To', 'Amended', 'Amendment Count', 'Last Amended By', 'Last Amended At', 'Last Reason'];
+  const rows = entries.map(e => {
+    const job = jobs.find(j => j.id === e.jobId); const jobProperty = job ? job.property : (e.property || ''); const jobDescription = job ? job.description : (e.description || '');
+    const last = e.amendments.length ? e.amendments[e.amendments.length - 1] : null;
+    return [
+      e.worker, e.jobId, job ? job.property : '', e.date, e.hours, e.comments || '',
+      job ? (job.reportedDate || '') : '', job ? (job.assignedTo || '') : '',
+      e.amendments.length ? 'Yes' : 'No', e.amendments.length,
+      last ? last.by : '', last ? last.at : '', last ? last.note : ''
+    ].map(v => '"' + String(v).replace(/"/g, '""') + '"').join(',');
+  });
+  const csv = [headers.join(','), ...rows].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'timesheets_' + new Date().toISOString().slice(0, 10) + '.csv';
+  a.click();
+}
+
+// ── Service Worker registration ───────────────────────────────────
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then(reg => console.log('SW registered:', reg.scope))
+      .catch(err => console.log('SW registration failed:', err));
+  });
+}
+</script>
+</body>
+</html>
