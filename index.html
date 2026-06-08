@@ -269,7 +269,7 @@ textarea { height: 60px; resize: none; }
         <button onclick="switchOfficeTab('entries')" id="otab-entries">Time Entries</button>
         <button onclick="switchOfficeTab('jobs')" id="otab-jobs">Active Jobs</button>
         <button onclick="switchOfficeTab('workers')" id="otab-workers">Workers</button>
-        <button onclick="switchOfficeTab('absences')" id="otab-absences">Absences</button>
+        <button onclick="switchOfficeTab('absences')" id="otab-absences">Absence Types</button>
         <button onclick="switchOfficeTab('recurring')" id="otab-recurring">Recurring Jobs</button>
       </div>
 
@@ -411,32 +411,6 @@ textarea { height: 60px; resize: none; }
           <p class="section-heading">Absences</p>
         </div>
         <div id="office-absences-list"><p class="text-muted">Loading...</p></div>
-        <div style="margin-top:1rem;padding-top:1rem;border-top:0.5px solid var(--color-border-tertiary);">
-          <p style="font-size:13px;font-weight:500;margin-bottom:0.75rem;">Add absence entry</p>
-          <div class="grid2">
-            <div>
-              <label style="margin-top:0;">Worker</label>
-              <select id="abs-entry-worker"></select>
-            </div>
-            <div>
-              <label style="margin-top:0;">Absence type</label>
-              <select id="abs-entry-job"></select>
-            </div>
-          </div>
-          <div class="grid2" style="margin-top:10px;">
-            <div>
-              <label style="margin-top:0;">Date</label>
-              <input type="date" id="abs-entry-date">
-            </div>
-            <div>
-              <label style="margin-top:0;">Hours</label>
-              <input type="number" id="abs-entry-hours" placeholder="e.g. 8" min="0.5" max="16" step="0.5">
-            </div>
-          </div>
-          <div class="form-footer">
-            <button class="btn btn-primary" onclick="submitAbsenceEntry()">Save entry</button>
-          </div>
-        </div>
       </div>
       <div class="card" style="margin-top:1rem;">
         <div class="row-between card-header">
@@ -1897,6 +1871,8 @@ async function submitOfficeEntry() {
   const hours    = parseFloat(document.getElementById('oae-hours').value);
   const comments = document.getElementById('oae-comments').value;
   if (!worker || !jobId || !date || isNaN(hours)) { alert('Please fill in all required fields.'); return; }
+  const alreadyLogged = entries.filter(e => e.worker === worker && normaliseDate(e.date) === date).reduce((s, e) => s + parseFloat(e.hours || 0), 0);
+  if (alreadyLogged + hours > 8) { alert('Overtime has to be approved via manager.'); return; }
   const allJobs = [...jobs];
   const jobObj = allJobs.find(j => j.id === jobId);
   const amendment = {
@@ -2164,6 +2140,8 @@ async function submitDailyEntry() {
   const hours    = parseFloat(document.getElementById('dae-hours').value);
   const comments = document.getElementById('dae-comments').value;
   if (!worker || !jobId || isNaN(hours)) { alert('Please fill in all required fields.'); return; }
+  const alreadyLogged = entries.filter(e => e.worker === worker && normaliseDate(e.date) === date).reduce((s, e) => s + parseFloat(e.hours || 0), 0);
+  if (alreadyLogged + hours > 8) { alert('Overtime has to be approved via manager.'); return; }
   const allJobs = [...jobs, ...absenceTypes];
   const jobObj = allJobs.find(j => j.id === jobId);
   const amendment = { by: 'Office', at: new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }), note: 'Created by Office' };
