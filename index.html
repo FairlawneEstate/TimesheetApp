@@ -2351,6 +2351,8 @@ async function officeReviewOvertime(id, status) {
     setSyncStatus('office', 'synced', 'Overtime ' + status);
     renderOvertimeTab();
   }
+}
+
 function switchOfficeTab(tab) {
   const tabs = ['daily','jobs','entries','absences','workers','recurring','overtime'];
   tabs.forEach(t => {
