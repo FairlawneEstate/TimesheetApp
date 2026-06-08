@@ -1732,8 +1732,9 @@ function renderOfficeEntries() {
             ${e.hours}h
           </td>
           <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-style:italic;color:var(--color-text-secondary);vertical-align:middle;">
-            ${e.comments || ''}
+            ${e.isOvertime && e.overtimeStart ? `<span style="font-style:normal;font-weight:500;color:var(--color-text-success);">${e.overtimeStart} – ${e.overtimeEnd}</span> ` : ''}${e.comments || ''}
             ${amended ? `<div class="audit-log-sm" style="font-style:normal;">${lastAmend.note === 'Created by Office' ? 'Created by' : e.isOvertime ? 'Approved by' : 'Amended by'} ${lastAmend.by} · ${lastAmend.at}</div>` : ''}
+            ${(() => { const otReq = e.isOvertime ? overtimeRequests.find(o => normaliseDate(o.date) === normaliseDate(e.date) && o.worker === e.worker && o.jobId === e.jobId && o.status === 'approved') : null; return otReq && otReq.reviewComment ? `<div style="font-size:10px;font-style:italic;margin-top:2px;color:var(--color-text-secondary);">${otReq.reviewComment}</div>` : ''; })()}
           </td>
           <td style="padding:4px 8px;text-align:right;vertical-align:middle;width:160px;white-space:nowrap;">
             <button class="btn btn-sm" onclick="toggleEditOfficeEntries('${e.id}')">Edit</button>
@@ -2426,6 +2427,31 @@ async function officeReviewOvertime(id, status) {
   localStorage.setItem('overtimeRequests', JSON.stringify(overtimeRequests));
 
   if (status === 'approved') {
+    // Inject the new entry locally immediately so it renders with correct OT data
+    // before the server refresh (which may return cached data)
+    const otReq = overtimeRequests[idx];
+    if (otReq) {
+      const otParts = (otReq.timeRange || '').split(/\s*[–-]\s*/);
+      const otStart = otParts[0] ? otParts[0].trim() : '';
+      const otEnd   = otParts[1] ? otParts[1].trim() : '';
+      const job = jobs.find(j => j.id === otReq.jobId) || recurringJobs.find(j => j.id === otReq.jobId);
+      const newEntry = {
+        id: 'ot_local_' + Date.now(),
+        worker: otReq.worker,
+        jobId: otReq.jobId,
+        date: String(otReq.date || '').slice(0, 10),
+        hours: otReq.hours,
+        comments: '',
+        createdAt: new Date().toISOString(),
+        amendments: [{ by: reviewedBy, at: new Date().toLocaleString('en-GB', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }), note: 'Overtime approved (' + (otReq.timeRange || '') + ')' + (reviewComment ? ': ' + reviewComment : '') }],
+        property: job ? job.property : '',
+        description: job ? (job.description || '') : '',
+        isOvertime: true,
+        overtimeStart: otStart,
+        overtimeEnd: otEnd
+      };
+      entries.push(newEntry);
+    }
     await refreshOffice();
     renderOvertimeTab();
   } else {
