@@ -534,6 +534,19 @@ const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbymLV00bzTkHWHNsxOKX
 const POLL_INTERVAL_MS = 60000;
 // ══════════════════════════════════════════════════════════════════
 
+function toHHMM(val) {
+  if (!val) return '';
+  const s = String(val);
+  // Already HH:MM format
+  if (/^\d{1,2}:\d{2}$/.test(s.trim())) return s.trim();
+  // Google Sheets returns time-only cells as a 1899 Date string — extract HH:MM
+  const d = new Date(s);
+  if (!isNaN(d.getTime())) {
+    return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+  }
+  return s;
+}
+
 let jobs = [];
 let entries = [];
 let workers = [];
@@ -606,8 +619,8 @@ function loadInitialData() {
       description: String(e.description || ''),
       amendments: amendmentsFromString(typeof e.amendments === 'string' ? e.amendments : JSON.stringify(e.amendments || [])),
       isOvertime: e.isOvertime === true || e.isOvertime === 'TRUE' || e.isOvertime === 1,
-      overtimeStart: String(e.overtimeStart || ''),
-      overtimeEnd: String(e.overtimeEnd || '')
+      overtimeStart: toHHMM(e.overtimeStart),
+      overtimeEnd: toHHMM(e.overtimeEnd)
     }));
     syncQueue.forEach(q => {
       if (!entries.find(e => e.id === q.id)) entries.push(q);
@@ -749,8 +762,8 @@ async function pollJobs() {
       description: String(e.description || ''),
       amendments: amendmentsFromString(typeof e.amendments === 'string' ? e.amendments : JSON.stringify(e.amendments || [])),
       isOvertime: e.isOvertime === true || e.isOvertime === 'TRUE' || e.isOvertime === 1,
-      overtimeStart: String(e.overtimeStart || ''),
-      overtimeEnd: String(e.overtimeEnd || '')
+      overtimeStart: toHHMM(e.overtimeStart),
+      overtimeEnd: toHHMM(e.overtimeEnd)
     }));
     syncQueue.forEach(q => { if (q.payload?.entry && !entries.find(e => e.id === q.payload.entry.id)) entries.push(q.payload.entry); });
     recurringJobs = (data.recurringJobs || recurringJobs).map(j => ({ ...j, assignedTo: String(j.assignedTo || '') }));
@@ -1482,8 +1495,8 @@ async function refreshOffice() {
         comments: String(e.comments || ''),
         amendments: amendmentsFromString(typeof e.amendments === 'string' ? e.amendments : JSON.stringify(e.amendments || [])),
         isOvertime: e.isOvertime === true || e.isOvertime === 'TRUE' || e.isOvertime === 1,
-        overtimeStart: String(e.overtimeStart || ''),
-        overtimeEnd: String(e.overtimeEnd || '')
+        overtimeStart: toHHMM(e.overtimeStart),
+        overtimeEnd: toHHMM(e.overtimeEnd)
       }));
         recurringJobs = (data.recurringJobs || []).map(j => ({ ...j, assignedTo: String(j.assignedTo || '') }));
       absenceTypes = data.absenceTypes || [];
@@ -2297,8 +2310,8 @@ function renderOvertimeTab() {
       <td style="padding:6px 10px;font-size:11px;color:var(--color-text-secondary);">${o.submittedAt ? new Date(o.submittedAt).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : ''}</td>
       ${showActions === 'pending' ? `
       <td style="padding:4px 8px;white-space:nowrap;">
-        <button class="btn btn-sm" style="background:var(--color-background-success);color:var(--color-text-success);border-color:var(--color-border-success);margin-right:4px;" onclick="officeReviewOvertime('${o.id}','approved')">Approve</button>
-        <button class="btn btn-sm" style="color:var(--color-text-error);border-color:var(--color-border-error);" onclick="officeReviewOvertime('${o.id}','declined')">Decline</button>
+        <button id="ot-approve-${o.id}" class="btn btn-sm" style="background:var(--color-background-success);color:var(--color-text-success);border-color:var(--color-border-success);margin-right:4px;" onclick="officeReviewOvertime('${o.id}','approved')">Approve</button>
+        <button id="ot-decline-${o.id}" class="btn btn-sm" style="color:var(--color-text-error);border-color:var(--color-border-error);" onclick="officeReviewOvertime('${o.id}','declined')">Decline</button>
       </td>` : showActions === 'approved' ? `
       <td style="padding:6px 10px;font-size:11px;color:var(--color-text-secondary);">${o.reviewedBy || ''} · ${o.reviewedAt ? new Date(o.reviewedAt).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : ''}</td>` : `
       <td style="padding:6px 10px;font-size:11px;color:var(--color-text-secondary);">${o.reviewedBy || ''} · ${o.reviewedAt ? new Date(o.reviewedAt).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : ''}</td>`}
@@ -2339,10 +2352,19 @@ function renderOvertimeTab() {
 }
 
 async function officeReviewOvertime(id, status) {
+  const approveBtn = document.getElementById('ot-approve-' + id);
+  const declineBtn = document.getElementById('ot-decline-' + id);
+  if (approveBtn) { approveBtn.disabled = true; approveBtn.textContent = status === 'approved' ? 'Approving…' : 'Approve'; }
+  if (declineBtn) { declineBtn.disabled = true; declineBtn.textContent = status === 'declined' ? 'Declining…' : 'Decline'; }
   const reviewedBy = currentOfficeUser || 'Office';
   setSyncStatus('office', 'pending', 'Updating overtime...');
   const result = await api('reviewOvertimeRequest', { id, status, reviewedBy });
-  if (result.error) { alert('Error: ' + result.error); return; }
+  if (result.error) {
+    alert('Error: ' + result.error);
+    if (approveBtn) { approveBtn.disabled = false; approveBtn.textContent = 'Approve'; }
+    if (declineBtn) { declineBtn.disabled = false; declineBtn.textContent = 'Decline'; }
+    return;
+  }
 
   const idx = overtimeRequests.findIndex(o => o.id === id);
   if (idx !== -1) {
