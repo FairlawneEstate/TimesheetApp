@@ -1594,6 +1594,19 @@ function renderOfficeEntries() {
 
   const allDays = [];
   const cursor = new Date(fromDate);
+  const entriesInRange = entries.filter(e => {
+    const d = normaliseDate(e.date);
+    return d >= (fromVal || '') && d <= (toVal || '9999');
+  });
+  const otInRange = overtimeRequests.filter(o => {
+    const d = normaliseDate(o.date);
+    return d >= (fromVal || '') && d <= (toVal || '9999');
+  });
+  const weekendDatesWithData = new Set([
+    ...entriesInRange.map(e => normaliseDate(e.date)),
+    ...otInRange.map(o => normaliseDate(o.date))
+  ].filter(ds => { const dow = new Date(ds + 'T12:00:00').getDay(); return dow === 0 || dow === 6; }));
+
   while (cursor <= toDate) {
     const y = cursor.getFullYear();
     const m = String(cursor.getMonth()+1).padStart(2,'0');
@@ -1601,6 +1614,8 @@ function renderOfficeEntries() {
     const dayStr = y + '-' + m + '-' + d;
     const dow = new Date(dayStr + 'T12:00:00').getDay();
     if (dow !== 0 && dow !== 6) {
+      allDays.push(dayStr);
+    } else if (weekendDatesWithData.has(dayStr)) {
       allDays.push(dayStr);
     }
     cursor.setDate(cursor.getDate() + 1);
