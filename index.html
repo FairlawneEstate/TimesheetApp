@@ -239,6 +239,14 @@ textarea { height: 60px; resize: none; }
       <div class="login-wrap">
         <p class="screen-title">Office access</p>
         <div class="card">
+          <label>User</label>
+          <select id="office-user-select">
+            <option value="">Select user...</option>
+            <option value="Office">Office</option>
+            <option value="Alex Arrowsmith">Alex Arrowsmith</option>
+            <option value="Dan Simmons">Dan Simmons</option>
+            <option value="Admin">Admin</option>
+          </select>
           <label>Password</label>
           <input type="password" id="office-pin" placeholder="Enter password">
           <div class="form-footer">
@@ -255,6 +263,7 @@ textarea { height: 60px; resize: none; }
           <p class="text-muted">Manage jobs and export timesheets</p>
         </div>
         <div style="display:flex;align-items:center;gap:10px;">
+          <span class="text-muted" style="font-size:13px;">Logged in as <strong id="office-user-display"></strong></span>
           <div class="sync-status">
             <span class="sync-dot" id="office-sync-dot"></span>
             <span id="office-sync-text">—</span>
@@ -498,6 +507,7 @@ let entries = [];
 let workers = [];
 let recurringJobs = [];
 let absenceTypes = [];
+let currentOfficeUser = null;
 let currentWorker = null;
 let syncQueue = JSON.parse(localStorage.getItem('syncQueue') || '[]');
 let pollTimer = null;
@@ -1223,16 +1233,20 @@ function showToast(id) {
 // ── Office ────────────────────────────────────────────────────────
 
 async function officeLogin() {
+  const user = document.getElementById('office-user-select').value;
   const p = document.getElementById('office-pin').value;
+  if (!user) { alert('Please select a user'); return; }
   if (!p) { alert('Enter a password'); return; }
   const btn = document.querySelector('#office-login-screen .btn-primary');
   if (btn) { btn.textContent = 'Signing in...'; btn.disabled = true; }
   try {
-    const result = await api('officeLogin', { password: p });
+    const result = await api('officeLogin', { user, password: p });
     if (result.success) {
+      currentOfficeUser = user;
       document.getElementById('office-login-screen').style.display = 'none';
       document.getElementById('office-screen').style.display = 'block';
       document.querySelector('.app').classList.add('office-wide');
+      document.getElementById('office-user-display').textContent = user;
       refreshOffice();
     } else {
       alert('Incorrect password');
@@ -1245,9 +1259,11 @@ async function officeLogin() {
 }
 
 function officeLogout() {
+  currentOfficeUser = null;
   document.getElementById('office-login-screen').style.display = 'block';
   document.getElementById('office-screen').style.display = 'none';
   document.getElementById('office-pin').value = '';
+  document.getElementById('office-user-select').value = '';
 }
 
 async function refreshOffice() {
