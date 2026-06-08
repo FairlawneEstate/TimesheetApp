@@ -582,7 +582,6 @@ function loadInitialData() {
     });
     localStorage.setItem('syncQueue', JSON.stringify(syncQueue));
     localStorage.setItem('workers', JSON.stringify(workers));
-    localStorage.setItem('absences', JSON.stringify(absences));
     populateWorkerDropdown();
     setSyncStatus('login', 'synced', 'Connected to Google Sheets');
     updateHoursPlaceholder();
@@ -701,7 +700,6 @@ async function pollJobs() {
       amendments: amendmentsFromString(typeof e.amendments === 'string' ? e.amendments : JSON.stringify(e.amendments || []))
     }));
     syncQueue.forEach(q => { if (q.payload?.entry && !entries.find(e => e.id === q.payload.entry.id)) entries.push(q.payload.entry); });
-    absences = (data.absences || absences).map(a => ({ ...a, date: String(a.date || '') }));
     recurringJobs = (data.recurringJobs || recurringJobs).map(j => ({ ...j, assignedTo: String(j.assignedTo || '') }));
     absenceTypes = data.absenceTypes || absenceTypes;
     localStorage.setItem('jobs', JSON.stringify(jobs));
@@ -709,7 +707,6 @@ async function pollJobs() {
     localStorage.setItem('absenceTypes', JSON.stringify(absenceTypes));
     localStorage.setItem('entries', JSON.stringify(entries));
     localStorage.setItem('workers', JSON.stringify(workers));
-    localStorage.setItem('absences', JSON.stringify(absences));
     const currentJobSel = document.getElementById('job-select');
     const savedJobId = currentJobSel ? currentJobSel.value : '';
     populateJobDropdown();
@@ -939,7 +936,7 @@ function renderWeek(wc) {
     const isPast = dayDate < today;
     const inFlagRange = isPast && dayDate >= prevMonthStart;
     const hoursLogged = dayEntries.reduce((s, e) => s + parseFloat(e.hours || 0), 0);
-    const absence = absences.find(a => a.worker === currentWorker && normaliseDate(a.date) === dayStr);
+    const absence = null;
     const isBankHoliday = BANK_HOLIDAYS.includes(dayStr);
     const shouldFlag = inFlagRange && !isBankHoliday && !absence && hoursLogged < 8;
 
@@ -1076,45 +1073,9 @@ const BANK_HOLIDAYS = [
   '2027-08-30','2027-12-27','2027-12-28'
 ];
 
-function absencePickerHTML(dateStr, current) {
-  const opts = ['Sick','Annual Leave','Bank Holiday','Other'];
-  return `
-    <select id="asel-${dateStr}" style="margin-bottom:6px;font-size:12px;padding:5px 8px;width:100%;">
-      ${opts.map(o => `<option value="${o}" ${o===current?'selected':''}>${o}</option>`).join('')}
-    </select>
-    <div class="absence-picker-actions">
-      <button class="btn btn-primary btn-sm" onclick="saveAbsence('${dateStr}')">Save</button>
-      ${current ? `<button class="btn btn-sm" onclick="removeAbsence('${dateStr}')">Remove</button>` : ''}
-      <button class="btn btn-sm" onclick="toggleAbsencePicker('${dateStr}')">Cancel</button>
-    </div>`;
-}
 
-function toggleAbsencePicker(dateStr) {
-  const el = document.getElementById('ap-' + dateStr);
-  if (el) el.style.display = el.style.display === 'block' ? 'none' : 'block';
-}
 
-async function saveAbsence(dateStr) {
-  const sel = document.getElementById('asel-' + dateStr);
-  if (!sel) return;
-  const reason = sel.value;
-  const worker = currentWorker;
-  if (!worker) return;
-  absences = absences.filter(a => !(a.worker === worker && normaliseDate(a.date) === dateStr));
-  absences.push({ worker, date: dateStr, reason });
-  localStorage.setItem('absences', JSON.stringify(absences));
-  renderEntriesByDate();
-  await queueOrSend('saveAbsence', { absence: { worker, date: dateStr, reason } });
-}
 
-async function removeAbsence(dateStr) {
-  const worker = currentWorker;
-  if (!worker) return;
-  absences = absences.filter(a => !(a.worker === worker && normaliseDate(a.date) === dateStr));
-  localStorage.setItem('absences', JSON.stringify(absences));
-  renderEntriesByDate();
-  await queueOrSend('removeAbsence', { worker, date: dateStr });
-}
 
 function populateAbsenceEntryForm() {
   const workerSel = document.getElementById('abs-entry-worker');
@@ -1154,12 +1115,6 @@ async function submitAbsenceEntry() {
 
 
 
-async function officeRemoveAbsence(worker, date) {
-  absences = absences.filter(a => !(a.worker === worker && normaliseDate(a.date) === date));
-  localStorage.setItem('absences', JSON.stringify(absences));
-  await queueOrSend('removeAbsence', { worker, date });
-  setSyncStatus('office', 'synced', 'Absence removed');
-}
 
 function renderEntriesByDate() {
   const container = document.getElementById('entries-by-date');
@@ -1314,8 +1269,7 @@ async function refreshOffice() {
       localStorage.setItem('absenceTypes', JSON.stringify(absenceTypes));
       localStorage.setItem('entries', JSON.stringify(entries));
       localStorage.setItem('workers', JSON.stringify(workers));
-      localStorage.setItem('absences', JSON.stringify(absences));
-      setSyncStatus('office', 'synced', 'Live from Google Sheets');
+        setSyncStatus('office', 'synced', 'Live from Google Sheets');
     } catch (e) {
       setSyncStatus('office', 'error', 'Using cached data');
     }
@@ -1379,43 +1333,9 @@ function renderOfficeDashboard() {
   if (entriesTab && entriesTab.style.display !== 'none') renderOfficeEntries();
 }
 
-function toggleOfficeAbsencePicker(pickerId) {
-  const el = document.getElementById(pickerId);
-  if (el) el.style.display = el.style.display === 'block' ? 'none' : 'block';
-}
 
-function officeAbsencePickerHTML(pickerId, workerName, dateStr, current) {
-  const opts = ['Sick','Annual Leave','Bank Holiday','Other'];
-  return `
-    <select id="oasel-${pickerId}" style="margin-bottom:6px;font-size:12px;padding:5px 8px;width:100%;">
-      ${opts.map(o => `<option value="${o}" ${o===current?'selected':''}>${o}</option>`).join('')}
-    </select>
-    <div class="absence-picker-actions">
-      <button class="btn btn-primary btn-sm" onclick="saveOfficeAbsence('${pickerId}','${workerName}','${dateStr}')">Save</button>
-      ${current ? `<button class="btn btn-sm" onclick="removeOfficeAbsence('${workerName}','${dateStr}')">Remove</button>` : ''}
-      <button class="btn btn-sm" onclick="toggleOfficeAbsencePicker('${pickerId}')">Cancel</button>
-    </div>`;
-}
 
-async function saveOfficeAbsence(pickerId, workerName, dateStr) {
-  const sel = document.getElementById('oasel-' + pickerId);
-  if (!sel) return;
-  const reason = sel.value;
-  absences = absences.filter(a => !(a.worker === workerName && normaliseDate(a.date) === dateStr));
-  absences.push({ worker: workerName, date: dateStr, reason });
-  localStorage.setItem('absences', JSON.stringify(absences));
-  renderOfficeEntries();
-  await queueOrSend('saveAbsence', { absence: { worker: workerName, date: dateStr, reason } });
-  setSyncStatus('office', 'synced', 'Absence saved');
-}
 
-async function removeOfficeAbsence(workerName, dateStr) {
-  absences = absences.filter(a => !(a.worker === workerName && normaliseDate(a.date) === dateStr));
-  localStorage.setItem('absences', JSON.stringify(absences));
-  renderOfficeEntries();
-  await queueOrSend('removeAbsence', { worker: workerName, date: dateStr });
-  setSyncStatus('office', 'synced', 'Absence removed');
-}
 
 function renderOfficeEntries() {
   const el = document.getElementById('office-entries-list');
@@ -1465,7 +1385,7 @@ function renderOfficeEntries() {
       const isPast = dayDate < today;
       const inFlagRange = isPast && dayDate >= prevMonthStart;
       const hoursLogged = dayEntries.reduce((s, e) => s + parseFloat(e.hours || 0), 0);
-      const absence = absences.find(a => a.worker === worker.name && normaliseDate(a.date) === dayStr);
+      const absence = null;
       const isBankHoliday = BANK_HOLIDAYS.includes(dayStr);
       const shouldFlag = inFlagRange && !isBankHoliday && !absence && hoursLogged < 8;
 
@@ -1949,7 +1869,7 @@ function renderDailyView() {
       .sort((a, b) => String(a.jobId).localeCompare(String(b.jobId), undefined, { numeric: true }));
 
     const hoursLogged = dayEntries.reduce((s, e) => s + parseFloat(e.hours || 0), 0);
-    const absence = absences.find(a => a.worker === worker.name && normaliseDate(a.date) === todayStr);
+    const absence = null;
     const isBankHoliday = BANK_HOLIDAYS.includes(todayStr);
     const shouldFlag = !isBankHoliday && !absence && hoursLogged < 8;
 
