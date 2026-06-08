@@ -521,7 +521,7 @@ textarea { height: 60px; resize: none; }
 <script>
 // ══════════════════════════════════════════════════════════════════
 // ══════════════════════════════════════════════════════════════════
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxWd4xKkhSWD4A0KDEQk5pTUs9EKdkFIHgLYDse8iXeP7cGIOv8Hz8wwIiZeg_Vfr598w/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzpqUvuHFR1E6U5i_5-IgyzsR07QkalDZ-ozGw7RIr6nxHTIteYWwhA38lv0Kmxx0O9bw/exec';
 const POLL_INTERVAL_MS = 60000;
 // ══════════════════════════════════════════════════════════════════
 
@@ -902,6 +902,8 @@ async function confirmOvertime() {
   entry.overtimeTimeRange = timeRange;
   entry.overtimeHours = otHours;
   entry.overtimeSubmittedAt = new Date().toISOString();
+  if (!entry.comments) entry.comments = 'Overtime: ' + timeRange;
+  else entry.comments = entry.comments + ' (Overtime: ' + timeRange + ')';
 
   const otRequest = {
     id: 'ot_' + uid(),
@@ -1141,6 +1143,7 @@ function renderWeek(wc) {
           ${isPending ? `<span class="badge-amended-sm" style="background:var(--color-background-info);color:var(--color-text-info);">Pending</span>` : ''}
           ${e.overtimeStatus === 'pending' ? `<span class="badge-amended-sm" style="background:#fff3cd;color:#856404;">⏱ OT Pending</span>` : ''}
           ${e.overtimeStatus === 'approved' ? `<span class="badge-amended-sm" style="background:var(--color-background-success);color:var(--color-text-success);">⏱ OT Approved</span>` : ''}
+          ${e.overtimeStatus === 'declined' ? `<span class="badge-amended-sm" style="background:#fdecea;color:var(--color-text-error);">⏱ OT Declined</span>` : ''}
         </td>
         <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:middle;width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
           ${jobProperty}
