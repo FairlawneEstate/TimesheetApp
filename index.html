@@ -1189,7 +1189,7 @@ function renderWeek(wc) {
         <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-style:italic;color:var(--color-text-secondary);vertical-align:middle;">
           ${e.overtimeStart ? `<span style="font-style:normal;font-weight:500;color:var(--color-text-success);">${e.overtimeStart} – ${e.overtimeEnd}</span> ` : ''}
           ${e.comments || ''}
-          ${amended ? `<div class="audit-log-sm" style="font-style:normal;">${lastAmend.note === 'Created by Office' ? 'Created by' : 'Amended by'} ${lastAmend.by} · ${lastAmend.at}</div>` : ''}
+          ${amended ? `<div class="audit-log-sm" style="font-style:normal;">${lastAmend.note === 'Created by Office' ? 'Created by' : e.isOvertime ? 'Approved by' : 'Amended by'} ${lastAmend.by} · ${lastAmend.at}</div>` : ''}
         </td>
         <td style="padding:4px 8px;text-align:right;vertical-align:middle;width:160px;white-space:nowrap;">
           <button class="btn btn-sm" onclick="toggleEditWeek('${e.id}')">Edit</button>
@@ -1373,7 +1373,7 @@ function renderEntryRow(e, isOffice) {
             ${isPending ? `<span class="badge badge-pending">Pending sync</span>` : ''}
           </div>
           <p class="entry-meta">${e.hours}hrs${e.comments ? ' · ' + e.comments : ''}${isOffice ? ' · <strong>' + e.worker + '</strong>' : ''}</p>
-          ${amended ? `<p class="audit-log">${lastAmend.note === 'Created by Office' ? 'Created by' : 'Amended by'} ${lastAmend.by} · ${lastAmend.at}${lastAmend.note && lastAmend.note !== 'Created by Office' ? ' — ' + lastAmend.note : ''}</p>` : ''}
+          ${amended ? `<p class="audit-log">${lastAmend.note === 'Created by Office' ? 'Created by' : e.isOvertime ? 'Approved by' : 'Amended by'} ${lastAmend.by} · ${lastAmend.at}${lastAmend.note && lastAmend.note !== 'Created by Office' && !e.isOvertime ? ' — ' + lastAmend.note : ''}</p>` : ''}
         </div>
         <button class="btn btn-sm" onclick="toggleEdit('${e.id}', ${isOffice})">Edit</button>
       </div>
@@ -1694,7 +1694,7 @@ function renderOfficeEntries() {
           </td>
           <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-style:italic;color:var(--color-text-secondary);vertical-align:middle;">
             ${e.comments || ''}
-            ${amended ? `<div class="audit-log-sm" style="font-style:normal;">${lastAmend.note === 'Created by Office' ? 'Created by' : 'Amended by'} ${lastAmend.by} · ${lastAmend.at}</div>` : ''}
+            ${amended ? `<div class="audit-log-sm" style="font-style:normal;">${lastAmend.note === 'Created by Office' ? 'Created by' : e.isOvertime ? 'Approved by' : 'Amended by'} ${lastAmend.by} · ${lastAmend.at}</div>` : ''}
           </td>
           <td style="padding:4px 8px;text-align:right;vertical-align:middle;width:160px;white-space:nowrap;">
             <button class="btn btn-sm" onclick="toggleEditOfficeEntries('${e.id}')">Edit</button>
