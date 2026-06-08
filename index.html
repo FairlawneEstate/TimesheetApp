@@ -122,7 +122,7 @@ textarea { height: 60px; resize: none; }
 .office-subnav button.active { background: var(--color-background-secondary); color: var(--color-text-primary); border-color: var(--color-border-primary); }
 .job-detail { display: none; margin-top: 12px; padding: 10px; background: var(--color-background-secondary); border-radius: var(--border-radius-md); }
 .app { padding: 0 1rem 2rem; max-width: 980px; margin: 0 auto; }
-.app.office-wide { max-width: 1400px; }
+.app.office-wide { max-width: 1800px; }
 .sync-status { font-size: 12px; color: var(--color-text-secondary); display: flex; align-items: center; gap: 6px; margin-top: 8px; }
 .sync-dot { width: 8px; height: 8px; border-radius: 50%; background: #ccc; display: inline-block; }
 .sync-dot.synced { background: #1a7a4a; }
@@ -1173,7 +1173,10 @@ function renderWeek(wc) {
         <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:middle;width:200px;">${o.property || ''}</td>
         <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:middle;">${o.description || ''}</td>
         <td style="padding:5px 6px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-weight:500;text-align:center;vertical-align:middle;white-space:nowrap;width:46px;">${o.hours}h</td>
-        <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-style:italic;color:var(--color-text-secondary);vertical-align:middle;">${o.timeRange || ''}</td>
+        <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-style:italic;color:var(--color-text-secondary);vertical-align:middle;">
+          ${o.timeRange || ''}
+          ${o.reviewComment ? `<div style="font-style:italic;font-size:10px;margin-top:2px;color:var(--color-text-secondary);">${o.reviewComment}</div>` : ''}
+        </td>
         <td style="padding:4px 8px;vertical-align:middle;width:60px;"></td>
       </tr>`;
       }).join('');
@@ -1280,7 +1283,10 @@ function renderWeek(wc) {
         <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:middle;width:200px;">${o.property || ''}</td>
         <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:middle;">${o.description || ''}</td>
         <td style="padding:5px 6px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-weight:500;text-align:center;vertical-align:middle;white-space:nowrap;width:46px;">${o.hours}h</td>
-        <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-style:italic;color:var(--color-text-secondary);vertical-align:middle;">${o.timeRange || ''}</td>
+        <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-style:italic;color:var(--color-text-secondary);vertical-align:middle;">
+          ${o.timeRange || ''}
+          ${o.reviewComment ? `<div style="font-style:italic;font-size:10px;margin-top:2px;color:var(--color-text-secondary);">${o.reviewComment}</div>` : ''}
+        </td>
         <td style="padding:4px 8px;vertical-align:middle;width:60px;"></td>
       </tr>`;
     }).join('');
@@ -2348,12 +2354,17 @@ function renderOvertimeTab() {
       <td style="padding:6px 10px;font-size:12px;font-style:italic;">${o.timeRange || ''}</td>
       <td style="padding:6px 10px;font-size:11px;color:var(--color-text-secondary);">${o.submittedAt ? new Date(o.submittedAt).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : ''}</td>
       ${showActions === 'pending' ? `
-      <td style="padding:4px 8px;white-space:nowrap;">
-        <button id="ot-approve-${o.id}" class="btn btn-sm" style="background:var(--color-background-success);color:var(--color-text-success);border-color:var(--color-border-success);margin-right:4px;" onclick="officeReviewOvertime('${o.id}','approved')">Approve</button>
-        <button id="ot-decline-${o.id}" class="btn btn-sm" style="color:var(--color-text-error);border-color:var(--color-border-error);" onclick="officeReviewOvertime('${o.id}','declined')">Decline</button>
-      </td>` : showActions === 'approved' ? `
-      <td style="padding:6px 10px;font-size:11px;color:var(--color-text-secondary);">${o.reviewedBy || ''} · ${o.reviewedAt ? new Date(o.reviewedAt).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : ''}</td>` : `
-      <td style="padding:6px 10px;font-size:11px;color:var(--color-text-secondary);">${o.reviewedBy || ''} · ${o.reviewedAt ? new Date(o.reviewedAt).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : ''}</td>`}
+      <td style="padding:4px 8px;min-width:180px;">
+        <textarea id="ot-comment-${o.id}" placeholder="Reason (optional)" style="width:100%;font-size:11px;padding:4px 6px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-sm);resize:vertical;min-height:48px;margin-bottom:6px;"></textarea>
+        <div style="white-space:nowrap;">
+          <button id="ot-approve-${o.id}" class="btn btn-sm" style="background:var(--color-background-success);color:var(--color-text-success);border-color:var(--color-border-success);margin-right:4px;" onclick="officeReviewOvertime('${o.id}','approved')">Approve</button>
+          <button id="ot-decline-${o.id}" class="btn btn-sm" style="color:var(--color-text-error);border-color:var(--color-border-error);" onclick="officeReviewOvertime('${o.id}','declined')">Decline</button>
+        </div>
+      </td>` : `
+      <td style="padding:6px 10px;font-size:11px;color:var(--color-text-secondary);">
+        <div style="font-weight:500;">${o.reviewedBy || ''} · ${o.reviewedAt ? new Date(o.reviewedAt).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : ''}</div>
+        ${o.reviewComment ? `<div style="margin-top:3px;font-style:italic;">${o.reviewComment}</div>` : ''}
+      </td>`}
     </tr>`;
   }
 
@@ -2369,7 +2380,7 @@ function renderOvertimeTab() {
         <th style="padding:6px 10px;font-size:11px;text-align:center;">Hrs</th>
         <th style="padding:6px 10px;font-size:11px;text-align:left;">Time Range</th>
         <th style="padding:6px 10px;font-size:11px;text-align:left;">Submitted</th>
-        <th style="padding:6px 10px;font-size:11px;text-align:left;">${showActions === 'pending' ? 'Action' : 'Reviewed by'}</th>
+        <th style="padding:6px 10px;font-size:11px;text-align:left;">${showActions === 'pending' ? 'Reason / Action' : 'Reviewed by / Comment'}</th>
       </tr></thead>
       <tbody>${list.map(o => otRow(o, showActions)).join('')}</tbody>
     </table>`;
@@ -2393,11 +2404,13 @@ function renderOvertimeTab() {
 async function officeReviewOvertime(id, status) {
   const approveBtn = document.getElementById('ot-approve-' + id);
   const declineBtn = document.getElementById('ot-decline-' + id);
+  const commentEl  = document.getElementById('ot-comment-' + id);
+  const reviewComment = commentEl ? commentEl.value.trim() : '';
   if (approveBtn) { approveBtn.disabled = true; approveBtn.textContent = status === 'approved' ? 'Approving…' : 'Approve'; }
   if (declineBtn) { declineBtn.disabled = true; declineBtn.textContent = status === 'declined' ? 'Declining…' : 'Decline'; }
   const reviewedBy = currentOfficeUser || 'Office';
   setSyncStatus('office', 'pending', 'Updating overtime...');
-  const result = await api('reviewOvertimeRequest', { id, status, reviewedBy });
+  const result = await api('reviewOvertimeRequest', { id, status, reviewedBy, reviewComment });
   if (result.error) {
     alert('Error: ' + result.error);
     if (approveBtn) { approveBtn.disabled = false; approveBtn.textContent = 'Approve'; }
@@ -2410,6 +2423,7 @@ async function officeReviewOvertime(id, status) {
     overtimeRequests[idx].status = status;
     overtimeRequests[idx].reviewedBy = reviewedBy;
     overtimeRequests[idx].reviewedAt = new Date().toISOString();
+    overtimeRequests[idx].reviewComment = reviewComment;
   }
   localStorage.setItem('overtimeRequests', JSON.stringify(overtimeRequests));
 
