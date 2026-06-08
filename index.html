@@ -604,7 +604,9 @@ function loadInitialData() {
       comments: String(e.comments || ''),
       property: String(e.property || ''),
       description: String(e.description || ''),
-      amendments: amendmentsFromString(typeof e.amendments === 'string' ? e.amendments : JSON.stringify(e.amendments || []))
+      amendments: amendmentsFromString(typeof e.amendments === 'string' ? e.amendments : JSON.stringify(e.amendments || [])),
+      isOvertime: e.isOvertime === true || e.isOvertime === 'TRUE' || e.isOvertime === 1,
+      overtimeTimeRange: String(e.overtimeTimeRange || '')
     }));
     syncQueue.forEach(q => {
       if (!entries.find(e => e.id === q.id)) entries.push(q);
@@ -744,7 +746,9 @@ async function pollJobs() {
       comments: String(e.comments || ''),
       property: String(e.property || ''),
       description: String(e.description || ''),
-      amendments: amendmentsFromString(typeof e.amendments === 'string' ? e.amendments : JSON.stringify(e.amendments || []))
+      amendments: amendmentsFromString(typeof e.amendments === 'string' ? e.amendments : JSON.stringify(e.amendments || [])),
+      isOvertime: e.isOvertime === true || e.isOvertime === 'TRUE' || e.isOvertime === 1,
+      overtimeTimeRange: String(e.overtimeTimeRange || '')
     }));
     syncQueue.forEach(q => { if (q.payload?.entry && !entries.find(e => e.id === q.payload.entry.id)) entries.push(q.payload.entry); });
     recurringJobs = (data.recurringJobs || recurringJobs).map(j => ({ ...j, assignedTo: String(j.assignedTo || '') }));
@@ -1156,9 +1160,7 @@ function renderWeek(wc) {
           <div style="font-weight:600;">${e.jobId}</div>
           ${amended ? `<span class="badge-amended-sm">Amended</span>` : ''}
           ${isPending ? `<span class="badge-amended-sm" style="background:var(--color-background-info);color:var(--color-text-info);">Pending</span>` : ''}
-          ${e.overtimeStatus === 'pending' ? `<span class="badge-amended-sm" style="background:#fff3cd;color:#856404;">⏱ OT Pending</span>` : ''}
-          ${e.overtimeStatus === 'approved' ? `<span class="badge-amended-sm" style="background:var(--color-background-success);color:var(--color-text-success);">⏱ OT Approved</span>` : ''}
-          ${e.overtimeStatus === 'declined' ? `<span class="badge-amended-sm" style="background:#fdecea;color:var(--color-text-error);">⏱ OT Declined</span>` : ''}
+          ${e.isOvertime ? `<span class="badge-amended-sm" style="background:var(--color-background-success);color:var(--color-text-success);">⏱ Overtime</span>` : ''}
         </td>
         <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:middle;width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
           ${jobProperty}
@@ -1170,6 +1172,7 @@ function renderWeek(wc) {
           ${e.hours}h
         </td>
         <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-style:italic;color:var(--color-text-secondary);vertical-align:middle;">
+          ${e.isOvertime && e.overtimeTimeRange ? `<span style="font-style:normal;font-weight:500;color:var(--color-text-success);">${e.overtimeTimeRange}</span> ` : ''}
           ${e.comments || ''}
           ${amended ? `<div class="audit-log-sm" style="font-style:normal;">${lastAmend.note === 'Created by Office' ? 'Created by' : 'Amended by'} ${lastAmend.by} · ${lastAmend.at}</div>` : ''}
         </td>
@@ -1475,7 +1478,9 @@ async function refreshOffice() {
       entries = (data.entries || []).map(e => ({
         ...e,
         comments: String(e.comments || ''),
-        amendments: amendmentsFromString(typeof e.amendments === 'string' ? e.amendments : JSON.stringify(e.amendments || []))
+        amendments: amendmentsFromString(typeof e.amendments === 'string' ? e.amendments : JSON.stringify(e.amendments || [])),
+        isOvertime: e.isOvertime === true || e.isOvertime === 'TRUE' || e.isOvertime === 1,
+        overtimeTimeRange: String(e.overtimeTimeRange || '')
       }));
         recurringJobs = (data.recurringJobs || []).map(j => ({ ...j, assignedTo: String(j.assignedTo || '') }));
       absenceTypes = data.absenceTypes || [];
@@ -2432,14 +2437,21 @@ async function toggleWorker(name, currentlyActive) {
 }
 
 function exportCSV() {
-  const headers = ['Worker', 'Job ID', 'Property', 'Date', 'Hours', 'Comments', 'Reported Date', 'Assigned To', 'Amended', 'Amendment Count', 'Last Amended By', 'Last Amended At', 'Last Reason'];
+  const headers = ['Worker', 'Job ID', 'Property', 'Description', 'Date', 'Hours', 'Is Overtime', 'Overtime Time Range', 'Comments', 'Reported Date', 'Assigned To', 'Amended', 'Amendment Count', 'Last Amended By', 'Last Amended At', 'Last Reason'];
   const rows = entries.map(e => {
-    const job = jobs.find(j => j.id === e.jobId); const jobProperty = job ? job.property : (e.property || ''); const jobDescription = job ? job.description : (e.description || '');
-    const last = e.amendments.length ? e.amendments[e.amendments.length - 1] : null;
+    const job = jobs.find(j => j.id === e.jobId);
+    const last = e.amendments && e.amendments.length ? e.amendments[e.amendments.length - 1] : null;
     return [
-      e.worker, e.jobId, job ? job.property : '', e.date, e.hours, e.comments || '',
-      job ? (job.reportedDate || '') : '', job ? (job.assignedTo || '') : '',
-      e.amendments.length ? 'Yes' : 'No', e.amendments.length,
+      e.worker, e.jobId,
+      job ? job.property : (e.property || ''),
+      job ? (job.description || '') : (e.description || ''),
+      e.date, e.hours,
+      e.isOvertime ? 'Yes' : 'No',
+      e.overtimeTimeRange || '',
+      e.comments || '',
+      job ? (job.reportedDate || '') : '',
+      job ? (job.assignedTo || '') : '',
+      last ? 'Yes' : 'No', e.amendments ? e.amendments.length : 0,
       last ? last.by : '', last ? last.at : '', last ? last.note : ''
     ].map(v => '"' + String(v).replace(/"/g, '""') + '"').join(',');
   });
