@@ -2345,13 +2345,12 @@ async function officeReviewOvertime(id, status) {
   localStorage.setItem('overtimeRequests', JSON.stringify(overtimeRequests));
 
   if (status === 'approved') {
-    await refreshOfficeData();
+    await refreshOffice();
+    renderOvertimeTab();
+  } else {
+    setSyncStatus('office', 'synced', 'Overtime ' + status);
+    renderOvertimeTab();
   }
-
-  setSyncStatus('office', 'synced', 'Overtime ' + status);
-  renderOvertimeTab();
-}
-
 function switchOfficeTab(tab) {
   const tabs = ['daily','jobs','entries','absences','workers','recurring','overtime'];
   tabs.forEach(t => {
