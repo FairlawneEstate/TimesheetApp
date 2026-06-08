@@ -279,6 +279,11 @@ textarea { height: 60px; resize: none; }
           <div class="stat">
             <p class="text-muted stat-label">Open jobs</p>
             <p class="stat-val" id="stat-open">—</p>
+          </div>
+          <div class="stat">
+            <p class="text-muted stat-label">Total entries</p>
+            <p class="stat-val" id="stat-entries">—</p>
+          </div>
         </div>
         <div class="card">
           <div class="row-between card-header">
@@ -801,10 +806,11 @@ function fillJobDetails() {
   const id = document.getElementById('job-select').value;
   const detail = document.getElementById('job-detail');
   if (!id) { detail.style.display = 'none'; return; }
-  const job = jobs.find(j => j.id === id);
+  const job = jobs.find(j => j.id === id) || recurringJobs.find(j => j.id === id) || absenceTypes.find(a => a.id === id);
+  if (!job) { detail.style.display = 'none'; return; }
   detail.style.display = 'block';
-  document.getElementById('job-prop').textContent = job.property;
-  document.getElementById('job-desc').textContent = job.description || '';
+  document.getElementById('job-prop').textContent = job.property || '';
+  document.getElementById('job-desc').textContent = job.description || job.name || '';
   document.getElementById('job-assigned').textContent = job.assignedTo ? 'Assigned to: ' + job.assignedTo : '';
 }
 
