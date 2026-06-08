@@ -1173,7 +1173,7 @@ function renderWeek(wc) {
         </td>` : ''}
         <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;vertical-align:middle;width:110px;">
           <div style="font-weight:600;">${e.jobId}</div>
-          ${amended ? `<span class="badge-amended-sm">Amended</span>` : ''}
+          ${amended && !e.isOvertime ? `<span class="badge-amended-sm">Amended</span>` : ''}
           ${isPending ? `<span class="badge-amended-sm" style="background:var(--color-background-info);color:var(--color-text-info);">Pending</span>` : ''}
           ${e.isOvertime ? `<span class="badge-amended-sm" style="background:var(--color-background-success);color:var(--color-text-success);">⏱ Overtime</span>` : ''}
         </td>
@@ -1369,7 +1369,8 @@ function renderEntryRow(e, isOffice) {
         <div class="entry-info">
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
             <span class="entry-job">${e.jobId} — ${job ? job.property : e.jobId}</span>
-            ${amended ? `<span class="badge badge-amended">Amended</span>` : ''}
+            ${amended && !e.isOvertime ? `<span class="badge badge-amended">Amended</span>` : ''}
+            ${e.isOvertime ? `<span class="badge" style="background:var(--color-background-success);color:var(--color-text-success);">⏱ Overtime</span>` : ''}
             ${isPending ? `<span class="badge badge-pending">Pending sync</span>` : ''}
           </div>
           <p class="entry-meta">${e.hours}hrs${e.comments ? ' · ' + e.comments : ''}${isOffice ? ' · <strong>' + e.worker + '</strong>' : ''}</p>
@@ -1680,8 +1681,9 @@ function renderOfficeEntries() {
           </td>` : ''}
           <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);${idx === 0 ? '' : 'border-left:0.5px solid var(--color-border-tertiary);'}font-size:12px;vertical-align:middle;width:110px;">
             <div style="font-weight:600;">${e.jobId}</div>
-            ${amended ? `<span class="badge-amended-sm">Amended</span>` : ''}
+            ${amended && !e.isOvertime ? `<span class="badge-amended-sm">Amended</span>` : ''}
             ${isPending ? `<span class="badge-amended-sm" style="background:var(--color-background-info);color:var(--color-text-info);">Pending</span>` : ''}
+            ${e.isOvertime ? `<span class="badge-amended-sm" style="background:var(--color-background-success);color:var(--color-text-success);">⏱ Overtime</span>` : ''}
           </td>
           <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:middle;width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
             ${jobProperty}
@@ -2137,12 +2139,13 @@ function renderDailyView() {
           <tr class="day-row" ${idx === 0 ? 'style="border-top:1.5px solid var(--color-border-secondary);"' : ''}>
             <td style="padding:9px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
               <span style="font-weight:600;">${e.jobId}</span>
-              ${amended ? `<span class="badge-amended-sm">${lastAmend.note === 'Created by Office' ? 'Office' : 'Amended'}</span>` : ''}
+              ${amended && !e.isOvertime ? `<span class="badge-amended-sm">${lastAmend.note === 'Created by Office' ? 'Office' : 'Amended'}</span>` : ''}
+              ${e.isOvertime ? `<span class="badge-amended-sm" style="background:var(--color-background-success);color:var(--color-text-success);">⏱ Overtime</span>` : ''}
             </td>
             <td style="padding:9px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${jobProperty}</td>
             <td style="padding:9px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${jobDescription}</td>
             <td style="padding:9px 6px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-weight:500;text-align:center;white-space:nowrap;width:46px;">${e.hours}h</td>
-            <td style="padding:9px 10px;font-size:12px;font-style:italic;color:var(--color-text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${e.comments || ''}${amended && lastAmend.note !== 'Created by Office' ? ` · Amended by ${lastAmend.by}` : ''}</td>
+            <td style="padding:9px 10px;font-size:12px;font-style:italic;color:var(--color-text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${e.comments || ''}${amended && !e.isOvertime && lastAmend.note !== 'Created by Office' ? ` · Amended by ${lastAmend.by}` : ''}</td>
             <td style="padding:4px 8px;text-align:right;vertical-align:middle;width:160px;white-space:nowrap;">
               <button class="btn btn-sm" onclick="toggleEditOfficeEntries('${e.id}')">Edit</button>
               <button class="btn btn-sm" style="color:var(--color-text-error);border-color:var(--color-border-error);margin-left:4px;" onclick="deleteEntry('${e.id}', true)">Delete</button>
