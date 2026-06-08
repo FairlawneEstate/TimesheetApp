@@ -1041,9 +1041,20 @@ function renderWeek(wc) {
               <div class="edit-field">
                 <label>Job</label>
                 <select id="ej-w-${e.id}">
-                  ${[...jobs.filter(j => j.open || j.id === e.jobId), ...recurringJobs.filter(j => j.active !== false && j.active !== 'FALSE')].filter((j,i,a) => a.findIndex(x=>x.id===j.id)===i).map(j =>
-                    `<option value="${j.id}" ${j.id === e.jobId ? 'selected' : ''}>${j.id} — ${j.property}</option>`
-                  ).join('')}
+                  ${(() => {
+                    const openJobs = jobs.filter(j => j.open || j.id === e.jobId);
+                    const assigned = openJobs.filter(j => expandAssignedTo(j.assignedTo).includes(currentWorker));
+                    const others   = openJobs.filter(j => !expandAssignedTo(j.assignedTo).includes(currentWorker));
+                    const recurr   = recurringJobs.filter(j => (j.active !== false && j.active !== 'FALSE') || j.id === e.jobId).filter(j => expandAssignedTo(j.assignedTo || '').includes(currentWorker));
+                    const absTypes = absenceTypes.filter(a => a.active !== false && a.active !== 'FALSE');
+                    const fmt = j => `<option value="${j.id}" ${j.id === e.jobId ? 'selected' : ''}>${j.id} · ${j.property || j.name || ''} · ${(j.description || j.name || '').slice(0,40)}</option>`;
+                    let html = '';
+                    if (assigned.length) html += `<optgroup label="Assigned Jobs">${assigned.map(fmt).join('')}</optgroup>`;
+                    if (others.length)   html += `<optgroup label="Other Jobs">${others.map(fmt).join('')}</optgroup>`;
+                    if (recurr.length)   html += `<optgroup label="Recurring Jobs">${recurr.map(fmt).join('')}</optgroup>`;
+                    if (absTypes.length) html += `<optgroup label="Absence / Leave">${absTypes.map(fmt).join('')}</optgroup>`;
+                    return html;
+                  })()}
                 </select>
               </div>
               <div class="edit-field">
@@ -1595,9 +1606,20 @@ function renderOfficeEntries() {
                 <div class="edit-field">
                   <label>Job</label>
                   <select id="ej-o-${e.id}">
-                    ${[...jobs.filter(j => j.open || j.id === e.jobId), ...recurringJobs.filter(j => j.active !== false && j.active !== 'FALSE')].filter((j,i,a) => a.findIndex(x=>x.id===j.id)===i).map(j =>
-                      `<option value="${j.id}" ${j.id === e.jobId ? 'selected' : ''}>${j.id} — ${j.property}</option>`
-                    ).join('')}
+                    ${(() => {
+                      const openJobs = jobs.filter(j => j.open || j.id === e.jobId);
+                      const assigned = openJobs.filter(j => expandAssignedTo(j.assignedTo).includes(e.worker));
+                      const others   = openJobs.filter(j => !expandAssignedTo(j.assignedTo).includes(e.worker));
+                      const recurr   = recurringJobs.filter(j => (j.active !== false && j.active !== 'FALSE') || j.id === e.jobId).filter(j => expandAssignedTo(j.assignedTo || '').includes(e.worker));
+                      const absTypes = absenceTypes.filter(a => a.active !== false && a.active !== 'FALSE');
+                      const fmt = j => `<option value="${j.id}" ${j.id === e.jobId ? 'selected' : ''}>${j.id} · ${j.property || j.name || ''} · ${(j.description || j.name || '').slice(0,40)}</option>`;
+                      let html = '';
+                      if (assigned.length) html += `<optgroup label="Assigned Jobs">${assigned.map(fmt).join('')}</optgroup>`;
+                      if (others.length)   html += `<optgroup label="Other Jobs">${others.map(fmt).join('')}</optgroup>`;
+                      if (recurr.length)   html += `<optgroup label="Recurring Jobs">${recurr.map(fmt).join('')}</optgroup>`;
+                      if (absTypes.length) html += `<optgroup label="Absence / Leave">${absTypes.map(fmt).join('')}</optgroup>`;
+                      return html;
+                    })()}
                   </select>
                 </div>
                 <div class="edit-field">
@@ -2027,9 +2049,20 @@ function renderDailyView() {
                   <div class="edit-field">
                     <label>Job</label>
                     <select id="ej-o-${e.id}">
-                      ${[...jobs.filter(j => j.open || j.id === e.jobId), ...absenceTypes.filter(a => a.active !== false && a.active !== 'FALSE')].filter((j,i,a) => a.findIndex(x=>x.id===j.id)===i).map(j =>
-                        `<option value="${j.id}" ${j.id === e.jobId ? 'selected' : ''}>${j.id} — ${j.property || j.name || ''}</option>`
-                      ).join('')}
+                      ${(() => {
+                        const openJobs = jobs.filter(j => j.open || j.id === e.jobId);
+                        const assigned = openJobs.filter(j => expandAssignedTo(j.assignedTo).includes(e.worker));
+                        const others   = openJobs.filter(j => !expandAssignedTo(j.assignedTo).includes(e.worker));
+                        const recurr   = recurringJobs.filter(j => (j.active !== false && j.active !== 'FALSE') || j.id === e.jobId).filter(j => expandAssignedTo(j.assignedTo || '').includes(e.worker));
+                        const absTypes = absenceTypes.filter(a => a.active !== false && a.active !== 'FALSE');
+                        const fmt = j => `<option value="${j.id}" ${j.id === e.jobId ? 'selected' : ''}>${j.id} · ${j.property || j.name || ''} · ${(j.description || j.name || '').slice(0,40)}</option>`;
+                        let html = '';
+                        if (assigned.length) html += `<optgroup label="Assigned Jobs">${assigned.map(fmt).join('')}</optgroup>`;
+                        if (others.length)   html += `<optgroup label="Other Jobs">${others.map(fmt).join('')}</optgroup>`;
+                        if (recurr.length)   html += `<optgroup label="Recurring Jobs">${recurr.map(fmt).join('')}</optgroup>`;
+                        if (absTypes.length) html += `<optgroup label="Absence / Leave">${absTypes.map(fmt).join('')}</optgroup>`;
+                        return html;
+                      })()}
                     </select>
                   </div>
                   <div class="edit-field">
