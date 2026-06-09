@@ -364,6 +364,10 @@ textarea { height: 60px; resize: none; }
           </div>
           <div id="job-list"><p class="text-muted">Loading...</p></div>
         </div>
+        <div class="card" style="margin-top:1rem;">
+          <div class="card-header"><p class="section-heading">Tasks</p></div>
+          <div id="task-list"><p class="text-muted">Loading...</p></div>
+        </div>
       </div>
 
       <!-- Daily View tab -->
@@ -1330,13 +1334,19 @@ function renderWeek(wc) {
                 <select id="ej-w-${e.id}">
                   ${(() => {
                     const openJobs = jobs.filter(j => j.open || j.id === e.jobId);
-                    const assigned = openJobs.filter(j => expandAssignedTo(j.assignedTo).includes(currentWorker));
-                    const recurr   = recurringJobs.filter(j => (j.active !== false && j.active !== 'FALSE') || j.id === e.jobId).filter(j => expandAssignedTo(j.assignedTo || '').includes(currentWorker));
                     const absTypes = absenceTypes.filter(a => a.active !== false && a.active !== 'FALSE');
                     const fmt = j => `<option value="${j.id}" ${j.id === e.jobId ? 'selected' : ''}>${j.id} · ${j.property || j.name || ''} · ${(j.description || j.name || '').slice(0,40)}</option>`;
                     let html = '';
-                    if (assigned.length) html += `<optgroup label="Assigned Jobs">${assigned.map(fmt).join('')}</optgroup>`;
-                    if (recurr.length)   html += `<optgroup label="Recurring Jobs">${recurr.map(fmt).join('')}</optgroup>`;
+                    if (currentWorker === 'Chris Rosier') {
+                      if (openJobs.length) html += `<optgroup label="Active Work Orders">${openJobs.map(fmt).join('')}</optgroup>`;
+                      const activeTasks = tasks.filter(t => (t.active !== false && t.active !== 'FALSE') || t.id === e.jobId);
+                      if (activeTasks.length) html += `<optgroup label="Tasks">${activeTasks.map(fmt).join('')}</optgroup>`;
+                    } else {
+                      const assigned = openJobs.filter(j => expandAssignedTo(j.assignedTo).includes(currentWorker));
+                      const recurr   = recurringJobs.filter(j => (j.active !== false && j.active !== 'FALSE') || j.id === e.jobId).filter(j => expandAssignedTo(j.assignedTo || '').includes(currentWorker));
+                      if (assigned.length) html += `<optgroup label="Assigned Jobs">${assigned.map(fmt).join('')}</optgroup>`;
+                      if (recurr.length)   html += `<optgroup label="Recurring Jobs">${recurr.map(fmt).join('')}</optgroup>`;
+                    }
                     if (absTypes.length) html += `<optgroup label="Absence / Leave">${absTypes.map(fmt).join('')}</optgroup>`;
                     return html;
                   })()}
@@ -1684,9 +1694,30 @@ function renderOfficeDashboard() {
     ? openJobs.map(j => renderJobRow(j)).join('')
     : '<p class="text-muted">No open jobs.</p>';
 
+  const taskEl = document.getElementById('task-list');
+  if (taskEl) {
+    const activeTasks = tasks.filter(t => t.active !== false && t.active !== 'FALSE');
+    taskEl.innerHTML = activeTasks.length
+      ? activeTasks.map(t => `
+        <div class="job-row" style="padding:10px 12px;border-bottom:0.5px solid var(--color-border-tertiary);display:flex;align-items:center;gap:12px;">
+          <span style="font-size:12px;font-weight:600;min-width:80px;">${t.id}</span>
+          <span style="font-size:12px;color:var(--color-text-secondary);flex:1;">${t.property || ''}</span>
+          <span style="font-size:12px;color:var(--color-text-secondary);flex:2;">${t.description || ''}</span>
+          <span style="font-size:11px;color:var(--color-text-secondary);">${t.assignedTo || ''}</span>
+        </div>`).join('')
+      : '<p class="text-muted" style="padding:0.5rem 0;">No active tasks.</p>';
+  }
+
   renderWorkersList();
   renderRecurringJobsList();
   renderAbsenceTypesList();
+  const taskElRefresh = document.getElementById('task-list');
+  if (taskElRefresh) {
+    const activeTasks = tasks.filter(t => t.active !== false && t.active !== 'FALSE');
+    taskElRefresh.innerHTML = activeTasks.length
+      ? activeTasks.map(t => `<div class="job-row" style="padding:10px 12px;border-bottom:0.5px solid var(--color-border-tertiary);display:flex;align-items:center;gap:12px;"><span style="font-size:12px;font-weight:600;min-width:80px;">${t.id}</span><span style="font-size:12px;color:var(--color-text-secondary);flex:1;">${t.property || ''}</span><span style="font-size:12px;color:var(--color-text-secondary);flex:2;">${t.description || ''}</span></div>`).join('')
+      : '<p class="text-muted" style="padding:0.5rem 0;">No active tasks.</p>';
+  }
   const awSel = document.getElementById('absence-worker-select');
   if (awSel) {
     const active = workers.filter(w => w.active !== false && w.active !== 'FALSE');
