@@ -359,6 +359,7 @@ textarea { height: 60px; resize: none; }
             <div style="display:flex;gap:8px;">
               <button class="btn btn-sm" onclick="refreshOffice()">↻ Refresh</button>
               <button class="btn btn-sm" id="sync-arthur-btn" onclick="syncFromArthur()">⟳ Sync from Arthur</button>
+              <button class="btn btn-sm" id="sync-tasks-btn" onclick="syncTasksNow()">⟳ Sync Tasks</button>
             </div>
           </div>
           <div id="job-list"><p class="text-muted">Loading...</p></div>
@@ -589,7 +590,7 @@ textarea { height: 60px; resize: none; }
 <script>
 // ══════════════════════════════════════════════════════════════════
 // ══════════════════════════════════════════════════════════════════
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxRBY3UHhiisg-X-PWMcD5-F9LE823jBPm0K2pWwZxCJpbOZjlJTpYrgWe06DoEC7y5bg/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbydxION5G9WyfiWZCDuaE0rYk1Efg29Ny7DsiKedE7W6dx1f3sw0ArOm2U1HTT1mmip7w/exec';
 const POLL_INTERVAL_MS = 60000;
 // ══════════════════════════════════════════════════════════════════
 
@@ -610,6 +611,7 @@ let jobs = [];
 let entries = [];
 let workers = [];
 let recurringJobs = [];
+let tasks = [];
 let absenceTypes = [];
 let currentOfficeUser = null;
 let overtimeRequests = [];
@@ -686,6 +688,7 @@ function loadInitialData() {
       if (!entries.find(e => e.id === q.id)) entries.push(q);
     });
     recurringJobs = (data.recurringJobs || []).map(j => ({ ...j, assignedTo: String(j.assignedTo || '') }));
+    tasks = (data.tasks || tasks).map(t => ({ ...t }));
     absenceTypes = (data.absenceTypes || []);
     overtimeRequests = (data.overtimeRequests || []);
     overtimeRequests = overtimeRequests.map(o => {
@@ -840,6 +843,7 @@ async function pollJobs() {
     recurringJobs = (data.recurringJobs || recurringJobs).map(j => ({ ...j, assignedTo: String(j.assignedTo || '') }));
     absenceTypes = data.absenceTypes || absenceTypes;
     overtimeRequests = data.overtimeRequests || overtimeRequests;
+    tasks = (data.tasks || tasks).map(t => ({ ...t }));
     overtimeRequests = overtimeRequests.map(o => {
       if (o.property && o.description) return o;
       const job = jobs.find(j => j.id === o.jobId) || recurringJobs.find(j => j.id === o.jobId);
@@ -891,17 +895,31 @@ function expandAssignedTo(assignedTo) {
 function populateJobDropdown() {
   const sel = document.getElementById('job-select');
   const open = jobs.filter(j => j.open);
-  const assignedRecurring = recurringJobs.filter(j => j.active !== false && j.active !== 'FALSE' && expandAssignedTo(j.assignedTo || '').includes(currentWorker));
-  const mine = open.filter(j => expandAssignedTo(j.assignedTo).includes(currentWorker));
+  const isManager = currentWorker === 'Chris Rosier';
   let html = '<option value="">Select a job...</option>';
-  const mineAll = [
-    ...mine,
-    ...assignedRecurring.map(j => ({ ...j, _recurring: true }))
-  ];
-  if (mineAll.length) {
-    html += `<optgroup label="Your assigned jobs">`;
-    html += mineAll.map(j => `<option value="${j.id}">${j.id} · ${j.property} · ${j.description && j.description.length > 40 ? j.description.slice(0, 40) + '…' : (j.description || '')}</option>`).join('');
-    html += `</optgroup>`;
+
+  if (isManager) {
+    // Manager sees all active WOs + all tasks, no recurring
+    if (open.length) {
+      html += `<optgroup label="Active Work Orders">`;
+      html += open.map(j => `<option value="${j.id}">${j.id} · ${j.property} · ${j.description && j.description.length > 40 ? j.description.slice(0, 40) + '…' : (j.description || '')}</option>`).join('');
+      html += `</optgroup>`;
+    }
+    const activeTasks = tasks.filter(t => t.active !== false && t.active !== 'FALSE');
+    if (activeTasks.length) {
+      html += `<optgroup label="Tasks">`;
+      html += activeTasks.map(t => `<option value="${t.id}">${t.id} · ${t.property || ''} · ${t.description && t.description.length > 40 ? t.description.slice(0, 40) + '…' : (t.description || '')}</option>`).join('');
+      html += `</optgroup>`;
+    }
+  } else {
+    const assignedRecurring = recurringJobs.filter(j => j.active !== false && j.active !== 'FALSE' && expandAssignedTo(j.assignedTo || '').includes(currentWorker));
+    const mine = open.filter(j => expandAssignedTo(j.assignedTo).includes(currentWorker));
+    const mineAll = [...mine, ...assignedRecurring.map(j => ({ ...j, _recurring: true }))];
+    if (mineAll.length) {
+      html += `<optgroup label="Your assigned jobs">`;
+      html += mineAll.map(j => `<option value="${j.id}">${j.id} · ${j.property} · ${j.description && j.description.length > 40 ? j.description.slice(0, 40) + '…' : (j.description || '')}</option>`).join('');
+      html += `</optgroup>`;
+    }
   }
 
   const activeAbsenceTypes = absenceTypes.filter(a => a.active !== false && a.active !== 'FALSE');
@@ -1611,6 +1629,7 @@ async function refreshOffice() {
         overtimeEnd: toHHMM(e.overtimeEnd)
       }));
         recurringJobs = (data.recurringJobs || []).map(j => ({ ...j, assignedTo: String(j.assignedTo || '') }));
+      tasks = (data.tasks || tasks).map(t => ({ ...t }));
       absenceTypes = data.absenceTypes || [];
       overtimeRequests = data.overtimeRequests || [];
     overtimeRequests = overtimeRequests.map(o => {
@@ -1933,6 +1952,21 @@ async function saveEditOfficeEntries(id) {
   renderOfficeEntries();
   const { synced } = await queueOrSend('updateEntry', { entry: { ...entry, amendments: amendmentsToString(entry.amendments) } });
   if (synced) setSyncStatus('office', 'synced', 'Saved to Sheets');
+}
+
+async function syncTasksNow() {
+  const btn = document.getElementById('sync-tasks-btn');
+  if (btn) { btn.textContent = 'Syncing…'; btn.disabled = true; }
+  try {
+    const result = await api('syncTasks');
+    if (result.error) throw new Error(result.error);
+    setSyncStatus('office', 'synced', `Tasks synced — +${result.added || 0} added`);
+    await refreshOffice();
+  } catch (err) {
+    setSyncStatus('office', 'error', 'Task sync failed: ' + err.message);
+  } finally {
+    if (btn) { btn.textContent = '⟳ Sync Tasks'; btn.disabled = false; }
+  }
 }
 
 async function syncFromArthur() {
