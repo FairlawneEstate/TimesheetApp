@@ -707,9 +707,12 @@ function loadInitialData() {
       };
     });
     localStorage.setItem('overtimeRequests', JSON.stringify(overtimeRequests));
+    localStorage.setItem('jobs', JSON.stringify(jobs));
     localStorage.setItem('entries', JSON.stringify(entries));
     localStorage.setItem('recurringJobs', JSON.stringify(recurringJobs));
     localStorage.setItem('absenceTypes', JSON.stringify(absenceTypes));
+    localStorage.setItem('workers', JSON.stringify(workers));
+    localStorage.setItem('tasks', JSON.stringify(tasks));
     const serverEntryIds = new Set(entries.map(e => String(e.id)));
     syncQueue = syncQueue.filter(q => {
       if ((q.action === 'addEntry' || q.action === 'updateEntry') && q.payload && q.payload.entry) {
@@ -732,6 +735,10 @@ function loadInitialData() {
     jobs = JSON.parse(localStorage.getItem('jobs') || '[]');
     entries = JSON.parse(localStorage.getItem('entries') || '[]');
     workers = JSON.parse(localStorage.getItem('workers') || '[]');
+    tasks = JSON.parse(localStorage.getItem('tasks') || '[]');
+    recurringJobs = JSON.parse(localStorage.getItem('recurringJobs') || '[]');
+    absenceTypes = JSON.parse(localStorage.getItem('absenceTypes') || '[]');
+    overtimeRequests = JSON.parse(localStorage.getItem('overtimeRequests') || '[]');
     recurringJobs = JSON.parse(localStorage.getItem('recurringJobs') || '[]').map(j => ({ ...j, assignedTo: String(j.assignedTo || '') }));
     absenceTypes = JSON.parse(localStorage.getItem('absenceTypes') || '[]');
     overtimeRequests = JSON.parse(localStorage.getItem('overtimeRequests') || '[]');
@@ -866,6 +873,8 @@ async function pollJobs() {
     localStorage.setItem('absenceTypes', JSON.stringify(absenceTypes));
     localStorage.setItem('entries', JSON.stringify(entries));
     localStorage.setItem('workers', JSON.stringify(workers));
+    localStorage.setItem('tasks', JSON.stringify(tasks));
+    localStorage.setItem('tasks', JSON.stringify(tasks));
     const currentJobSel = document.getElementById('job-select');
     const savedJobId = currentJobSel ? currentJobSel.value : '';
     populateJobDropdown();
@@ -1669,6 +1678,10 @@ async function refreshOffice() {
     jobs = JSON.parse(localStorage.getItem('jobs') || '[]');
     entries = JSON.parse(localStorage.getItem('entries') || '[]');
     workers = JSON.parse(localStorage.getItem('workers') || '[]');
+    tasks = JSON.parse(localStorage.getItem('tasks') || '[]');
+    recurringJobs = JSON.parse(localStorage.getItem('recurringJobs') || '[]');
+    absenceTypes = JSON.parse(localStorage.getItem('absenceTypes') || '[]');
+    overtimeRequests = JSON.parse(localStorage.getItem('overtimeRequests') || '[]');
     setSyncStatus('office', 'error', 'Offline — cached data');
   }
   renderOfficeDashboard();
