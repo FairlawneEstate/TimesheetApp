@@ -613,7 +613,6 @@ let pollTimer = null;
 // ── Startup ──────────────────────────────────────────────────────
 
 window.addEventListener('load', () => {
-  document.querySelector('.nav').style.display = 'none';
   if (SCRIPT_URL) {
     loadInitialData();
   } else {
@@ -772,7 +771,6 @@ function switchTab(tab) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById('view-' + tab).classList.add('active');
   document.querySelector('.app').classList.toggle('office-wide', tab === 'office');
-  document.querySelector('.nav').style.display = tab === 'office' ? '' : 'none';
 }
 
 // ── Worker helpers ────────────────────────────────────────────────
