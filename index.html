@@ -144,6 +144,7 @@ textarea { height: 60px; resize: none; }
   .card { padding: 1.5rem; }
 }
 </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 <div class="app">
@@ -351,7 +352,8 @@ textarea { height: 60px; resize: none; }
             <p class="section-heading">Time entries &amp; audit trail</p>
             <div style="display:flex;gap:8px;">
               <button class="btn btn-sm" id="office-add-entry-toggle" onclick="toggleOfficeAddEntry()">+ Add entry</button>
-              <button class="btn btn-primary btn-sm" onclick="exportCSV()">↓ Export CSV</button>
+              <button class="btn btn-primary btn-sm" onclick="exportXLSX()">↓ Export XLSX</button>
+              <button class="btn btn-sm" onclick="exportCSV()" style="margin-left:6px;">↓ CSV</button>
             </div>
           </div>
           <div id="office-add-entry-form" style="display:none;margin-bottom:1rem;padding:1rem;background:var(--color-background-secondary);border-radius:var(--border-radius-md);">
@@ -2568,7 +2570,124 @@ async function toggleWorker(name, currentlyActive) {
   if (synced) setSyncStatus('office', 'synced', 'Worker updated in Sheets');
 }
 
-function exportCSV() {
+function exportXLSX() {
+  const workerFilter = document.getElementById('oe-worker-filter')?.value || '';
+  const fromVal      = document.getElementById('oe-date-from')?.value || '';
+  const toVal        = document.getElementById('oe-date-to')?.value || '';
+
+  const filtered = entries.filter(e => {
+    if (workerFilter && e.worker !== workerFilter) return false;
+    const d = normaliseDate(e.date);
+    if (fromVal && d < fromVal) return false;
+    if (toVal   && d > toVal)   return false;
+    return true;
+  });
+
+  if (!filtered.length) { alert('No entries match the current filters.'); return; }
+
+  // Build sorted unique date list
+  const dateSet = new Set(filtered.map(e => normaliseDate(e.date)));
+  const from = fromVal || [...dateSet].sort()[0];
+  const to   = toVal   || [...dateSet].sort().pop();
+  const allDates = [];
+  const cur = new Date(from + 'T12:00:00');
+  const end = new Date(to   + 'T12:00:00');
+  while (cur <= end) {
+    const ds  = cur.toISOString().slice(0,10);
+    const dow = cur.getDay();
+    if (dow !== 0 && dow !== 6 || dateSet.has(ds)) allDates.push(ds);
+    cur.setDate(cur.getDate() + 1);
+  }
+
+  // Group by worker
+  const byWorker = {};
+  for (const e of filtered) {
+    (byWorker[e.worker] = byWorker[e.worker] || []).push(e);
+  }
+
+  const wb   = XLSX.utils.book_new();
+  const rows = [];
+
+  const dateLabel = ds => {
+    const d = new Date(ds + 'T12:00:00');
+    return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()] + '\n' + d.getDate() + ' ' +
+           ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()];
+  };
+
+  for (const [workerName, wEntries] of Object.entries(byWorker).sort()) {
+    // Name row
+    rows.push([`NAME:  ${workerName}`]);
+    // Header row
+    rows.push(['W/O Number', 'Property Name/Number', 'Description', ...allDates.map(dateLabel), 'Comments', '', 'Start', 'Finish', 'Hrs']);
+
+    // Group by jobId preserving order of first appearance
+    const woOrder = [], woMap = {};
+    for (const e of wEntries) {
+      const id = e.jobId || '';
+      if (!woMap[id]) { woMap[id] = []; woOrder.push(id); }
+      woMap[id].push(e);
+    }
+
+    const totals = {};
+    let grandTotal = 0;
+
+    for (const jobId of woOrder) {
+      const jobEntries = woMap[jobId];
+      const job = jobs.find(j => j.id === jobId) || recurringJobs.find(j => j.id === jobId);
+      const prop = (job ? job.property : '') || jobEntries[0].property || '';
+      const desc = (job ? (job.description || '') : '') || jobEntries[0].description || '';
+
+      // Sort entries by date
+      jobEntries.sort((a,b) => normaliseDate(a.date).localeCompare(normaliseDate(b.date)));
+
+      let firstRow = true;
+      for (const e of jobEntries) {
+        const ds   = normaliseDate(e.date);
+        const hrs  = parseFloat(e.hours) || 0;
+        const dateCells = allDates.map(d => d === ds ? (hrs || null) : null);
+        totals[ds] = (totals[ds] || 0) + hrs;
+        grandTotal += hrs;
+        rows.push([
+          firstRow ? jobId : '',
+          firstRow ? prop  : '',
+          firstRow ? desc  : '',
+          ...dateCells,
+          e.comments || '',
+          '',
+          e.isOvertime && e.overtimeStart ? e.overtimeStart : '',
+          e.isOvertime && e.overtimeEnd   ? e.overtimeEnd   : '',
+          e.isOvertime ? hrs : null
+        ]);
+        firstRow = false;
+      }
+    }
+
+    // Totals row
+    rows.push(['Total', '', '', ...allDates.map(d => totals[d] || null), '', '', '', '', grandTotal || null]);
+    // Gap
+    rows.push([]);
+    rows.push([]);
+  }
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+
+  // Column widths
+  const colWidths = [
+    { wch: 16 }, { wch: 40 }, { wch: 45 },
+    ...allDates.map(() => ({ wch: 9 })),
+    { wch: 26 }, { wch: 4 }, { wch: 9 }, { wch: 9 }, { wch: 9 }
+  ];
+  ws['!cols'] = colWidths;
+
+  XLSX.utils.book_append_sheet(wb, ws, 'Timesheets');
+
+  const workerPart = workerFilter ? '_' + workerFilter.replace(/ /g,'_') : '_All_Workers';
+  const fromPart   = fromVal || 'start';
+  const toPart     = toVal   || 'today';
+  XLSX.writeFile(wb, `Fairlawne_Timesheet${workerPart}_${fromPart}_to_${toPart}.xlsx`);
+}
+
+
   const workerFilter = document.getElementById('oe-worker-filter')?.value || '';
   const fromVal      = document.getElementById('oe-date-from')?.value || '';
   const toVal        = document.getElementById('oe-date-to')?.value || '';
