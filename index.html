@@ -2569,8 +2569,20 @@ async function toggleWorker(name, currentlyActive) {
 }
 
 function exportCSV() {
+  const workerFilter = document.getElementById('oe-worker-filter')?.value || '';
+  const fromVal      = document.getElementById('oe-date-from')?.value || '';
+  const toVal        = document.getElementById('oe-date-to')?.value || '';
+
+  const filtered = entries.filter(e => {
+    if (workerFilter && e.worker !== workerFilter) return false;
+    const d = normaliseDate(e.date);
+    if (fromVal && d < fromVal) return false;
+    if (toVal   && d > toVal)   return false;
+    return true;
+  });
+
   const headers = ['Worker', 'Job ID', 'Property', 'Description', 'Date', 'Hours', 'Is Overtime', 'Overtime Start', 'Overtime End', 'Comments', 'Reported Date', 'Assigned To', 'Amended', 'Amendment Count', 'Last Amended By', 'Last Amended At', 'Last Reason'];
-  const rows = entries.map(e => {
+  const rows = filtered.map(e => {
     const job = jobs.find(j => j.id === e.jobId) || recurringJobs.find(j => j.id === e.jobId);
     const last = e.amendments && e.amendments.length ? e.amendments[e.amendments.length - 1] : null;
     return [
@@ -2588,11 +2600,16 @@ function exportCSV() {
       last ? last.by : '', last ? last.at : '', last ? last.note : ''
     ].map(v => '"' + String(v).replace(/"/g, '""') + '"').join(',');
   });
+
   const csv = [headers.join(','), ...rows].join('\n');
   const blob = new Blob([csv], { type: 'text/csv' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'timesheets_' + new Date().toISOString().slice(0, 10) + '.csv';
+
+  const workerPart = workerFilter ? '_' + workerFilter.replace(/ /g, '_') : '_All_Workers';
+  const fromPart   = fromVal || 'start';
+  const toPart     = toVal   || 'today';
+  a.download = 'Timesheets' + workerPart + '_' + fromPart + '_to_' + toPart + '.csv';
   a.click();
 }
 
