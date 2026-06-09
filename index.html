@@ -594,7 +594,7 @@ textarea { height: 60px; resize: none; }
 <script>
 // ══════════════════════════════════════════════════════════════════
 // ══════════════════════════════════════════════════════════════════
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbykN23NhLXPOQc6vUm4Xhmnpi4DtBAwWJ3PSxFU51fdhfJJ7qPtFvsJO8akKHyzc_2pKg/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbza4d99LHshx4G5CN7CkmslZlM0MCfZG79VPklFPK39U2i7BRPZXx6MKO_N_-9w9aMlZA/exec';
 const POLL_INTERVAL_MS = 60000;
 // ══════════════════════════════════════════════════════════════════
 
@@ -1288,7 +1288,7 @@ function renderWeek(wc) {
     }
 
     const entryRowsHtml = dayEntries.map((e, idx) => {
-      const job = jobs.find(j => j.id === e.jobId) || recurringJobs.find(j => j.id === e.jobId); const jobProperty = job ? job.property : (e.property || ''); const jobDescription = job ? (job.description || '') : (e.description || '');
+      const job = jobs.find(j => j.id === e.jobId) || recurringJobs.find(j => j.id === e.jobId) || tasks.find(j => j.id === e.jobId); const jobProperty = job ? job.property : (e.property || ''); const jobDescription = job ? (job.description || '') : (e.description || '');
       const amended = e.amendments && e.amendments.length > 0;
       const lastAmend = amended ? e.amendments[e.amendments.length - 1] : null;
       const isPending = syncQueue.some(q => q.payload?.entry?.id === e.id);
@@ -1497,7 +1497,7 @@ function groupByDate(arr) {
 }
 
 function renderEntryRow(e, isOffice) {
-  const job = jobs.find(j => j.id === e.jobId) || recurringJobs.find(j => j.id === e.jobId); const jobProperty = job ? job.property : (e.property || ''); const jobDescription = job ? (job.description || '') : (e.description || '');
+  const job = jobs.find(j => j.id === e.jobId) || recurringJobs.find(j => j.id === e.jobId) || tasks.find(j => j.id === e.jobId); const jobProperty = job ? job.property : (e.property || ''); const jobDescription = job ? (job.description || '') : (e.description || '');
   const amended = e.amendments && e.amendments.length > 0;
   const lastAmend = amended ? e.amendments[e.amendments.length - 1] : null;
   const isPending = syncQueue.some(q => q.payload?.entry?.id === e.id);
@@ -1852,7 +1852,7 @@ function renderOfficeEntries() {
       }
 
       return dayEntries.map((e, idx) => {
-        const job = jobs.find(j => j.id === e.jobId) || recurringJobs.find(j => j.id === e.jobId); const jobProperty = job ? job.property : (e.property || ''); const jobDescription = job ? (job.description || '') : (e.description || '');
+        const job = jobs.find(j => j.id === e.jobId) || recurringJobs.find(j => j.id === e.jobId) || tasks.find(j => j.id === e.jobId); const jobProperty = job ? job.property : (e.property || ''); const jobDescription = job ? (job.description || '') : (e.description || '');
         const amended = e.amendments && e.amendments.length > 0;
         const lastAmend = amended ? e.amendments[e.amendments.length - 1] : null;
         const isPending = syncQueue.some(q => q.payload?.entry?.id === e.id);
@@ -2330,7 +2330,7 @@ function renderDailyView() {
     const entryRows = dayEntries.length === 0
       ? `<tr><td colspan="6" style="padding:10px 12px;font-size:12px;color:var(--color-text-secondary);width:100%;">No entries</td></tr>`
       : dayEntries.map((e, idx) => {
-          const job = jobs.find(j => j.id === e.jobId) || recurringJobs.find(j => j.id === e.jobId);
+          const job = jobs.find(j => j.id === e.jobId) || recurringJobs.find(j => j.id === e.jobId) || tasks.find(j => j.id === e.jobId);
           const jobProperty = job ? job.property : (e.property || '');
           const jobDescription = job ? (job.description || '') : (e.description || '');
           const amended = e.amendments && e.amendments.length > 0;
@@ -2849,7 +2849,7 @@ function exportCSV() {
 
   const headers = ['Worker', 'Job ID', 'Property', 'Description', 'Date', 'Hours', 'Is Overtime', 'Overtime Start', 'Overtime End', 'Comments', 'Reported Date', 'Assigned To', 'Amended', 'Amendment Count', 'Last Amended By', 'Last Amended At', 'Last Reason'];
   const rows = filtered.map(e => {
-    const job = jobs.find(j => j.id === e.jobId) || recurringJobs.find(j => j.id === e.jobId);
+    const job = jobs.find(j => j.id === e.jobId) || recurringJobs.find(j => j.id === e.jobId) || tasks.find(j => j.id === e.jobId);
     const last = e.amendments && e.amendments.length ? e.amendments[e.amendments.length - 1] : null;
     return [
       e.worker, e.jobId,
