@@ -62,7 +62,7 @@ textarea { height: 60px; resize: none; }
 .week-block { margin-bottom: 1.5rem; }
 .week-heading { font-size: 12px; font-weight: 600; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
 .week-table-wrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: var(--border-radius-lg); border: 0.5px solid var(--color-border-tertiary); margin-bottom: 1rem; }
-.week-table { width: 100%; min-width: 600px; border-collapse: collapse; background: var(--color-background-primary); }
+.week-table { width: 100%; min-width: 700px; border-collapse: collapse; background: var(--color-background-primary); }
 .week-table th { font-size: 11px; font-weight: 600; color: var(--color-text-secondary); text-align: left; padding: 8px 12px; background: var(--color-background-secondary); border-bottom: 0.5px solid var(--color-border-tertiary); }
 .week-table td { font-size: 12px; padding: 0; vertical-align: top; }
 .day-row { border-bottom: 0.5px solid var(--color-border-tertiary); }
@@ -123,6 +123,7 @@ textarea { height: 60px; resize: none; }
 .office-subnav button.active { background: var(--color-background-secondary); color: var(--color-text-primary); border-color: var(--color-border-primary); }
 .job-detail { display: none; margin-top: 12px; padding: 10px; background: var(--color-background-secondary); border-radius: var(--border-radius-md); }
 .app { padding: 0 1rem 2rem; max-width: 980px; margin: 0 auto; }
+.app.worker-wide { max-width: 1200px; }
 .app.office-wide { max-width: 1800px; }
 .sync-status { font-size: 12px; color: var(--color-text-secondary); display: flex; align-items: center; gap: 6px; margin-top: 8px; }
 .sync-dot { width: 8px; height: 8px; border-radius: 50%; background: #ccc; display: inline-block; }
@@ -154,7 +155,7 @@ textarea { height: 60px; resize: none; }
 /* ── Tablet optimisation (worker view) ─────────────────────────── */
 @media (min-width: 600px) and (max-width: 1400px) and (pointer: coarse) {
 
-  .app { padding: 0 1.5rem 3rem; max-width: 860px; }
+  .app { padding: 0 1.5rem 3rem; max-width: 1200px; }
 
   select, input[type="date"], input[type="number"], input[type="password"], textarea {
     font-size: 16px;
@@ -620,6 +621,7 @@ let pollTimer = null;
 // ── Startup ──────────────────────────────────────────────────────
 
 window.addEventListener('load', () => {
+  document.querySelector('.app').classList.add('worker-wide');
   if (SCRIPT_URL) {
     loadInitialData();
   } else {
@@ -778,6 +780,7 @@ function switchTab(tab) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById('view-' + tab).classList.add('active');
   document.querySelector('.app').classList.toggle('office-wide', tab === 'office');
+  document.querySelector('.app').classList.toggle('worker-wide', tab === 'worker');
 }
 
 // ── Worker helpers ────────────────────────────────────────────────
