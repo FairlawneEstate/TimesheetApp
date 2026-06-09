@@ -143,6 +143,59 @@ textarea { height: 60px; resize: none; }
   .grid2 { gap: 16px; }
   .card { padding: 1.5rem; }
 }
+
+/* ── Tablet optimisation (worker view) ─────────────────────────── */
+@media (min-width: 600px) and (max-width: 1400px) and (pointer: coarse) {
+
+  .app { padding: 0 1.5rem 3rem; max-width: 860px; }
+
+  select, input[type="date"], input[type="number"], input[type="password"], textarea {
+    font-size: 16px;
+    padding: 14px 12px;
+    min-height: 52px;
+  }
+
+  textarea { min-height: 90px; }
+
+  label { font-size: 15px; margin-bottom: 6px; }
+
+  .btn-primary.full-width {
+    font-size: 17px;
+    padding: 18px;
+    min-height: 58px;
+    border-radius: var(--border-radius-lg);
+    letter-spacing: 0.3px;
+  }
+
+  .btn:not(.btn-primary):not(.btn-sm) {
+    font-size: 15px;
+    padding: 12px 20px;
+    min-height: 48px;
+  }
+
+  .screen-title { font-size: 22px; }
+
+  .card { padding: 1.75rem; margin-bottom: 1.25rem; }
+
+  .login-wrap { max-width: 480px; margin: 3rem auto; }
+  .login-wrap .card { padding: 2rem; }
+  .login-wrap .screen-title { font-size: 24px; text-align: center; margin-bottom: 1rem; }
+
+  .week-table th { font-size: 12px; padding: 10px 12px; }
+  .week-table td { font-size: 13px; }
+  .day-cell { padding: 12px 10px !important; }
+  .day-name { font-size: 14px; font-weight: 600; }
+  .day-date { font-size: 12px; }
+
+  .btn-sm {
+    font-size: 13px;
+    padding: 8px 14px;
+    min-height: 40px;
+  }
+
+  .section-label { font-size: 15px; margin: 1.25rem 0 0.75rem; }
+  .sync-status { font-size: 13px; }
+}
 </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
@@ -560,6 +613,7 @@ let pollTimer = null;
 // ── Startup ──────────────────────────────────────────────────────
 
 window.addEventListener('load', () => {
+  document.querySelector('.nav').style.display = 'none';
   if (SCRIPT_URL) {
     loadInitialData();
   } else {
@@ -718,6 +772,7 @@ function switchTab(tab) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById('view-' + tab).classList.add('active');
   document.querySelector('.app').classList.toggle('office-wide', tab === 'office');
+  document.querySelector('.nav').style.display = tab === 'office' ? '' : 'none';
 }
 
 // ── Worker helpers ────────────────────────────────────────────────
