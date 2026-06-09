@@ -2637,35 +2637,45 @@ function exportXLSX() {
       const prop = (job ? job.property : '') || jobEntries[0].property || '';
       const desc = (job ? (job.description || '') : '') || jobEntries[0].description || '';
 
-      // Accumulate hours per date for this WO — always one row per WO
-      const hoursByDate = {};
-      const commentsByDate = {};
-      let otEntry = null;
-      let otHrs = 0;
+      // Separate regular and OT entries
+      const regularEntries = jobEntries.filter(e => !e.isOvertime);
+      const otEntries      = jobEntries.filter(e => e.isOvertime);
 
-      for (const e of jobEntries) {
+      // Regular row — accumulate hours per date
+      const hoursByDate    = {};
+      const commentsByDate = {};
+
+      for (const e of regularEntries) {
         const ds  = normaliseDate(e.date);
         const hrs = parseFloat(e.hours) || 0;
-        hoursByDate[ds]    = (hoursByDate[ds] || 0) + hrs;
-        totals[ds]         = (totals[ds] || 0) + hrs;
-        grandTotal        += hrs;
+        hoursByDate[ds] = (hoursByDate[ds] || 0) + hrs;
+        totals[ds]      = (totals[ds] || 0) + hrs;
+        grandTotal     += hrs;
         if (e.comments) commentsByDate[ds] = (commentsByDate[ds] ? commentsByDate[ds] + '; ' : '') + e.comments;
-        if (e.isOvertime && e.overtimeStart && !otEntry) otEntry = e;
-        if (e.isOvertime) otHrs += hrs;
       }
 
       const dateCells = allDates.map(d => hoursByDate[d] || null);
       const comments  = Object.values(commentsByDate).filter(Boolean).join('; ');
 
-      rows.push([
-        jobId, prop, desc,
-        ...dateCells,
-        comments,
-        '',
-        otEntry ? otEntry.overtimeStart : '',
-        otEntry ? otEntry.overtimeEnd   : '',
-        otHrs || null
-      ]);
+      rows.push([jobId, prop, desc, ...dateCells, comments, '', '', '', null]);
+
+      // OT rows — one row per OT entry, W/O/Property/Description repeated
+      for (const e of otEntries) {
+        const ds  = normaliseDate(e.date);
+        const hrs = parseFloat(e.hours) || 0;
+        totals[ds]  = (totals[ds] || 0) + hrs;
+        grandTotal += hrs;
+        const otDateCells = allDates.map(d => d === ds ? (hrs || null) : null);
+        rows.push([
+          jobId, prop, desc,
+          ...otDateCells,
+          e.comments || '',
+          '',
+          e.overtimeStart || '',
+          e.overtimeEnd   || '',
+          hrs || null
+        ]);
+      }
     }
 
     // Totals row — date column totals only, Hrs column is for OT only so leave blank
