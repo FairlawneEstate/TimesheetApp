@@ -2640,30 +2640,69 @@ function exportXLSX() {
       // Sort entries by date
       jobEntries.sort((a,b) => normaliseDate(a.date).localeCompare(normaliseDate(b.date)));
 
-      let firstRow = true;
+      // Group by date — consolidate same WO onto one row per date group
+      // If multiple entries on the same date for same WO, they get separate rows
+      // Otherwise all different dates collapse onto a single row
+      const byDate = {};
       for (const e of jobEntries) {
-        const ds   = normaliseDate(e.date);
-        const hrs  = parseFloat(e.hours) || 0;
-        const dateCells = allDates.map(d => d === ds ? (hrs || null) : null);
-        totals[ds] = (totals[ds] || 0) + hrs;
-        grandTotal += hrs;
+        const ds = normaliseDate(e.date);
+        (byDate[ds] = byDate[ds] || []).push(e);
+      }
+
+      // Check if all dates have exactly one entry — if so, one row for the whole WO
+      const allSingleEntry = Object.values(byDate).every(arr => arr.length === 1);
+
+      if (allSingleEntry) {
+        // Single row — spread all date hours across columns
+        const dateCells = allDates.map(d => {
+          const dayEntries = byDate[d];
+          if (!dayEntries) return null;
+          const hrs = parseFloat(dayEntries[0].hours) || 0;
+          totals[d] = (totals[d] || 0) + hrs;
+          grandTotal += hrs;
+          return hrs || null;
+        });
+        // Use first OT entry for Start/Finish if any are OT
+        const otEntry = jobEntries.find(e => e.isOvertime && e.overtimeStart);
+        const comments = jobEntries.map(e => e.comments || '').filter(Boolean).join('; ');
+        const otHrs = jobEntries.filter(e => e.isOvertime).reduce((s,e) => s + (parseFloat(e.hours)||0), 0);
         rows.push([
-          firstRow ? jobId : '',
-          firstRow ? prop  : '',
-          firstRow ? desc  : '',
+          jobId, prop, desc,
           ...dateCells,
-          e.comments || '',
+          comments,
           '',
-          e.isOvertime && e.overtimeStart ? e.overtimeStart : '',
-          e.isOvertime && e.overtimeEnd   ? e.overtimeEnd   : '',
-          e.isOvertime ? hrs : null
+          otEntry ? otEntry.overtimeStart : '',
+          otEntry ? otEntry.overtimeEnd   : '',
+          otHrs || null
         ]);
-        firstRow = false;
+      } else {
+        // Multiple entries on same date — one row per date, WO/prop/desc only on first
+        let firstRow = true;
+        for (const ds of Object.keys(byDate).sort()) {
+          for (const e of byDate[ds]) {
+            const hrs = parseFloat(e.hours) || 0;
+            const dateCells = allDates.map(d => d === ds ? (hrs || null) : null);
+            totals[ds] = (totals[ds] || 0) + hrs;
+            grandTotal += hrs;
+            rows.push([
+              firstRow ? jobId : '',
+              firstRow ? prop  : '',
+              firstRow ? desc  : '',
+              ...dateCells,
+              e.comments || '',
+              '',
+              e.isOvertime && e.overtimeStart ? e.overtimeStart : '',
+              e.isOvertime && e.overtimeEnd   ? e.overtimeEnd   : '',
+              e.isOvertime ? hrs : null
+            ]);
+            firstRow = false;
+          }
+        }
       }
     }
 
-    // Totals row
-    rows.push(['Total', '', '', ...allDates.map(d => totals[d] || null), '', '', '', '', grandTotal || null]);
+    // Totals row — date column totals only, Hrs column is for OT only so leave blank
+    rows.push(['Total', '', '', ...allDates.map(d => totals[d] || null), '', '', '', '', null]);
     // Gap
     rows.push([]);
     rows.push([]);
