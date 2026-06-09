@@ -594,7 +594,7 @@ textarea { height: 60px; resize: none; }
 <script>
 // ══════════════════════════════════════════════════════════════════
 // ══════════════════════════════════════════════════════════════════
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbza4d99LHshx4G5CN7CkmslZlM0MCfZG79VPklFPK39U2i7BRPZXx6MKO_N_-9w9aMlZA/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbykN23NhLXPOQc6vUm4Xhmnpi4DtBAwWJ3PSxFU51fdhfJJ7qPtFvsJO8akKHyzc_2pKg/exec';
 const POLL_INTERVAL_MS = 60000;
 // ══════════════════════════════════════════════════════════════════
 
@@ -680,6 +680,7 @@ function loadInitialData() {
     workers = data.workers || [];
     entries = (data.entries || []).map(e => ({
       ...e,
+      worker: String(e.worker || '').trim().replace(/\s+/g, ' '),
       comments: String(e.comments || ''),
       property: String(e.property || ''),
       description: String(e.description || ''),
@@ -835,6 +836,7 @@ async function pollJobs() {
     workers = data.workers || workers;
     entries = (data.entries || []).map(e => ({
       ...e,
+      worker: String(e.worker || '').trim().replace(/\s+/g, ' '),
       comments: String(e.comments || ''),
       property: String(e.property || ''),
       description: String(e.description || ''),
@@ -1632,6 +1634,7 @@ async function refreshOffice() {
       workers = data.workers || [];
       entries = (data.entries || []).map(e => ({
         ...e,
+        worker: String(e.worker || '').trim().replace(/\s+/g, ' '),
         comments: String(e.comments || ''),
         amendments: amendmentsFromString(typeof e.amendments === 'string' ? e.amendments : JSON.stringify(e.amendments || [])),
         isOvertime: e.isOvertime === true || e.isOvertime === 'TRUE' || e.isOvertime === 1,
