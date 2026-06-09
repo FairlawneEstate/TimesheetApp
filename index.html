@@ -677,7 +677,7 @@ function loadInitialData() {
   setSyncStatus('login', 'pending', 'Connecting...');
   api('getData').then(function(data) {
     jobs = data.jobs || [];
-    workers = data.workers || [];
+    workers = (data.workers || []).map(w => ({ ...w, name: String(w.name || '').trim().replace(/\s+/g, ' ') }));
     entries = (data.entries || []).map(e => ({
       ...e,
       worker: String(e.worker || '').trim().replace(/\s+/g, ' '),
@@ -833,7 +833,7 @@ async function pollJobs() {
   try {
     const data = await api('getData');
     jobs = data.jobs || [];
-    workers = data.workers || workers;
+    workers = (data.workers || workers).map(w => ({ ...w, name: String(w.name || '').trim().replace(/\s+/g, ' ') }));
     entries = (data.entries || []).map(e => ({
       ...e,
       worker: String(e.worker || '').trim().replace(/\s+/g, ' '),
@@ -1631,7 +1631,7 @@ async function refreshOffice() {
     try {
       const data = await api('getData');
       jobs = data.jobs || [];
-      workers = data.workers || [];
+      workers = (data.workers || []).map(w => ({ ...w, name: String(w.name || '').trim().replace(/\s+/g, ' ') }));
       entries = (data.entries || []).map(e => ({
         ...e,
         worker: String(e.worker || '').trim().replace(/\s+/g, ' '),
