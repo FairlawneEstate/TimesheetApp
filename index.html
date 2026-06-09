@@ -61,7 +61,8 @@ textarea { height: 60px; resize: none; }
 /* ── Timesheet week view ── */
 .week-block { margin-bottom: 1.5rem; }
 .week-heading { font-size: 12px; font-weight: 600; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
-.week-table { width: 100%; border-collapse: collapse; background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); overflow: hidden; }
+.week-table-wrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: var(--border-radius-lg); border: 0.5px solid var(--color-border-tertiary); margin-bottom: 1rem; }
+.week-table { width: 100%; min-width: 600px; border-collapse: collapse; background: var(--color-background-primary); }
 .week-table th { font-size: 11px; font-weight: 600; color: var(--color-text-secondary); text-align: left; padding: 8px 12px; background: var(--color-background-secondary); border-bottom: 0.5px solid var(--color-border-tertiary); }
 .week-table td { font-size: 12px; padding: 0; vertical-align: top; }
 .day-row { border-bottom: 0.5px solid var(--color-border-tertiary); }
@@ -132,6 +133,12 @@ textarea { height: 60px; resize: none; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .config-banner { display:none; background: #fff8e1; border: 1px solid #f0c040; border-radius: var(--border-radius-md); padding: 12px 16px; margin-bottom: 1.5rem; font-size: 13px; color: #8a5a00; }
 .config-banner strong { display: block; margin-bottom: 4px; }
+@media (max-width: 600px) {
+  .app { padding: 0 0.75rem 2rem; max-width: 100%; overflow-x: hidden; }
+  .week-block { margin-left: -0.75rem; margin-right: -0.75rem; }
+  .week-table-wrap { border-radius: 0; border-left: none; border-right: none; }
+  .week-heading { padding-left: 0.75rem; }
+}
 @media (max-width: 840px) {
   .grid2 { grid-template-columns: 1fr; }
   .row-between { flex-direction: column; align-items: stretch; gap: 12px; }
@@ -1369,6 +1376,7 @@ function renderWeek(wc) {
   return `
     <div class="week-block">
       <p class="week-heading">W/C ${fmtDate(wc)}</p>
+      <div class="week-table-wrap">
       <table class="week-table">
         <thead>
           <tr>
@@ -1383,6 +1391,7 @@ function renderWeek(wc) {
         </thead>
         <tbody>${rows}</tbody>
       </table>
+      </div>
     </div>`;
 }
 
