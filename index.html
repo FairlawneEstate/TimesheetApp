@@ -906,13 +906,13 @@ function populateJobDropdown() {
     // Manager sees all active WOs + all tasks, no recurring
     if (open.length) {
       html += `<optgroup label="Active Work Orders">`;
-      html += open.map(j => `<option value="${j.id}">${j.id} · ${j.property} · ${j.description && j.description.length > 40 ? j.description.slice(0, 40) + '…' : (j.description || '')}</option>`).join('');
+      html += open.map(j => `<option value="${j.id}">${j.id} · ${j.property} · ${j.description && j.description.length > 60 ? j.description.slice(0, 60) + '…' : (j.description || '')}</option>`).join('');
       html += `</optgroup>`;
     }
     const activeTasks = tasks.filter(t => t.active !== false && t.active !== 'FALSE');
     if (activeTasks.length) {
       html += `<optgroup label="Tasks">`;
-      html += activeTasks.map(t => `<option value="${t.id}">${t.id} · ${t.property || ''} · ${t.description && t.description.length > 40 ? t.description.slice(0, 40) + '…' : (t.description || '')}</option>`).join('');
+      html += activeTasks.map(t => `<option value="${t.id}">${t.id} · ${t.property || ''} · ${t.description && t.description.length > 60 ? t.description.slice(0, 60) + '…' : (t.description || '')}</option>`).join('');
       html += `</optgroup>`;
     }
   } else {
@@ -921,7 +921,7 @@ function populateJobDropdown() {
     const mineAll = [...mine, ...assignedRecurring.map(j => ({ ...j, _recurring: true }))];
     if (mineAll.length) {
       html += `<optgroup label="Your assigned jobs">`;
-      html += mineAll.map(j => `<option value="${j.id}">${j.id} · ${j.property} · ${j.description && j.description.length > 40 ? j.description.slice(0, 40) + '…' : (j.description || '')}</option>`).join('');
+      html += mineAll.map(j => `<option value="${j.id}">${j.id} · ${j.property} · ${j.description && j.description.length > 60 ? j.description.slice(0, 60) + '…' : (j.description || '')}</option>`).join('');
       html += `</optgroup>`;
     }
   }
