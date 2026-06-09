@@ -805,7 +805,7 @@ function workerLogin() {
   if (!w || p.length < 4) { alert('Please select your name and enter a 4-digit PIN.'); return; }
   const worker = workers.find(x => x.name === w);
   if (worker && String(worker.pin) !== String(p)) { alert('Incorrect PIN. Please try again.'); return; }
-  currentWorker = w;
+  currentWorker = w.trim().replace(/\s+/g, ' ');
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('timesheet-screen').style.display = 'block';
   document.getElementById('worker-greeting').textContent = 'Hello, ' + w;
@@ -899,7 +899,7 @@ function expandAssignedTo(assignedTo) {
 function populateJobDropdown() {
   const sel = document.getElementById('job-select');
   const open = jobs.filter(j => j.open);
-  const isManager = currentWorker === 'Chris Rosier';
+  const isManager = (currentWorker || '').trim().toLowerCase().replace(/\s+/g, ' ') === 'chris rosier';
   let html = '<option value="">Select a job...</option>';
 
   if (isManager) {
@@ -1337,7 +1337,7 @@ function renderWeek(wc) {
                     const absTypes = absenceTypes.filter(a => a.active !== false && a.active !== 'FALSE');
                     const fmt = j => `<option value="${j.id}" ${j.id === e.jobId ? 'selected' : ''}>${j.id} · ${j.property || j.name || ''} · ${(j.description || j.name || '').slice(0,40)}</option>`;
                     let html = '';
-                    if (currentWorker === 'Chris Rosier') {
+                    if ((currentWorker || '').trim().toLowerCase().replace(/\s+/g, ' ') === 'chris rosier') {
                       if (openJobs.length) html += `<optgroup label="Active Work Orders">${openJobs.map(fmt).join('')}</optgroup>`;
                       const activeTasks = tasks.filter(t => (t.active !== false && t.active !== 'FALSE') || t.id === e.jobId);
                       if (activeTasks.length) html += `<optgroup label="Tasks">${activeTasks.map(fmt).join('')}</optgroup>`;
