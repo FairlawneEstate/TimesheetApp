@@ -130,7 +130,7 @@ textarea { height: 60px; resize: none; }
 .sync-dot.error { background: #c0392b; }
 .spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid #ccc; border-top-color: #111; border-radius: 50%; animation: spin 0.7s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
-.config-banner { background: #fff8e1; border: 1px solid #f0c040; border-radius: var(--border-radius-md); padding: 12px 16px; margin-bottom: 1.5rem; font-size: 13px; color: #8a5a00; }
+.config-banner { display:none; background: #fff8e1; border: 1px solid #f0c040; border-radius: var(--border-radius-md); padding: 12px 16px; margin-bottom: 1.5rem; font-size: 13px; color: #8a5a00; }
 .config-banner strong { display: block; margin-bottom: 4px; }
 @media (max-width: 840px) {
   .grid2 { grid-template-columns: 1fr; }
@@ -144,7 +144,7 @@ textarea { height: 60px; resize: none; }
   .card { padding: 1.5rem; }
 }
 </style>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
 </head>
 <body>
 <div class="app">
@@ -561,9 +561,9 @@ let pollTimer = null;
 
 window.addEventListener('load', () => {
   if (SCRIPT_URL) {
-    document.getElementById('config-banner').style.display = 'none';
     loadInitialData();
   } else {
+    document.getElementById('config-banner').style.display = 'block';
     setSyncStatus('login', 'error', 'Not connected — set SCRIPT_URL');
     jobs = [
       { id: 'JOB0001', property: 'Estate', description: 'Repair works at Estate', assignedTo: 'Chris R', open: true },
