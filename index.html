@@ -1587,7 +1587,7 @@ async function saveEdit(id, isOffice) {
   localStorage.setItem('entries', JSON.stringify(entries));
 
   if (isOffice) { renderOfficeDashboard(); }
-  else { renderEntriesByDate(); showToast('toast-amended'); }
+  else { renderEntriesByDate(); updateHoursPlaceholder(); showToast('toast-amended'); }
 
   const { synced } = await queueOrSend('updateEntry', { entry: { ...entry, amendments: amendmentsToString(entry.amendments) } });
   if (synced && isOffice) setSyncStatus('office', 'synced', 'Saved to Sheets');
@@ -2257,6 +2257,7 @@ async function deleteEntry(id, isOffice) {
     setSyncStatus('office', 'pending', 'Deleting...');
   } else {
     renderEntriesByDate();
+    updateHoursPlaceholder();
   }
   const { synced } = await queueOrSend('deleteEntry', { id });
   if (synced) setSyncStatus(isOffice ? 'office' : 'worker', 'synced', 'Entry deleted');
