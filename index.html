@@ -1565,6 +1565,38 @@ function toggleEdit(id, isOffice) {
   if (el) el.style.display = el.style.display === 'block' ? 'none' : 'block';
 }
 
+
+async function saveDailyViewEdit(id) {
+  const entry = entries.find(e => e.id === id);
+  if (!entry) return;
+  const newJob      = document.getElementById(`ej-o-${id}`).value;
+  const newHours    = parseFloat(document.getElementById(`eh-o-${id}`).value);
+  const newComments = document.getElementById(`en-o-${id}`).value;
+  const reason      = document.getElementById(`er-o-${id}`).value;
+  if (isNaN(newHours)) { alert('Please enter valid hours.'); return; }
+
+  entry.amendments.push({
+    by: 'Office',
+    at: new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+    note: reason
+  });
+  entry.jobId    = newJob;
+  entry.hours    = newHours;
+  entry.comments = newComments;
+  localStorage.setItem('entries', JSON.stringify(entries));
+
+  renderDailyView();
+  renderOfficeEntries();
+
+  const { synced } = await queueOrSend('updateEntry', { entry: { ...entry, amendments: amendmentsToString(entry.amendments) } });
+  if (synced) setSyncStatus('office', 'synced', 'Saved to Sheets');
+}
+
+function closeDailyViewEdit(id) {
+  const row = document.getElementById(`editrow-o-${id}`);
+  if (row) row.style.display = 'none';
+}
+
 async function saveEdit(id, isOffice) {
   const p = isOffice ? 'o' : 'w';
   const entry = entries.find(e => e.id === id);
@@ -2409,8 +2441,8 @@ function renderDailyView() {
                   <input type="text" id="er-o-${e.id}" placeholder="e.g. Entered wrong hours">
                 </div>
                 <div class="edit-actions">
-                  <button class="btn btn-primary btn-sm" onclick="saveEditOfficeEntries('${e.id}')">Save changes</button>
-                  <button class="btn btn-sm" onclick="toggleEditOfficeEntries('${e.id}')">Cancel</button>
+                  <button class="btn btn-primary btn-sm" onclick="saveDailyViewEdit('${e.id}')">Save changes</button>
+                  <button class="btn btn-sm" onclick="closeDailyViewEdit('${e.id}')">Cancel</button>
                 </div>
               </div>
             </td>
