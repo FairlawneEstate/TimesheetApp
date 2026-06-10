@@ -1592,6 +1592,12 @@ async function saveDailyViewEdit(id) {
   if (synced) setSyncStatus('office', 'synced', 'Saved to Sheets');
 }
 
+function toggleDailyViewEdit(id) {
+  const row = document.getElementById(`editrow-o-${id}`);
+  if (!row) return;
+  row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
+}
+
 function closeDailyViewEdit(id) {
   const row = document.getElementById(`editrow-o-${id}`);
   if (row) row.style.display = 'none';
@@ -2400,7 +2406,7 @@ function renderDailyView() {
               ${e.isOvertime && amended && lastAmend.note && lastAmend.note.includes('): ') ? `<div style="font-size:10px;font-style:italic;margin-top:2px;color:var(--color-text-secondary);">${lastAmend.note.slice(lastAmend.note.indexOf('): ') + 3)}</div>` : ''}
             </td>
             <td style="padding:4px 8px;text-align:right;vertical-align:middle;width:160px;white-space:nowrap;">
-              <button class="btn btn-sm" onclick="toggleEditOfficeEntries('${e.id}')">Edit</button>
+              <button class="btn btn-sm" onclick="toggleDailyViewEdit('${e.id}')">Edit</button>
               <button class="btn btn-sm" style="color:var(--color-text-error);border-color:var(--color-border-error);margin-left:4px;" onclick="deleteEntry('${e.id}', true)">Delete</button>
             </td>
           </tr>
