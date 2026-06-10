@@ -1118,6 +1118,7 @@ async function submitEntry() {
   document.getElementById('entry-hours').value = '';
   document.getElementById('entry-comments').value = '';
 
+  updateHoursPlaceholder();
   renderEntriesByDate();
 
   const { synced } = await queueOrSend('addEntry', { entry: { ...entry, amendments: amendmentsToString(entry.amendments) } });
