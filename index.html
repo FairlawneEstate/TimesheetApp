@@ -1937,13 +1937,13 @@ function renderOfficeEntries() {
               <button class="btn btn-sm" style="color:var(--color-text-error);border-color:var(--color-border-error);margin-left:4px;" onclick="deleteEntry('${e.id}', true)">Delete</button>
           </td>
         </tr>
-        <tr id="editrow-o-${e.id}" style="display:none;">
+        <tr id="editrow-oe-${e.id}" style="display:none;">
           <td colspan="7" style="padding:0;">
             <div class="entry-edit" style="display:block;margin:0;border-radius:0;">
               <div class="edit-grid">
                 <div class="edit-field">
                   <label>Job</label>
-                  <select id="ej-o-${e.id}">
+                  <select id="ej-oe-${e.id}">
                     ${(() => {
                       const openJobs = jobs.filter(j => j.open || j.id === e.jobId);
                       const assigned = openJobs.filter(j => expandAssignedTo(j.assignedTo).includes(e.worker));
@@ -1962,16 +1962,16 @@ function renderOfficeEntries() {
                 </div>
                 <div class="edit-field">
                   <label>Hours</label>
-                  <input type="number" id="eh-o-${e.id}" value="${e.hours}" min="0.5" max="16" step="0.5">
+                  <input type="number" id="eh-oe-${e.id}" value="${e.hours}" min="0.5" max="16" step="0.5">
                 </div>
               </div>
               <div class="edit-comments">
                 <label>Comments</label>
-                <textarea id="en-o-${e.id}">${e.comments || ''}</textarea>
+                <textarea id="en-oe-${e.id}">${e.comments || ''}</textarea>
               </div>
               <div class="edit-comments">
                 <label>Reason for amendment</label>
-                <input type="text" id="er-o-${e.id}" placeholder="e.g. Entered wrong hours">
+                <input type="text" id="er-oe-${e.id}" placeholder="e.g. Entered wrong hours">
               </div>
               <div class="edit-actions">
                 <button class="btn btn-primary btn-sm" onclick="saveEditOfficeEntries('${e.id}')">Save changes</button>
@@ -2007,17 +2007,17 @@ function renderOfficeEntries() {
 }
 
 function toggleEditOfficeEntries(id) {
-  const row = document.getElementById('editrow-o-' + id);
+  const row = document.getElementById('editrow-oe-' + id);
   if (row) row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
 }
 
 async function saveEditOfficeEntries(id) {
   const entry = entries.find(e => e.id === id);
   if (!entry) return;
-  const newJob = document.getElementById(`ej-o-${id}`).value;
-  const newHours = parseFloat(document.getElementById(`eh-o-${id}`).value);
-  const newComments = document.getElementById(`en-o-${id}`).value;
-  const reason = document.getElementById(`er-o-${id}`).value;
+  const newJob = document.getElementById(`ej-oe-${id}`).value;
+  const newHours = parseFloat(document.getElementById(`eh-oe-${id}`).value);
+  const newComments = document.getElementById(`en-oe-${id}`).value;
+  const reason = document.getElementById(`er-oe-${id}`).value;
   if (isNaN(newHours)) { alert('Please enter valid hours.'); return; }
   const amendment = {
     by: 'Office',
