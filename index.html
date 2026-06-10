@@ -2292,6 +2292,7 @@ async function deleteEntry(id, isOffice) {
   localStorage.setItem('entries', JSON.stringify(entries));
   if (isOffice) {
     renderOfficeEntries();
+    renderDailyView();
     setSyncStatus('office', 'pending', 'Deleting...');
   } else {
     renderEntriesByDate();
