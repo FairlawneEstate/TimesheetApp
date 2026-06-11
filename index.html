@@ -1300,7 +1300,7 @@ function renderWeek(wc) {
     }
 
     const entryRowsHtml = dayEntries.map((e, idx) => {
-      const job = jobs.find(j => j.id === e.jobId) || recurringJobs.find(j => j.id === e.jobId) || tasks.find(j => j.id === e.jobId); const jobProperty = job ? job.property : (e.property || ''); const jobDescription = (job ? (job.description || '') : (e.description || '')).slice(0, 300);
+      const job = jobs.find(j => j.id === e.jobId) || recurringJobs.find(j => j.id === e.jobId) || tasks.find(j => j.id === e.jobId); const jobProperty = job ? job.property : (e.property || ''); const jobDescription = (job ? (job.description || '') : (e.description || '')).slice(0, 200);
       const amended = e.amendments && e.amendments.length > 0;
       const lastAmend = amended ? e.amendments[e.amendments.length - 1] : null;
       const isPending = syncQueue.some(q => q.payload?.entry?.id === e.id);
@@ -1907,7 +1907,7 @@ function renderOfficeEntries() {
       }
 
       return dayEntries.map((e, idx) => {
-        const job = jobs.find(j => j.id === e.jobId) || recurringJobs.find(j => j.id === e.jobId) || tasks.find(j => j.id === e.jobId); const jobProperty = job ? job.property : (e.property || ''); const jobDescription = (job ? (job.description || '') : (e.description || '')).slice(0, 300);
+        const job = jobs.find(j => j.id === e.jobId) || recurringJobs.find(j => j.id === e.jobId) || tasks.find(j => j.id === e.jobId); const jobProperty = job ? job.property : (e.property || ''); const jobDescription = (job ? (job.description || '') : (e.description || '')).slice(0, 200);
         const amended = e.amendments && e.amendments.length > 0;
         const lastAmend = amended ? e.amendments[e.amendments.length - 1] : null;
         const isPending = syncQueue.some(q => q.payload?.entry?.id === e.id);
@@ -2389,7 +2389,7 @@ function renderDailyView() {
       : dayEntries.map((e, idx) => {
           const job = jobs.find(j => j.id === e.jobId) || recurringJobs.find(j => j.id === e.jobId) || tasks.find(j => j.id === e.jobId);
           const jobProperty = job ? job.property : (e.property || '');
-          const jobDescription = (job ? (job.description || '') : (e.description || '')).slice(0, 300);
+          const jobDescription = (job ? (job.description || '') : (e.description || '')).slice(0, 200);
           const amended = e.amendments && e.amendments.length > 0;
           const lastAmend = amended ? e.amendments[e.amendments.length - 1] : null;
           return `
@@ -2911,7 +2911,7 @@ function exportCSV() {
     return [
       e.worker, e.jobId,
       job ? job.property : (e.property || ''),
-      (job ? (job.description || '') : (e.description || '')).slice(0, 300),
+      (job ? (job.description || '') : (e.description || '')).slice(0, 200),
       e.date, e.hours,
       e.isOvertime ? 'Yes' : 'No',
       e.overtimeStart || '',
