@@ -204,6 +204,42 @@ textarea { height: 60px; resize: none; }
   .section-label { font-size: 15px; margin: 1.25rem 0 0.75rem; }
   .sync-status { font-size: 13px; }
 }
+
+/* ── Searchable Select ───────────────────────────────────────── */
+.ss-wrap { position: relative; width: 100%; }
+.ss-input {
+  width: 100%; box-sizing: border-box; padding: 8px 30px 8px 10px;
+  border: 0.5px solid var(--color-border-secondary);
+  border-radius: var(--border-radius-md);
+  background: var(--color-background-primary); color: var(--color-text-primary);
+  font-size: 13px; cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath fill='%23888' d='M5 7L0 2h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 10px center;
+}
+.ss-input:focus { outline: none; border-color: var(--color-border-primary); }
+.ss-input.ss-open { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+.ss-dropdown {
+  display: none; position: absolute; z-index: 999; width: 100%;
+  background: var(--color-background-primary);
+  border: 0.5px solid var(--color-border-primary); border-top: none;
+  border-bottom-left-radius: var(--border-radius-md);
+  border-bottom-right-radius: var(--border-radius-md);
+  max-height: 250px; overflow-y: auto;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+.ss-dropdown.ss-open { display: block; }
+.ss-group { padding: 5px 10px 2px; font-size: 10px; font-weight: 600;
+  text-transform: uppercase; color: var(--color-text-secondary);
+  letter-spacing: 0.4px; border-top: 0.5px solid var(--color-border-tertiary); }
+.ss-group:first-child { border-top: none; }
+.ss-opt { padding: 7px 10px; font-size: 13px; cursor: pointer; color: var(--color-text-primary); }
+.ss-opt:hover { background: var(--color-background-secondary); }
+.ss-opt.selected { font-weight: 600; }
+.ss-none { padding: 8px 10px; font-size: 13px; color: var(--color-text-secondary); font-style: italic; }
+@media (min-width:600px) and (max-width:1400px) and (pointer:coarse) {
+  .ss-input { font-size: 16px; padding: 14px 30px 14px 12px; min-height: 52px; }
+  .ss-opt   { padding: 12px 12px; font-size: 15px; }
+}
 </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
@@ -265,9 +301,7 @@ textarea { height: 60px; resize: none; }
 
       <div class="card">
         <label>Job number</label>
-        <select id="job-select" onchange="fillJobDetails()">
-          <option value="">Select a job...</option>
-        </select>
+        <div id="ss-job"></div>
         <div id="job-detail" class="job-detail">
           <p class="job-title" id="job-prop"></p>
           <p class="text-muted" id="job-desc"></p>
@@ -875,13 +909,9 @@ async function pollJobs() {
     localStorage.setItem('workers', JSON.stringify(workers));
     localStorage.setItem('tasks', JSON.stringify(tasks));
     localStorage.setItem('tasks', JSON.stringify(tasks));
-    const currentJobSel = document.getElementById('job-select');
-    const savedJobId = currentJobSel ? currentJobSel.value : '';
+    const savedJobId = ssVal('ss-job');
     populateJobDropdown();
-    if (savedJobId && currentJobSel) {
-      currentJobSel.value = savedJobId;
-      if (!currentJobSel.value) currentJobSel.value = '';
-    }
+    if (savedJobId) ssSet('ss-job', savedJobId);
     renderEntriesByDate();
     updateHoursPlaceholder();
     setSyncStatus('worker', 'synced', 'Updated ' + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }));
@@ -908,46 +938,11 @@ function expandAssignedTo(assignedTo) {
 }
 
 function populateJobDropdown() {
-  const sel = document.getElementById('job-select');
-  const open = jobs.filter(j => j.open);
-  const isManager = (currentWorker || '').trim().toLowerCase().replace(/\s+/g, ' ') === 'chris rosier';
-  let html = '<option value="">Select a job...</option>';
-
-  if (isManager) {
-    // Manager sees all active WOs + all tasks, no recurring
-    if (open.length) {
-      html += `<optgroup label="Active Work Orders">`;
-      html += open.map(j => `<option value="${j.id}">${j.id} · ${j.property} · ${j.description && j.description.length > 60 ? j.description.slice(0, 60) + '…' : (j.description || '')}</option>`).join('');
-      html += `</optgroup>`;
-    }
-    const activeTasks = tasks.filter(t => t.active !== false && t.active !== 'FALSE');
-    if (activeTasks.length) {
-      html += `<optgroup label="Tasks">`;
-      html += activeTasks.map(t => `<option value="${t.id}">${t.id} · ${t.property || ''} · ${t.description && t.description.length > 60 ? t.description.slice(0, 60) + '…' : (t.description || '')}</option>`).join('');
-      html += `</optgroup>`;
-    }
-  } else {
-    const assignedRecurring = recurringJobs.filter(j => j.active !== false && j.active !== 'FALSE' && expandAssignedTo(j.assignedTo || '').includes(currentWorker));
-    const mine = open.filter(j => expandAssignedTo(j.assignedTo).includes(currentWorker));
-    const mineAll = [...mine, ...assignedRecurring.map(j => ({ ...j, _recurring: true }))];
-    if (mineAll.length) {
-      html += `<optgroup label="Your assigned jobs">`;
-      html += mineAll.map(j => `<option value="${j.id}">${j.id} · ${j.property} · ${j.description && j.description.length > 60 ? j.description.slice(0, 60) + '…' : (j.description || '')}</option>`).join('');
-      html += `</optgroup>`;
-    }
-  }
-
-  const activeAbsenceTypes = absenceTypes.filter(a => a.active !== false && a.active !== 'FALSE');
-  if (activeAbsenceTypes.length) {
-    html += `<optgroup label="Absence / Leave">`;
-    html += activeAbsenceTypes.map(a => `<option value="${a.id}">${a.id} · ${a.name}</option>`).join('');
-    html += `</optgroup>`;
-  }
-  sel.innerHTML = html;
+  ssInit('ss-job', buildJobOpts(currentWorker), '', function(val){ fillJobDetails(val); }, 'Search or select a job...');
 }
 
-function fillJobDetails() {
-  const id = document.getElementById('job-select').value;
+function fillJobDetails(id) {
+  id = id !== undefined ? id : ssVal('ss-job');
   const detail = document.getElementById('job-detail');
   if (!id) { detail.style.display = 'none'; return; }
   const job = jobs.find(j => j.id === id) || recurringJobs.find(j => j.id === id) || absenceTypes.find(a => a.id === id);
@@ -1070,7 +1065,8 @@ async function confirmOvertime() {
 
   document.getElementById('overtime-modal').style.display = 'none';
   pendingOvertimeEntry = null;
-  document.getElementById('job-select').value = '';
+  ssReset('ss-job');
+  fillJobDetails('');
   document.getElementById('job-detail').style.display = 'none';
   document.getElementById('entry-hours').value = '';
   document.getElementById('entry-comments').value = '';
@@ -1087,7 +1083,7 @@ async function confirmOvertime() {
 }
 
 async function submitEntry() {
-  const jobId = document.getElementById('job-select').value;
+  const jobId = ssVal('ss-job');
   const date = document.getElementById('entry-date').value;
   const hours = parseFloat(document.getElementById('entry-hours').value);
   const comments = document.getElementById('entry-comments').value;
@@ -1113,7 +1109,8 @@ async function submitEntry() {
   entries.push(entry);
   localStorage.setItem('entries', JSON.stringify(entries));
 
-  document.getElementById('job-select').value = '';
+  ssReset('ss-job');
+  fillJobDetails('');
   document.getElementById('job-detail').style.display = 'none';
   document.getElementById('entry-hours').value = '';
   document.getElementById('entry-comments').value = '';
@@ -2943,6 +2940,95 @@ if ('serviceWorker' in navigator) {
       .then(reg => console.log('SW registered:', reg.scope))
       .catch(err => console.log('SW registration failed:', err));
   });
+}
+
+// ── Searchable Select helpers ─────────────────────────────────────
+function ssInit(id, opts, val, cb, ph) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  el._ssOpts = opts; el._ssCb = cb; el._ssVal = val || '';
+  var lbl = (opts.find(function(o){return o.v===el._ssVal;})||{}).l || '';
+  el.innerHTML =
+    '<div class="ss-wrap">' +
+    '<input class="ss-input" id="' + id + '_i" type="text" autocomplete="off"' +
+    ' placeholder="' + (ph||'Search...') + '"' +
+    ' value="' + lbl.replace(/"/g,'&quot;') + '" readonly' +
+    ' onfocus="ssOpen('' + id + '')" oninput="ssFilt('' + id + '')">' +
+    '<div class="ss-dropdown" id="' + id + '_d"></div></div>';
+  ssDraw(id, '');
+}
+function ssDraw(id, q) {
+  var el = document.getElementById(id), dd = document.getElementById(id + '_d');
+  if (!el || !dd) return;
+  var opts = el._ssOpts || [], val = el._ssVal || '';
+  var list = q ? opts.filter(function(o){ return o.l.toLowerCase().indexOf(q.toLowerCase()) > -1 || (o.g||'').toLowerCase().indexOf(q.toLowerCase()) > -1; }) : opts;
+  if (!list.length) { dd.innerHTML = '<div class="ss-none">No results</div>'; return; }
+  var h = '', g = null;
+  list.forEach(function(o) {
+    if (o.g && o.g !== g) { h += '<div class="ss-group">' + o.g + '</div>'; g = o.g; }
+    h += '<div class="ss-opt' + (o.v === val ? ' selected' : '') + '"' +
+         ' onmousedown="ssPick('' + id + '','' + o.v.replace(/\/g,'\\').replace(/'/g,"\'") + '')">' + o.l + '</div>';
+  });
+  dd.innerHTML = h;
+}
+function ssOpen(id) {
+  document.querySelectorAll('.ss-dropdown.ss-open').forEach(function(d){
+    var c = d.id.replace('_d',''), inp = document.getElementById(c + '_i'), cel = document.getElementById(c);
+    if (c !== id) {
+      var lbl = ((cel&&cel._ssOpts||[]).find(function(o){return o.v===(cel&&cel._ssVal||'');})||{}).l||'';
+      if (inp) { inp.value = lbl; inp.readOnly = true; inp.classList.remove('ss-open'); }
+      d.classList.remove('ss-open');
+    }
+  });
+  var inp = document.getElementById(id + '_i'), dd = document.getElementById(id + '_d');
+  if (!inp || !dd) return;
+  inp.readOnly = false; inp.value = ''; inp.classList.add('ss-open'); dd.classList.add('ss-open');
+  ssDraw(id, '');
+}
+function ssFilt(id) { var inp = document.getElementById(id+'_i'); if (inp) ssDraw(id, inp.value); }
+function ssPick(id, v) {
+  var el = document.getElementById(id), inp = document.getElementById(id+'_i'), dd = document.getElementById(id+'_d');
+  if (!el) return;
+  el._ssVal = v;
+  var lbl = ((el._ssOpts||[]).find(function(o){return o.v===v;})||{}).l||'';
+  if (inp) { inp.value = lbl; inp.readOnly = true; inp.classList.remove('ss-open'); }
+  if (dd) dd.classList.remove('ss-open');
+  if (el._ssCb) el._ssCb(v);
+}
+function ssVal(id) { var el = document.getElementById(id); return el ? el._ssVal || '' : ''; }
+function ssSet(id, v) {
+  var el = document.getElementById(id), inp = document.getElementById(id+'_i'), dd = document.getElementById(id+'_d');
+  if (!el) return; el._ssVal = v;
+  var lbl = ((el._ssOpts||[]).find(function(o){return o.v===v;})||{}).l||'';
+  if (inp) { inp.value = lbl; inp.readOnly = true; inp.classList.remove('ss-open'); }
+  if (dd) dd.classList.remove('ss-open');
+}
+function ssReset(id) { ssSet(id,''); }
+document.addEventListener('mousedown', function(e) {
+  if (!e.target.closest('.ss-wrap')) {
+    document.querySelectorAll('.ss-dropdown.ss-open').forEach(function(d){
+      var id = d.id.replace('_d','');
+      var el = document.getElementById(id), inp = document.getElementById(id+'_i');
+      var lbl = ((el&&el._ssOpts||[]).find(function(o){return o.v===(el&&el._ssVal||'');})||{}).l||'';
+      if (inp) { inp.value = lbl; inp.readOnly = true; inp.classList.remove('ss-open'); }
+      d.classList.remove('ss-open');
+    });
+  }
+});
+function buildJobOpts(forWorker) {
+  var w = (forWorker||currentWorker||'').trim().toLowerCase().replace(/\s+/g,' ');
+  var isMgr = w === 'chris rosier';
+  var opts = [];
+  function fmt(j, g) { return {v: j.id, l: j.id + ' · ' + (j.property||'') + ' · ' + ((j.description||j.name||'').slice(0,60)), g: g}; }
+  if (isMgr) {
+    jobs.filter(function(j){return j.open;}).forEach(function(j){opts.push(fmt(j,'Active Work Orders'));});
+    tasks.filter(function(t){return t.active!==false&&t.active!=='FALSE';}).forEach(function(t){opts.push(fmt(t,'Tasks'));});
+  } else {
+    jobs.filter(function(j){return j.open&&expandAssignedTo(j.assignedTo).includes(forWorker||currentWorker);}).forEach(function(j){opts.push(fmt(j,'Assigned Jobs'));});
+    recurringJobs.filter(function(j){return j.active!==false&&j.active!=='FALSE'&&expandAssignedTo(j.assignedTo||'').includes(forWorker||currentWorker);}).forEach(function(j){opts.push(fmt(j,'Recurring Jobs'));});
+  }
+  absenceTypes.filter(function(a){return a.active!==false&&a.active!=='FALSE';}).forEach(function(a){opts.push({v:a.id,l:a.id+' · '+a.name,g:'Absence / Leave'});});
+  return opts;
 }
 </script>
 </body>
