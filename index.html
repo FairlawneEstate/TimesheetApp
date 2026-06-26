@@ -204,44 +204,6 @@ textarea { height: 60px; resize: none; }
   .section-label { font-size: 15px; margin: 1.25rem 0 0.75rem; }
   .sync-status { font-size: 13px; }
 }
-
-/* ── Searchable Select Component ─────────────────────────────── */
-.ss-wrap { position: relative; width: 100%; }
-.ss-input {
-  width: 100%; box-sizing: border-box;
-  padding: 8px 32px 8px 10px;
-  border: 0.5px solid var(--color-border-secondary);
-  border-radius: var(--border-radius-md);
-  background: var(--color-background-primary);
-  color: var(--color-text-primary);
-  font-size: 13px; cursor: pointer;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
-  background-repeat: no-repeat; background-position: right 10px center;
-}
-.ss-input:focus { outline: none; border-color: var(--color-border-primary); }
-.ss-input.ss-open { border-bottom-left-radius:0; border-bottom-right-radius:0; border-color:var(--color-border-primary); }
-.ss-dropdown {
-  display:none; position:absolute; z-index:1000; width:100%;
-  background:var(--color-background-primary);
-  border:0.5px solid var(--color-border-primary); border-top:none;
-  border-bottom-left-radius:var(--border-radius-md); border-bottom-right-radius:var(--border-radius-md);
-  max-height:260px; overflow-y:auto; box-shadow:0 4px 12px rgba(0,0,0,0.08);
-}
-.ss-dropdown.ss-open { display:block; }
-.ss-group-label {
-  padding:6px 10px 3px; font-size:10px; font-weight:600; text-transform:uppercase;
-  color:var(--color-text-secondary); letter-spacing:0.5px;
-  border-top:0.5px solid var(--color-border-tertiary);
-}
-.ss-group-label:first-child { border-top:none; }
-.ss-option { padding:8px 10px; font-size:13px; cursor:pointer; color:var(--color-text-primary); }
-.ss-option:hover, .ss-option.ss-focused { background:var(--color-background-secondary); }
-.ss-option.ss-selected { font-weight:500; }
-.ss-no-results { padding:8px 10px; font-size:13px; color:var(--color-text-secondary); font-style:italic; }
-@media (min-width:600px) and (max-width:1400px) and (pointer:coarse) {
-  .ss-input { font-size:16px; padding:14px 32px 14px 12px; min-height:52px; }
-  .ss-option { padding:12px; font-size:15px; }
-}
 </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
@@ -303,7 +265,9 @@ textarea { height: 60px; resize: none; }
 
       <div class="card">
         <label>Job number</label>
-        <div id="job-select-ss"></div>
+        <select id="job-select" onchange="fillJobDetails()">
+          <option value="">Select a job...</option>
+        </select>
         <div id="job-detail" class="job-detail">
           <p class="job-title" id="job-prop"></p>
           <p class="text-muted" id="job-desc"></p>
@@ -425,7 +389,7 @@ textarea { height: 60px; resize: none; }
               </div>
               <div>
                 <label style="margin-top:0;">Job</label>
-                <div id="dae-job-ss"></div>
+                <select id="dae-job"></select>
               </div>
             </div>
             <div class="grid2" style="margin-top:10px;">
@@ -467,7 +431,7 @@ textarea { height: 60px; resize: none; }
               </div>
               <div>
                 <label style="margin-top:0;">Job</label>
-                <div id="oae-job-ss"></div>
+                <select id="oae-job"></select>
               </div>
             </div>
             <div class="grid2" style="margin-top:10px;">
@@ -911,9 +875,13 @@ async function pollJobs() {
     localStorage.setItem('workers', JSON.stringify(workers));
     localStorage.setItem('tasks', JSON.stringify(tasks));
     localStorage.setItem('tasks', JSON.stringify(tasks));
-    const savedJobId = ssGetValue('job-select-ss');
+    const currentJobSel = document.getElementById('job-select');
+    const savedJobId = currentJobSel ? currentJobSel.value : '';
     populateJobDropdown();
-    if (savedJobId) ssSetValue('job-select-ss', savedJobId);
+    if (savedJobId && currentJobSel) {
+      currentJobSel.value = savedJobId;
+      if (!currentJobSel.value) currentJobSel.value = '';
+    }
     renderEntriesByDate();
     updateHoursPlaceholder();
     setSyncStatus('worker', 'synced', 'Updated ' + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }));
@@ -940,13 +908,46 @@ function expandAssignedTo(assignedTo) {
 }
 
 function populateJobDropdown() {
-  const opts = buildJobOptions(currentWorker);
-  createSearchableSelect('job-select-ss', opts, '', function(val) { fillJobDetailsFromValue(val); }, 'Search or select a job...');
+  const sel = document.getElementById('job-select');
+  const open = jobs.filter(j => j.open);
+  const isManager = (currentWorker || '').trim().toLowerCase().replace(/\s+/g, ' ') === 'chris rosier';
+  let html = '<option value="">Select a job...</option>';
+
+  if (isManager) {
+    // Manager sees all active WOs + all tasks, no recurring
+    if (open.length) {
+      html += `<optgroup label="Active Work Orders">`;
+      html += open.map(j => `<option value="${j.id}">${j.id} · ${j.property} · ${j.description && j.description.length > 60 ? j.description.slice(0, 60) + '…' : (j.description || '')}</option>`).join('');
+      html += `</optgroup>`;
+    }
+    const activeTasks = tasks.filter(t => t.active !== false && t.active !== 'FALSE');
+    if (activeTasks.length) {
+      html += `<optgroup label="Tasks">`;
+      html += activeTasks.map(t => `<option value="${t.id}">${t.id} · ${t.property || ''} · ${t.description && t.description.length > 60 ? t.description.slice(0, 60) + '…' : (t.description || '')}</option>`).join('');
+      html += `</optgroup>`;
+    }
+  } else {
+    const assignedRecurring = recurringJobs.filter(j => j.active !== false && j.active !== 'FALSE' && expandAssignedTo(j.assignedTo || '').includes(currentWorker));
+    const mine = open.filter(j => expandAssignedTo(j.assignedTo).includes(currentWorker));
+    const mineAll = [...mine, ...assignedRecurring.map(j => ({ ...j, _recurring: true }))];
+    if (mineAll.length) {
+      html += `<optgroup label="Your assigned jobs">`;
+      html += mineAll.map(j => `<option value="${j.id}">${j.id} · ${j.property} · ${j.description && j.description.length > 60 ? j.description.slice(0, 60) + '…' : (j.description || '')}</option>`).join('');
+      html += `</optgroup>`;
+    }
+  }
+
+  const activeAbsenceTypes = absenceTypes.filter(a => a.active !== false && a.active !== 'FALSE');
+  if (activeAbsenceTypes.length) {
+    html += `<optgroup label="Absence / Leave">`;
+    html += activeAbsenceTypes.map(a => `<option value="${a.id}">${a.id} · ${a.name}</option>`).join('');
+    html += `</optgroup>`;
+  }
+  sel.innerHTML = html;
 }
 
-
-function fillJobDetails() { fillJobDetailsFromValue(ssGetValue('job-select-ss')); }
-function fillJobDetailsFromValue(id) {
+function fillJobDetails() {
+  const id = document.getElementById('job-select').value;
   const detail = document.getElementById('job-detail');
   if (!id) { detail.style.display = 'none'; return; }
   const job = jobs.find(j => j.id === id) || recurringJobs.find(j => j.id === id) || absenceTypes.find(a => a.id === id);
@@ -1069,8 +1070,7 @@ async function confirmOvertime() {
 
   document.getElementById('overtime-modal').style.display = 'none';
   pendingOvertimeEntry = null;
-  ssReset('job-select-ss');
-  fillJobDetailsFromValue('');
+  document.getElementById('job-select').value = '';
   document.getElementById('job-detail').style.display = 'none';
   document.getElementById('entry-hours').value = '';
   document.getElementById('entry-comments').value = '';
@@ -1087,7 +1087,7 @@ async function confirmOvertime() {
 }
 
 async function submitEntry() {
-  const jobId = ssGetValue('job-select-ss');
+  const jobId = document.getElementById('job-select').value;
   const date = document.getElementById('entry-date').value;
   const hours = parseFloat(document.getElementById('entry-hours').value);
   const comments = document.getElementById('entry-comments').value;
@@ -1113,8 +1113,7 @@ async function submitEntry() {
   entries.push(entry);
   localStorage.setItem('entries', JSON.stringify(entries));
 
-  ssReset('job-select-ss');
-  fillJobDetailsFromValue('');
+  document.getElementById('job-select').value = '';
   document.getElementById('job-detail').style.display = 'none';
   document.getElementById('entry-hours').value = '';
   document.getElementById('entry-comments').value = '';
@@ -1570,7 +1569,7 @@ function toggleEdit(id, isOffice) {
 async function saveDailyViewEdit(id) {
   const entry = entries.find(e => e.id === id);
   if (!entry) return;
-  const newJob      = ssGetValue(`ej-o-${id}-ss`);
+  const newJob      = document.getElementById(`ej-o-${id}`).value;
   const newHours    = parseFloat(document.getElementById(`eh-o-${id}`).value);
   const newComments = document.getElementById(`en-o-${id}`).value;
   const reason      = document.getElementById(`er-o-${id}`).value;
@@ -1950,7 +1949,22 @@ function renderOfficeEntries() {
               <div class="edit-grid">
                 <div class="edit-field">
                   <label>Job</label>
-                  <div id="ej-oe-${e.id}-ss" data-worker="${e.worker}" data-job="${e.jobId}" style="flex:1;min-width:200px;"></div>
+                  <select id="ej-oe-${e.id}">
+                    ${(() => {
+                      const openJobs = jobs.filter(j => j.open || j.id === e.jobId);
+                      const assigned = openJobs.filter(j => expandAssignedTo(j.assignedTo).includes(e.worker));
+                      const others   = openJobs.filter(j => !expandAssignedTo(j.assignedTo).includes(e.worker));
+                      const recurr   = recurringJobs.filter(j => j.active !== false && j.active !== 'FALSE' || j.id === e.jobId);
+                      const absTypes = absenceTypes.filter(a => a.active !== false && a.active !== 'FALSE');
+                      const fmt = j => `<option value="${j.id}" ${j.id === e.jobId ? 'selected' : ''}>${j.id} · ${j.property || j.name || ''} · ${(j.description || j.name || '').slice(0,40)}</option>`;
+                      let html = '';
+                      if (assigned.length) html += `<optgroup label="Assigned Jobs">${assigned.map(fmt).join('')}</optgroup>`;
+                      if (others.length)   html += `<optgroup label="Other Jobs">${others.map(fmt).join('')}</optgroup>`;
+                      if (recurr.length)   html += `<optgroup label="Recurring Jobs">${recurr.map(fmt).join('')}</optgroup>`;
+                      if (absTypes.length) html += `<optgroup label="Absence / Leave">${absTypes.map(fmt).join('')}</optgroup>`;
+                      return html;
+                    })()}
+                  </select>
                 </div>
                 <div class="edit-field">
                   <label>Hours</label>
@@ -1996,7 +2010,6 @@ function renderOfficeEntries() {
   });
 
   el.innerHTML = html;
-  initInlineJobSelects();
 }
 
 function toggleEditOfficeEntries(id) {
@@ -2007,7 +2020,7 @@ function toggleEditOfficeEntries(id) {
 async function saveEditOfficeEntries(id) {
   const entry = entries.find(e => e.id === id);
   if (!entry) return;
-  const newJob = ssGetValue(`ej-oe-${id}-ss`);
+  const newJob = document.getElementById(`ej-oe-${id}`).value;
   const newHours = parseFloat(document.getElementById(`eh-oe-${id}`).value);
   const newComments = document.getElementById(`en-oe-${id}`).value;
   const reason = document.getElementById(`er-oe-${id}`).value;
@@ -2212,16 +2225,82 @@ function toggleOfficeAddEntry() {
     const workerSel = document.getElementById('oae-worker');
     const active = workers.filter(w => w.active !== false && w.active !== 'FALSE');
     workerSel.innerHTML = '<option value="">Select worker...</option>' + active.map(w => `<option value="${w.name}">${w.name}</option>`).join('');
-    createSearchableSelect('oae-job-ss', [], '', null, 'Select worker first...');
+    document.getElementById('oae-job').innerHTML = '<option value="">Select worker first...</option>';
   }
 }
 
 function populateOfficeEntryJobDropdown() {
-  const w = document.getElementById('oae-worker').value;
-  if (!w) { createSearchableSelect('oae-job-ss', [], '', null, 'Select worker first...'); return; }
-  createSearchableSelect('oae-job-ss', buildJobOptions(w), '', null, 'Search or select a job...');
+  const selectedWorker = document.getElementById('oae-worker').value;
+  const jobSel = document.getElementById('oae-job');
+  if (!selectedWorker) {
+    jobSel.innerHTML = '<option value="">Select worker first...</option>';
+    return;
+  }
+  const openJobs = jobs.filter(j => j.open);
+  const assigned = openJobs.filter(j => expandAssignedTo(j.assignedTo).includes(selectedWorker));
+  const others = openJobs.filter(j => !expandAssignedTo(j.assignedTo).includes(selectedWorker));
+  const activeRecurring = recurringJobs.filter(j => j.active !== false && j.active !== 'FALSE');
+  const fmt = j => `<option value="${j.id}">${j.id} · ${j.property}${j.description ? ' · ' + (j.description.length > 40 ? j.description.slice(0,40) + '…' : j.description) : ''}</option>`;
+  let html = '<option value="">Select a job...</option>';
+  if (assigned.length) html += `<optgroup label="Assigned Jobs">${assigned.map(fmt).join('')}</optgroup>`;
+  if (others.length)   html += `<optgroup label="Other Jobs">${others.map(fmt).join('')}</optgroup>`;
+  const activeRecurring2 = recurringJobs.filter(j => j.active !== false && j.active !== 'FALSE');
+  if (activeRecurring2.length) html += `<optgroup label="Recurring Jobs">${activeRecurring2.map(fmt).join('')}</optgroup>`;
+  const activeAbsTypes = absenceTypes.filter(a => a.active !== false && a.active !== 'FALSE');
+  if (activeAbsTypes.length) html += `<optgroup label="Absence / Leave">${activeAbsTypes.map(a => `<option value="${a.id}">${a.id} · ${a.name}</option>`).join('')}</optgroup>`;
+  jobSel.innerHTML = html;
 }
 
+async function submitOfficeEntry() {
+  const worker   = document.getElementById('oae-worker').value;
+  const jobId    = document.getElementById('oae-job').value;
+  const date     = document.getElementById('oae-date').value;
+  const hours    = parseFloat(document.getElementById('oae-hours').value);
+  const comments = document.getElementById('oae-comments').value;
+  if (!worker || !jobId || !date || isNaN(hours)) { alert('Please fill in all required fields.'); return; }
+  const alreadyLogged = entries.filter(e => e.worker === worker && normaliseDate(e.date) === date).reduce((s, e) => s + parseFloat(e.hours || 0), 0);
+  if (alreadyLogged + hours > 8) { alert('Overtime has to be approved via manager.'); return; }
+  const allJobs = [...jobs];
+  const jobObj = allJobs.find(j => j.id === jobId);
+  const amendment = {
+    by: 'Office',
+    at: new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+    note: 'Created by Office'
+  };
+  const entry = {
+    id: uid(), worker, jobId, date, hours, comments,
+    amendments: [amendment],
+    createdAt: new Date().toISOString(),
+    property: jobObj ? jobObj.property : '',
+    description: jobObj ? jobObj.description : ''
+  };
+  entries.push(entry);
+  localStorage.setItem('entries', JSON.stringify(entries));
+  document.getElementById('oae-worker').value = '';
+  document.getElementById('oae-job').innerHTML = '<option value="">Select worker first...</option>';
+  document.getElementById('oae-hours').value = '';
+  document.getElementById('oae-comments').value = '';
+  toggleOfficeAddEntry();
+  renderOfficeEntries();
+  const { synced } = await queueOrSend('addEntry', { entry: { ...entry, amendments: amendmentsToString(entry.amendments) } });
+  if (synced) setSyncStatus('office', 'synced', 'Entry saved to Sheets');
+}
+
+async function deleteEntry(id, isOffice) {
+  if (!confirm('Are you sure you want to delete this entry? This cannot be undone.')) return;
+  entries = entries.filter(e => e.id !== id);
+  localStorage.setItem('entries', JSON.stringify(entries));
+  if (isOffice) {
+    renderOfficeEntries();
+    renderDailyView();
+    setSyncStatus('office', 'pending', 'Deleting...');
+  } else {
+    renderEntriesByDate();
+    updateHoursPlaceholder();
+  }
+  const { synced } = await queueOrSend('deleteEntry', { id });
+  if (synced) setSyncStatus(isOffice ? 'office' : 'worker', 'synced', 'Entry deleted');
+}
 
 function renderAbsenceTypesList() {
   const el = document.getElementById('absence-types-list');
@@ -2338,7 +2417,22 @@ function renderDailyView() {
                 <div class="edit-grid">
                   <div class="edit-field">
                     <label>Job</label>
-                    <div id="ej-o-${e.id}-ss" data-worker="${e.worker}" data-job="${e.jobId}" style="flex:1;min-width:200px;"></div>
+                    <select id="ej-o-${e.id}">
+                      ${(() => {
+                        const openJobs = jobs.filter(j => j.open || j.id === e.jobId);
+                        const assigned = openJobs.filter(j => expandAssignedTo(j.assignedTo).includes(e.worker));
+                        const others   = openJobs.filter(j => !expandAssignedTo(j.assignedTo).includes(e.worker));
+                        const recurr   = recurringJobs.filter(j => j.active !== false && j.active !== 'FALSE' || j.id === e.jobId);
+                        const absTypes = absenceTypes.filter(a => a.active !== false && a.active !== 'FALSE');
+                        const fmt = j => `<option value="${j.id}" ${j.id === e.jobId ? 'selected' : ''}>${j.id} · ${j.property || j.name || ''} · ${(j.description || j.name || '').slice(0,40)}</option>`;
+                        let html = '';
+                        if (assigned.length) html += `<optgroup label="Assigned Jobs">${assigned.map(fmt).join('')}</optgroup>`;
+                        if (others.length)   html += `<optgroup label="Other Jobs">${others.map(fmt).join('')}</optgroup>`;
+                        if (recurr.length)   html += `<optgroup label="Recurring Jobs">${recurr.map(fmt).join('')}</optgroup>`;
+                        if (absTypes.length) html += `<optgroup label="Absence / Leave">${absTypes.map(fmt).join('')}</optgroup>`;
+                        return html;
+                      })()}
+                    </select>
                   </div>
                   <div class="edit-field">
                     <label>Hours</label>
@@ -2400,7 +2494,6 @@ function renderDailyView() {
   });
 
   el.innerHTML = html;
-  initInlineJobSelects();
 }
 
 function toggleDailyAddEntry() {
@@ -2413,16 +2506,50 @@ function toggleDailyAddEntry() {
     const workerSel = document.getElementById('dae-worker');
     const active = workers.filter(w => w.active !== false && w.active !== 'FALSE');
     workerSel.innerHTML = '<option value="">Select worker...</option>' + active.map(w => `<option value="${w.name}">${w.name}</option>`).join('');
-    createSearchableSelect('dae-job-ss', [], '', null, 'Select worker first...');
+    document.getElementById('dae-job').innerHTML = '<option value="">Select worker first...</option>';
   }
 }
 
 function populateDailyEntryJobDropdown() {
-  const w = document.getElementById('dae-worker').value;
-  if (!w) { createSearchableSelect('dae-job-ss', [], '', null, 'Select worker first...'); return; }
-  createSearchableSelect('dae-job-ss', buildJobOptions(w), '', null, 'Search or select a job...');
+  const selectedWorker = document.getElementById('dae-worker').value;
+  const jobSel = document.getElementById('dae-job');
+  if (!selectedWorker) { jobSel.innerHTML = '<option value="">Select worker first...</option>'; return; }
+  const openJobs = jobs.filter(j => j.open);
+  const assigned = openJobs.filter(j => expandAssignedTo(j.assignedTo).includes(selectedWorker));
+  const others = openJobs.filter(j => !expandAssignedTo(j.assignedTo).includes(selectedWorker));
+  const activeAbsTypes = absenceTypes.filter(a => a.active !== false && a.active !== 'FALSE');
+  const fmt = j => `<option value="${j.id}">${j.id} · ${j.property}${j.description ? ' · ' + (j.description.length > 40 ? j.description.slice(0,40) + '…' : j.description) : ''}</option>`;
+  let html = '<option value="">Select a job...</option>';
+  if (assigned.length) html += `<optgroup label="Assigned Jobs">${assigned.map(fmt).join('')}</optgroup>`;
+  if (others.length)   html += `<optgroup label="Other Jobs">${others.map(fmt).join('')}</optgroup>`;
+  if (activeAbsTypes.length) html += `<optgroup label="Absence / Leave">${activeAbsTypes.map(a => `<option value="${a.id}">${a.id} · ${a.name}</option>`).join('')}</optgroup>`;
+  jobSel.innerHTML = html;
 }
 
+async function submitDailyEntry() {
+  const worker   = document.getElementById('dae-worker').value;
+  const jobId    = document.getElementById('dae-job').value;
+  const date     = new Date().toISOString().slice(0,10);
+  const hours    = parseFloat(document.getElementById('dae-hours').value);
+  const comments = document.getElementById('dae-comments').value;
+  if (!worker || !jobId || isNaN(hours)) { alert('Please fill in all required fields.'); return; }
+  const alreadyLogged = entries.filter(e => e.worker === worker && normaliseDate(e.date) === date).reduce((s, e) => s + parseFloat(e.hours || 0), 0);
+  if (alreadyLogged + hours > 8) { alert('Overtime has to be approved via manager.'); return; }
+  const allJobs = [...jobs, ...absenceTypes];
+  const jobObj = allJobs.find(j => j.id === jobId);
+  const amendment = { by: 'Office', at: new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }), note: 'Created by Office' };
+  const entry = { id: uid(), worker, jobId, date, hours, comments, amendments: [amendment], createdAt: new Date().toISOString(), property: jobObj ? jobObj.property : '', description: jobObj ? (jobObj.description || jobObj.name || '') : '' };
+  entries.push(entry);
+  localStorage.setItem('entries', JSON.stringify(entries));
+  document.getElementById('dae-worker').value = '';
+  document.getElementById('dae-job').innerHTML = '<option value="">Select worker first...</option>';
+  document.getElementById('dae-hours').value = '';
+  document.getElementById('dae-comments').value = '';
+  toggleDailyAddEntry();
+  renderDailyView();
+  const { synced } = await queueOrSend('addEntry', { entry: { ...entry, amendments: amendmentsToString(entry.amendments) } });
+  if (synced) setSyncStatus('office', 'synced', 'Entry saved to Sheets');
+}
 
 function renderOvertimeTab() {
   const el = document.getElementById('overtime-tab-content');
@@ -2815,155 +2942,6 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js')
       .then(reg => console.log('SW registered:', reg.scope))
       .catch(err => console.log('SW registration failed:', err));
-  });
-}
-
-async function submitOfficeEntry() {
-  const worker   = document.getElementById('oae-worker').value;
-  const jobId    = ssGetValue('oae-job-ss');
-  const date     = document.getElementById('oae-date').value;
-  const hours    = parseFloat(document.getElementById('oae-hours').value);
-  const comments = document.getElementById('oae-comments').value;
-  if (!worker || !jobId || !date || isNaN(hours)) { alert('Please fill in all required fields.'); return; }
-  const alreadyLogged = entries.filter(e => e.worker === worker && normaliseDate(e.date) === date).reduce((s, e) => s + parseFloat(e.hours || 0), 0);
-  if (alreadyLogged + hours > 8) { alert('Overtime has to be approved via manager.'); return; }
-  const allJobs = [...jobs];
-  const jobObj = allJobs.find(j => j.id === jobId);
-  const amendment = {
-    by: 'Office',
-    at: new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
-    note: 'Created by Office'
-  };
-  const entry = {
-    id: uid(), worker, jobId, date, hours, comments,
-    amendments: [amendment],
-    createdAt: new Date().toISOString(),
-    property: jobObj ? jobObj.property : '',
-    description: jobObj ? jobObj.description : ''
-  };
-  entries.push(entry);
-  localStorage.setItem('entries', JSON.stringify(entries));
-  document.getElementById('oae-worker').value = '';
-  createSearchableSelect('oae-job-ss', [], '', null, 'Select worker first...');
-  document.getElementById('oae-hours').value = '';
-  document.getElementById('oae-comments').value = '';
-  toggleOfficeAddEntry();
-  renderOfficeEntries();
-  const { synced } = await queueOrSend('addEntry', { entry: { ...entry, amendments: amendmentsToString(entry.amendments) } });
-  if (synced) setSyncStatus('office', 'synced', 'Entry saved to Sheets');
-}
-
-
-async function submitDailyEntry() {
-  const worker   = document.getElementById('dae-worker').value;
-  const jobId    = ssGetValue('dae-job-ss');
-  const date     = new Date().toISOString().slice(0,10);
-  const hours    = parseFloat(document.getElementById('dae-hours').value);
-  const comments = document.getElementById('dae-comments').value;
-  if (!worker || !jobId || isNaN(hours)) { alert('Please fill in all required fields.'); return; }
-  const alreadyLogged = entries.filter(e => e.worker === worker && normaliseDate(e.date) === date).reduce((s, e) => s + parseFloat(e.hours || 0), 0);
-  if (alreadyLogged + hours > 8) { alert('Overtime has to be approved via manager.'); return; }
-  const allJobs = [...jobs, ...absenceTypes];
-  const jobObj = allJobs.find(j => j.id === jobId);
-  const amendment = { by: 'Office', at: new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }), note: 'Created by Office' };
-  const entry = { id: uid(), worker, jobId, date, hours, comments, amendments: [amendment], createdAt: new Date().toISOString(), property: jobObj ? jobObj.property : '', description: jobObj ? (jobObj.description || jobObj.name || '') : '' };
-  entries.push(entry);
-  localStorage.setItem('entries', JSON.stringify(entries));
-  document.getElementById('dae-worker').value = '';
-  createSearchableSelect('dae-job-ss', [], '', null, 'Select worker first...');
-  document.getElementById('dae-hours').value = '';
-  document.getElementById('dae-comments').value = '';
-  toggleDailyAddEntry();
-  renderDailyView();
-  const { synced } = await queueOrSend('addEntry', { entry: { ...entry, amendments: amendmentsToString(entry.amendments) } });
-  if (synced) setSyncStatus('office', 'synced', 'Entry saved to Sheets');
-}
-
-
-function createSearchableSelect(containerId, options, selectedValue, onChangeFn, placeholder) {
-  placeholder = placeholder || 'Search or select...';
-  const container = document.getElementById(containerId);
-  if (!container) return;
-  container._ssOptions  = options;
-  container._ssValue    = selectedValue || '';
-  container._ssOnChange = onChangeFn;
-  const opt = options.find(o => o.value === (selectedValue || ''));
-  container.innerHTML = '<div class="ss-wrap"><input type="text" class="ss-input" id="' + containerId + '-input" placeholder="' + placeholder + '" autocomplete="off" value="' + (opt ? opt.label.replace(/"/g,'&quot;') : '') + '" readonly onfocus="ssOpen('' + containerId + '')" oninput="ssFilter('' + containerId + '')"/><div class="ss-dropdown" id="' + containerId + '-dropdown"></div></div>';
-  ssRenderDropdown(containerId, '');
-}
-function ssRenderDropdown(id, filter) {
-  const container = document.getElementById(id);
-  const dropdown  = document.getElementById(id + '-dropdown');
-  if (!container || !dropdown) return;
-  const options  = container._ssOptions || [];
-  const selected = container._ssValue  || '';
-  const q = filter.toLowerCase();
-  const filtered = q ? options.filter(o => o.label.toLowerCase().includes(q) || (o.group||'').toLowerCase().includes(q)) : options;
-  if (!filtered.length) { dropdown.innerHTML = '<div class="ss-no-results">No results</div>'; return; }
-  let html = '', lastGroup = null;
-  for (const opt of filtered) {
-    if (opt.group && opt.group !== lastGroup) { html += '<div class="ss-group-label">' + opt.group + '</div>'; lastGroup = opt.group; }
-    html += '<div class="ss-option' + (opt.value === selected ? ' ss-selected' : '') + '" data-value="' + opt.value.replace(/"/g,'&quot;') + '" onmousedown="ssSelect('' + id + '','' + opt.value.replace(/'/g,"\'") + '')">' + opt.label + '</div>';
-  }
-  dropdown.innerHTML = html;
-}
-function ssOpen(id) {
-  const input = document.getElementById(id+'-input'), dropdown = document.getElementById(id+'-dropdown');
-  if (!input||!dropdown) return;
-  document.querySelectorAll('.ss-dropdown.ss-open').forEach(d => { if(d.id!==id+'-dropdown'){const i=document.getElementById(d.id.replace('-dropdown','-input'));if(i){i.classList.remove('ss-open');i.readOnly=true;const c=document.getElementById(d.id.replace('-dropdown',''));const o=(c&&c._ssOptions||[]).find(x=>x.value===(c&&c._ssValue||''));i.value=o?o.label:'';}d.classList.remove('ss-open');}});
-  input.readOnly=false; input.value=''; input.select();
-  input.classList.add('ss-open'); dropdown.classList.add('ss-open');
-  ssRenderDropdown(id,'');
-}
-function ssFilter(id) { const input=document.getElementById(id+'-input'); if(input) ssRenderDropdown(id,input.value); }
-function ssSelect(id, value) {
-  const container=document.getElementById(id), input=document.getElementById(id+'-input'), dropdown=document.getElementById(id+'-dropdown');
-  if(!container||!input||!dropdown) return;
-  container._ssValue=value;
-  const opt=(container._ssOptions||[]).find(o=>o.value===value);
-  input.value=opt?opt.label:''; input.readOnly=true;
-  input.classList.remove('ss-open'); dropdown.classList.remove('ss-open');
-  if(container._ssOnChange) container._ssOnChange(value);
-}
-function ssClose(id) {
-  const container=document.getElementById(id), input=document.getElementById(id+'-input'), dropdown=document.getElementById(id+'-dropdown');
-  if(!input||!dropdown) return;
-  const opt=(container&&container._ssOptions||[]).find(o=>o.value===(container&&container._ssValue||''));
-  input.value=opt?opt.label:''; input.readOnly=true;
-  input.classList.remove('ss-open'); dropdown.classList.remove('ss-open');
-}
-function ssGetValue(id) { const c=document.getElementById(id); return c?c._ssValue||'':''; }
-function ssSetValue(id,value) {
-  const container=document.getElementById(id), input=document.getElementById(id+'-input'), dropdown=document.getElementById(id+'-dropdown');
-  if(!container) return; container._ssValue=value;
-  const opt=(container._ssOptions||[]).find(o=>o.value===value);
-  if(input){input.value=opt?opt.label:'';input.readOnly=true;input.classList.remove('ss-open');}
-  if(dropdown) dropdown.classList.remove('ss-open');
-}
-function ssReset(id) { ssSetValue(id,''); const i=document.getElementById(id+'-input'); if(i) i.value=''; }
-document.addEventListener('mousedown', function(e) {
-  if(!e.target.closest('.ss-wrap')) document.querySelectorAll('.ss-dropdown.ss-open').forEach(d=>ssClose(d.id.replace('-dropdown','')));
-});
-function buildJobOptions(forWorker) {
-  const w = (forWorker||currentWorker||'').trim().toLowerCase().replace(/\s+/g,' ');
-  const isManager = w === 'chris rosier';
-  const opts = [];
-  const fmt = (j,group) => ({value:j.id, label:j.id+' · '+(j.property||'')+' · '+((j.description||j.name||'').slice(0,60)), group});
-  if (isManager) {
-    jobs.filter(j=>j.open).forEach(j=>opts.push(fmt(j,'Active Work Orders')));
-    tasks.filter(t=>t.active!==false&&t.active!=='FALSE').forEach(t=>opts.push(fmt(t,'Tasks')));
-  } else {
-    jobs.filter(j=>j.open&&expandAssignedTo(j.assignedTo).includes(forWorker||currentWorker)).forEach(j=>opts.push(fmt(j,'Assigned Jobs')));
-    recurringJobs.filter(j=>j.active!==false&&j.active!=='FALSE'&&expandAssignedTo(j.assignedTo||'').includes(forWorker||currentWorker)).forEach(j=>opts.push(fmt(j,'Recurring Jobs')));
-  }
-  absenceTypes.filter(a=>a.active!==false&&a.active!=='FALSE').forEach(a=>opts.push({value:a.id,label:a.id+' · '+a.name,group:'Absence / Leave'}));
-  return opts;
-}
-function initInlineJobSelects() {
-  document.querySelectorAll('[data-worker][data-job]').forEach(el => {
-    if (el._ssInitialised) return;
-    el._ssInitialised = true;
-    createSearchableSelect(el.id, buildJobOptions(el.getAttribute('data-worker')), el.getAttribute('data-job'), null, 'Search job...');
   });
 }
 </script>
