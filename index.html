@@ -950,22 +950,16 @@ function populateJobDropdown() {
   let html = '<option value="">Select a job...</option>';
 
   if (isManager) {
-    // Manager sees all active WOs + recurring jobs assigned to him + all tasks
+    // Manager sees all active WOs + all tasks, no recurring
     if (open.length) {
       html += `<optgroup label="Active Work Orders">`;
-      html += open.map(j => `<option value="${j.id}">${j.id} · ${j.property} · ${j.description && j.description.length > 60 ? j.description.slice(0, 60) + '…' : (j.description || '')}</option>`).join('');
-      html += `</optgroup>`;
-    }
-    const managerRecurring = recurringJobs.filter(j => j.active !== false && j.active !== 'FALSE' && expandAssignedTo(j.assignedTo || '').includes(currentWorker));
-    if (managerRecurring.length) {
-      html += `<optgroup label="Recurring Jobs">`;
-      html += managerRecurring.map(j => `<option value="${j.id}">${j.id} · ${j.property} · ${j.description && j.description.length > 60 ? j.description.slice(0, 60) + '…' : (j.description || '')}</option>`).join('');
+      html += open.map(j => `<option value="${j.id}">${j.id} · ${propLabel(j.property)} · ${j.description && j.description.length > 60 ? j.description.slice(0, 60) + '…' : (j.description || '')}</option>`).join('');
       html += `</optgroup>`;
     }
     const activeTasks = tasks.filter(t => t.active !== false && t.active !== 'FALSE');
     if (activeTasks.length) {
       html += `<optgroup label="Tasks">`;
-      html += activeTasks.map(t => `<option value="${t.id}">${t.id} · ${t.property || ''} · ${t.description && t.description.length > 60 ? t.description.slice(0, 60) + '…' : (t.description || '')}</option>`).join('');
+      html += activeTasks.map(t => `<option value="${t.id}">${t.id} · ${propLabel(t.property)} · ${t.description && t.description.length > 60 ? t.description.slice(0, 60) + '…' : (t.description || '')}</option>`).join('');
       html += `</optgroup>`;
     }
   } else {
@@ -974,7 +968,7 @@ function populateJobDropdown() {
     const mineAll = [...mine, ...assignedRecurring.map(j => ({ ...j, _recurring: true }))];
     if (mineAll.length) {
       html += `<optgroup label="Your assigned jobs">`;
-      html += mineAll.map(j => `<option value="${j.id}">${j.id} · ${j.property} · ${j.description && j.description.length > 60 ? j.description.slice(0, 60) + '…' : (j.description || '')}</option>`).join('');
+      html += mineAll.map(j => `<option value="${j.id}">${j.id} · ${propLabel(j.property)} · ${j.description && j.description.length > 60 ? j.description.slice(0, 60) + '…' : (j.description || '')}</option>`).join('');
       html += `</optgroup>`;
     }
   }
@@ -1390,7 +1384,7 @@ function renderWeek(wc) {
                   ${(() => {
                     const openJobs = jobs.filter(j => j.open || j.id === e.jobId);
                     const absTypes = absenceTypes.filter(a => a.active !== false && a.active !== 'FALSE');
-                    const fmt = j => `<option value="${j.id}" ${j.id === e.jobId ? 'selected' : ''}>${j.id} · ${j.property || j.name || ''} · ${(j.description || j.name || '').slice(0,40)}</option>`;
+                    const fmt = j => `<option value="${j.id}" ${j.id === e.jobId ? 'selected' : ''}>${j.id} · ${propLabel(j.property || j.name || '')} · ${(j.description || j.name || '').slice(0,40)}</option>`;
                     let html = '';
                     if ((currentWorker || '').trim().toLowerCase().replace(/\s+/g, ' ') === 'chris rosier') {
                       if (openJobs.length) html += `<optgroup label="Active Work Orders">${openJobs.map(fmt).join('')}</optgroup>`;
@@ -2000,7 +1994,7 @@ function renderOfficeEntries() {
                       const others   = openJobs.filter(j => !expandAssignedTo(j.assignedTo).includes(e.worker));
                       const recurr   = recurringJobs.filter(j => j.active !== false && j.active !== 'FALSE' || j.id === e.jobId);
                       const absTypes = absenceTypes.filter(a => a.active !== false && a.active !== 'FALSE');
-                      const fmt = j => `<option value="${j.id}" ${j.id === e.jobId ? 'selected' : ''}>${j.id} · ${j.property || j.name || ''} · ${(j.description || j.name || '').slice(0,40)}</option>`;
+                      const fmt = j => `<option value="${j.id}" ${j.id === e.jobId ? 'selected' : ''}>${j.id} · ${propLabel(j.property || j.name || '')} · ${(j.description || j.name || '').slice(0,40)}</option>`;
                       let html = '';
                       if (assigned.length) html += `<optgroup label="Assigned Jobs">${assigned.map(fmt).join('')}</optgroup>`;
                       if (others.length)   html += `<optgroup label="Other Jobs">${others.map(fmt).join('')}</optgroup>`;
@@ -2470,7 +2464,7 @@ function renderDailyView() {
                         const others   = openJobs.filter(j => !expandAssignedTo(j.assignedTo).includes(e.worker));
                         const recurr   = recurringJobs.filter(j => j.active !== false && j.active !== 'FALSE' || j.id === e.jobId);
                         const absTypes = absenceTypes.filter(a => a.active !== false && a.active !== 'FALSE');
-                        const fmt = j => `<option value="${j.id}" ${j.id === e.jobId ? 'selected' : ''}>${j.id} · ${j.property || j.name || ''} · ${(j.description || j.name || '').slice(0,40)}</option>`;
+                        const fmt = j => `<option value="${j.id}" ${j.id === e.jobId ? 'selected' : ''}>${j.id} · ${propLabel(j.property || j.name || '')} · ${(j.description || j.name || '').slice(0,40)}</option>`;
                         let html = '';
                         if (assigned.length) html += `<optgroup label="Assigned Jobs">${assigned.map(fmt).join('')}</optgroup>`;
                         if (others.length)   html += `<optgroup label="Other Jobs">${others.map(fmt).join('')}</optgroup>`;
@@ -3116,6 +3110,9 @@ document.addEventListener('mousedown', function(e) {
     });
   }
 });
+
+// Truncate property for display in dropdowns (full value stored/shown in tables)
+function propLabel(p, max) { max = max || 40; p = p || ''; return p.length > max ? p.slice(0, max) + '…' : p; }
 </script>
 </body>
 </html>
