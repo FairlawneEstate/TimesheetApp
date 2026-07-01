@@ -950,10 +950,16 @@ function populateJobDropdown() {
   let html = '<option value="">Select a job...</option>';
 
   if (isManager) {
-    // Manager sees all active WOs + all tasks, no recurring
+    // Manager sees all active WOs + recurring jobs assigned to him + all tasks
     if (open.length) {
       html += `<optgroup label="Active Work Orders">`;
       html += open.map(j => `<option value="${j.id}">${j.id} · ${propLabel(j.property)} · ${j.description && j.description.length > 60 ? j.description.slice(0, 60) + '…' : (j.description || '')}</option>`).join('');
+      html += `</optgroup>`;
+    }
+    const managerRecurring = recurringJobs.filter(j => j.active !== false && j.active !== 'FALSE' && expandAssignedTo(j.assignedTo || '').includes(currentWorker));
+    if (managerRecurring.length) {
+      html += `<optgroup label="Recurring Jobs">`;
+      html += managerRecurring.map(j => `<option value="${j.id}">${j.id} · ${propLabel(j.property)} · ${j.description && j.description.length > 60 ? j.description.slice(0, 60) + '…' : (j.description || '')}</option>`).join('');
       html += `</optgroup>`;
     }
     const activeTasks = tasks.filter(t => t.active !== false && t.active !== 'FALSE');
@@ -1104,6 +1110,13 @@ async function confirmOvertime() {
 
   overtimeRequests.push(otRequest);
   localStorage.setItem('overtimeRequests', JSON.stringify(overtimeRequests));
+
+  // If entry doesn't exist yet (office add-entry context), save it now
+  if (!entries.find(e => e.id === entry.id)) {
+    entries.push(entry);
+    localStorage.setItem('entries', JSON.stringify(entries));
+    await queueOrSend('addEntry', { entry: { ...entry, amendments: amendmentsToString(entry.amendments) } });
+  }
 
   document.getElementById('overtime-modal').style.display = 'none';
   pendingOvertimeEntry = null;
@@ -1330,7 +1343,9 @@ function renderWeek(wc) {
           ${o.timeRange || ''}
           ${o.reviewComment ? `<div style="font-style:italic;font-size:10px;margin-top:2px;color:var(--color-text-secondary);">${o.reviewComment}</div>` : ''}
         </td>
-        <td style="padding:4px 8px;vertical-align:middle;width:60px;"></td>
+        <td style="padding:4px 8px;vertical-align:middle;width:60px;text-align:right;">
+          ${o.status === 'pending' ? `<button class="btn btn-sm" style="color:var(--color-text-error);border-color:var(--color-border-error);font-size:11px;" onclick="deleteOTRequest('${o.id}')">Delete</button>` : ''}
+        </td>
       </tr>`;
       }).join('');
       return emptyRowHtml + otRowsForDay;
@@ -1446,7 +1461,9 @@ function renderWeek(wc) {
           ${o.timeRange || ''}
           ${o.reviewComment ? `<div style="font-style:italic;font-size:10px;margin-top:2px;color:var(--color-text-secondary);">${o.reviewComment}</div>` : ''}
         </td>
-        <td style="padding:4px 8px;vertical-align:middle;width:60px;"></td>
+        <td style="padding:4px 8px;vertical-align:middle;width:60px;text-align:right;">
+          ${o.status === 'pending' ? `<button class="btn btn-sm" style="color:var(--color-text-error);border-color:var(--color-border-error);font-size:11px;" onclick="deleteOTRequest('${o.id}')">Delete</button>` : ''}
+        </td>
       </tr>`;
     }).join('');
 
@@ -1954,7 +1971,9 @@ function renderOfficeEntries() {
           <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:middle;">${otDesc}</td>
           <td style="padding:5px 6px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-weight:500;text-align:center;vertical-align:middle;width:46px;">${o.hours}h</td>
           <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-style:italic;color:var(--color-text-secondary);vertical-align:middle;">${o.timeRange || ''}</td>
-          <td style="padding:4px 8px;vertical-align:middle;"></td>
+          <td style="padding:4px 8px;vertical-align:middle;text-align:right;">
+            ${o.status === 'pending' ? `<button class="btn btn-sm" style="color:var(--color-text-error);border-color:var(--color-border-error);" onclick="deleteOTRequest('${o.id}')">Delete</button>` : ''}
+          </td>
         </tr>`;
       }).join('');
 
@@ -2638,7 +2657,7 @@ function renderOvertimeTab() {
       <td style="padding:6px 10px;font-size:12px;font-weight:500;">${o.worker}</td>
       <td style="padding:6px 10px;font-size:12px;">${fmtShortDate(o.date)}</td>
       <td style="padding:6px 10px;font-size:12px;font-weight:600;">${o.jobId}</td>
-      <td style="padding:6px 10px;font-size:12px;color:var(--color-text-secondary);">${property}</td>
+      <td style="padding:6px 10px;font-size:12px;color:var(--color-text-secondary);">${propLabel(property, 35)}</td>
       <td style="padding:6px 10px;font-size:12px;color:var(--color-text-secondary);">${desc}</td>
       <td style="padding:6px 10px;font-size:12px;font-weight:500;text-align:center;">${o.hours}h</td>
       <td style="padding:6px 10px;font-size:12px;font-style:italic;">${o.timeRange || ''}</td>
@@ -3143,6 +3162,19 @@ document.addEventListener('mousedown', function(e) {
 
 // Truncate property for display in dropdowns (full value stored/shown in tables)
 function propLabel(p, max) { max = max || 40; p = p || ''; return p.length > max ? p.slice(0, max) + '…' : p; }
+
+async function deleteOTRequest(id) {
+  if (!confirm('Delete this overtime request?')) return;
+  const idx = overtimeRequests.findIndex(o => o.id === id);
+  if (idx === -1) return;
+  overtimeRequests.splice(idx, 1);
+  localStorage.setItem('overtimeRequests', JSON.stringify(overtimeRequests));
+  renderEntriesByDate();
+  renderOfficeEntries && renderOfficeEntries();
+  renderOvertimeTab && renderOvertimeTab();
+  const { synced } = await queueOrSend('deleteOTRequest', { id });
+  if (synced) setSyncStatus(currentUser ? 'office' : 'worker', 'synced', 'OT request deleted');
+}
 </script>
 </body>
 </html>
