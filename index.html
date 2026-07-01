@@ -950,16 +950,10 @@ function populateJobDropdown() {
   let html = '<option value="">Select a job...</option>';
 
   if (isManager) {
-    // Manager sees all active WOs + recurring jobs assigned to him + all tasks
+    // Manager sees all active WOs + all tasks, no recurring
     if (open.length) {
       html += `<optgroup label="Active Work Orders">`;
       html += open.map(j => `<option value="${j.id}">${j.id} · ${propLabel(j.property)} · ${j.description && j.description.length > 60 ? j.description.slice(0, 60) + '…' : (j.description || '')}</option>`).join('');
-      html += `</optgroup>`;
-    }
-    const managerRecurring = recurringJobs.filter(j => j.active !== false && j.active !== 'FALSE' && expandAssignedTo(j.assignedTo || '').includes(currentWorker));
-    if (managerRecurring.length) {
-      html += `<optgroup label="Recurring Jobs">`;
-      html += managerRecurring.map(j => `<option value="${j.id}">${j.id} · ${propLabel(j.property)} · ${j.description && j.description.length > 60 ? j.description.slice(0, 60) + '…' : (j.description || '')}</option>`).join('');
       html += `</optgroup>`;
     }
     const activeTasks = tasks.filter(t => t.active !== false && t.active !== 'FALSE');
@@ -1110,13 +1104,6 @@ async function confirmOvertime() {
 
   overtimeRequests.push(otRequest);
   localStorage.setItem('overtimeRequests', JSON.stringify(overtimeRequests));
-
-  // If the entry doesn't exist yet (office add-entry context), save it now
-  if (!entries.find(e => e.id === entry.id)) {
-    entries.push(entry);
-    localStorage.setItem('entries', JSON.stringify(entries));
-    await queueOrSend('addEntry', { entry: { ...entry, amendments: amendmentsToString(entry.amendments) } });
-  }
 
   document.getElementById('overtime-modal').style.display = 'none';
   pendingOvertimeEntry = null;
@@ -1945,6 +1932,32 @@ function renderOfficeEntries() {
           <td colspan="2"></td>
         </tr>`;
 
+      const pendingOTRows_oe = overtimeRequests.filter(o =>
+        o.worker === worker.name && normaliseDate(o.date) === dayStr && (o.status === 'pending' || o.status === 'declined')
+      ).map(o => {
+        const otJob = jobs.find(j => j.id === o.jobId) || recurringJobs.find(j => j.id === o.jobId) || tasks.find(j => j.id === o.jobId);
+        const otProp = propLabel((otJob ? otJob.property : '') || o.property || '', 35);
+        const otDesc = ((otJob ? (otJob.description || '') : '') || o.description || '').slice(0, 200);
+        const statusStyle = o.status === 'pending' ? 'background:#fff3cd;color:#856404;' : 'background:#fdecea;color:var(--color-text-error);';
+        const statusLabel = o.status === 'pending' ? '⏱ OT Pending' : '⏱ OT Declined';
+        return `
+        <tr class="day-row" style="opacity:0.85;border-top:0.5px solid var(--color-border-tertiary);">
+          <td class="day-cell" style="vertical-align:top;">
+            <div class="day-name">${dayName}</div>
+            <div class="day-date">${fmtShortDate(dayStr)}</div>
+          </td>
+          <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;vertical-align:middle;width:110px;">
+            <div style="font-weight:600;">${o.jobId}</div>
+            <span class="badge-amended-sm" style="${statusStyle}">${statusLabel}</span>
+          </td>
+          <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:middle;width:200px;">${otProp}</td>
+          <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:middle;">${otDesc}</td>
+          <td style="padding:5px 6px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-weight:500;text-align:center;vertical-align:middle;width:46px;">${o.hours}h</td>
+          <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-style:italic;color:var(--color-text-secondary);vertical-align:middle;">${o.timeRange || ''}</td>
+          <td style="padding:4px 8px;vertical-align:middle;"></td>
+        </tr>`;
+      }).join('');
+
       if (isEmpty) {
         return `
         <tr class="day-row" style="border-top:1.5px solid var(--color-border-secondary);border-bottom:1.5px solid var(--color-border-secondary);">
@@ -1954,7 +1967,7 @@ function renderOfficeEntries() {
             ${dayCellContent}
           </td>
           <td colspan="6" style="padding:10px 12px;font-size:12px;color:var(--color-text-secondary);">—</td>
-        </tr>`;
+        </tr>` + pendingOTRows_oe;
       }
 
       return dayEntries.map((e, idx) => {
@@ -2039,7 +2052,7 @@ function renderOfficeEntries() {
             </div>
           </td>
         </tr>`;
-      }).join('') + totalRow;
+      }).join('') + pendingOTRows_oe + totalRow;
     }).join('');
 
     html += `
