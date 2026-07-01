@@ -204,6 +204,42 @@ textarea { height: 60px; resize: none; }
   .section-label { font-size: 15px; margin: 1.25rem 0 0.75rem; }
   .sync-status { font-size: 13px; }
 }
+
+/* ── Searchable Select Overlay ───────────────────────────────── */
+.ss-wrap { position: relative; width: 100%; }
+.ss-input {
+  width: 100%; box-sizing: border-box; padding: 7px 28px 7px 9px;
+  border: 0.5px solid var(--color-border-secondary);
+  border-radius: var(--border-radius-md);
+  background: var(--color-background-primary);
+  color: var(--color-text-primary); font-size: 13px; cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath fill='%23888' d='M5 7L0 2h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 8px center;
+}
+.ss-input:focus { outline: none; border-color: var(--color-border-primary); }
+.ss-input.ss-open { border-bottom-left-radius:0; border-bottom-right-radius:0; border-color:var(--color-border-primary); }
+.ss-drop {
+  display:none; position:absolute; z-index:9999; width:100%;
+  background:var(--color-background-primary);
+  border:0.5px solid var(--color-border-primary); border-top:none;
+  border-bottom-left-radius:var(--border-radius-md);
+  border-bottom-right-radius:var(--border-radius-md);
+  max-height:240px; overflow-y:auto;
+  box-shadow:0 4px 12px rgba(0,0,0,0.1);
+}
+.ss-drop.ss-open { display:block; }
+.ss-grp { padding:5px 10px 2px; font-size:10px; font-weight:600;
+  text-transform:uppercase; color:var(--color-text-secondary);
+  letter-spacing:0.4px; border-top:0.5px solid var(--color-border-tertiary); }
+.ss-grp:first-child { border-top:none; }
+.ss-row { padding:7px 10px; font-size:13px; cursor:pointer; color:var(--color-text-primary); }
+.ss-row:hover { background:var(--color-background-secondary); }
+.ss-row.ss-sel { font-weight:600; }
+.ss-none { padding:8px 10px; font-size:13px; color:var(--color-text-secondary); font-style:italic; }
+@media (min-width:600px) and (max-width:1400px) and (pointer:coarse) {
+  .ss-input { font-size:16px; padding:13px 28px 13px 11px; min-height:50px; }
+  .ss-row   { padding:11px 10px; font-size:15px; }
+}
 </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
@@ -944,6 +980,7 @@ function populateJobDropdown() {
     html += `</optgroup>`;
   }
   sel.innerHTML = html;
+  if (!sel._ssAttached) { ssAttach('job-select', 'Search jobs...'); } else { ssRefresh('job-select'); }
 }
 
 function fillJobDetails() {
@@ -1499,6 +1536,7 @@ function renderEntriesByDate() {
   const dateVal = document.getElementById('entry-date') ? document.getElementById('entry-date').value : '';
   const wc = getWeekCommencing(dateVal || new Date().toISOString().slice(0, 10));
   container.innerHTML = renderWeek(wc);
+  initInlineJobSelects();
 }
 function groupByDate(arr) {
   return arr.reduce((g, e) => {
@@ -2010,6 +2048,7 @@ function renderOfficeEntries() {
   });
 
   el.innerHTML = html;
+  initInlineJobSelects();
 }
 
 function toggleEditOfficeEntries(id) {
@@ -2249,6 +2288,7 @@ function populateOfficeEntryJobDropdown() {
   const activeAbsTypes = absenceTypes.filter(a => a.active !== false && a.active !== 'FALSE');
   if (activeAbsTypes.length) html += `<optgroup label="Absence / Leave">${activeAbsTypes.map(a => `<option value="${a.id}">${a.id} · ${a.name}</option>`).join('')}</optgroup>`;
   jobSel.innerHTML = html;
+  if (!jobSel._ssAttached) { ssAttach('oae-job', 'Search jobs...'); } else { ssRefresh('oae-job'); }
 }
 
 async function submitOfficeEntry() {
@@ -2494,6 +2534,7 @@ function renderDailyView() {
   });
 
   el.innerHTML = html;
+  initInlineJobSelects();
 }
 
 function toggleDailyAddEntry() {
@@ -2524,6 +2565,7 @@ function populateDailyEntryJobDropdown() {
   if (others.length)   html += `<optgroup label="Other Jobs">${others.map(fmt).join('')}</optgroup>`;
   if (activeAbsTypes.length) html += `<optgroup label="Absence / Leave">${activeAbsTypes.map(a => `<option value="${a.id}">${a.id} · ${a.name}</option>`).join('')}</optgroup>`;
   jobSel.innerHTML = html;
+  if (!jobSel._ssAttached) { ssAttach('dae-job', 'Search jobs...'); } else { ssRefresh('dae-job'); }
 }
 
 async function submitDailyEntry() {
@@ -2944,6 +2986,130 @@ if ('serviceWorker' in navigator) {
       .catch(err => console.log('SW registration failed:', err));
   });
 }
+
+
+function initInlineJobSelects() {
+  // Attach searchable overlay to all inline edit job selects in the DOM
+  document.querySelectorAll('select[id^="ej-"]').forEach(function(sel) {
+    if (!sel._ssAttached) ssAttach(sel.id, 'Search jobs...');
+  });
+}
+// ── Searchable Select — wraps any native <select> ────────────────
+function ssAttach(selId, placeholder) {
+  var sel = document.getElementById(selId);
+  if (!sel || sel._ssAttached) return;
+  sel._ssAttached = true;
+  sel.style.display = 'none';
+
+  var wrap = document.createElement('div');
+  wrap.className = 'ss-wrap';
+  wrap.innerHTML =
+    '<input class="ss-input" id="' + selId + '_ssi" type="text"' +
+    ' placeholder="' + (placeholder || 'Search...') + '"' +
+    ' autocomplete="off" readonly>' +
+    '<div class="ss-drop" id="' + selId + '_ssd"></div>';
+  sel.parentNode.insertBefore(wrap, sel.nextSibling);
+
+  document.getElementById(selId + '_ssi').addEventListener('focus', function() { ssOpen(selId); });
+  document.getElementById(selId + '_ssi').addEventListener('input',  function() { ssDraw(selId, this.value); });
+
+  ssSyncLabel(selId);
+}
+
+function ssOpen(selId) {
+  // Close any other open dropdowns
+  document.querySelectorAll('.ss-drop.ss-open').forEach(function(d) {
+    var id = d.id.replace('_ssd', '');
+    if (id !== selId) ssClose(id);
+  });
+  var inp = document.getElementById(selId + '_ssi');
+  var dd  = document.getElementById(selId + '_ssd');
+  if (!inp || !dd) return;
+  inp.readOnly = false;
+  inp.value = '';
+  inp.classList.add('ss-open');
+  dd.classList.add('ss-open');
+  ssDraw(selId, '');
+}
+
+function ssClose(selId) {
+  var inp = document.getElementById(selId + '_ssi');
+  var dd  = document.getElementById(selId + '_ssd');
+  if (!inp || !dd) return;
+  inp.readOnly = true;
+  inp.classList.remove('ss-open');
+  dd.classList.remove('ss-open');
+  ssSyncLabel(selId);
+}
+
+function ssSyncLabel(selId) {
+  var sel = document.getElementById(selId);
+  var inp = document.getElementById(selId + '_ssi');
+  if (!sel || !inp) return;
+  var opt = sel.options[sel.selectedIndex];
+  inp.value = (opt && opt.value) ? opt.text : '';
+}
+
+function ssDraw(selId, q) {
+  var sel = document.getElementById(selId);
+  var dd  = document.getElementById(selId + '_ssd');
+  if (!sel || !dd) return;
+  var lq = q.toLowerCase();
+  var opts = Array.from(sel.options).filter(function(o) { return o.value !== ''; });
+  var filtered = lq ? opts.filter(function(o) { return o.text.toLowerCase().indexOf(lq) > -1; }) : opts;
+  if (!filtered.length) { dd.innerHTML = '<div class="ss-none">No results</div>'; return; }
+
+  // Group by optgroup
+  var html = '';
+  var groups = {};
+  var groupOrder = [];
+  filtered.forEach(function(o) {
+    var g = o.parentElement.tagName === 'OPTGROUP' ? o.parentElement.label : '';
+    if (!groups[g]) { groups[g] = []; groupOrder.push(g); }
+    groups[g].push(o);
+  });
+  groupOrder.forEach(function(g) {
+    if (g) html += '<div class="ss-grp">' + g + '</div>';
+    groups[g].forEach(function(o) {
+      var cur = sel.value === o.value ? ' ss-sel' : '';
+      html += '<div class="ss-row' + cur + '" data-val="' + o.value.replace(/"/g,'&quot;') + '">' + o.text + '</div>';
+    });
+  });
+  dd.innerHTML = html;
+  dd.querySelectorAll('.ss-row').forEach(function(row) {
+    row.addEventListener('mousedown', function(e) {
+      e.preventDefault();
+      ssPick(selId, this.getAttribute('data-val'));
+    });
+  });
+}
+
+function ssPick(selId, val) {
+  var sel = document.getElementById(selId);
+  if (!sel) return;
+  sel.value = val;
+  // Fire onchange so existing handlers run unchanged
+  var evt = document.createEvent('Event');
+  evt.initEvent('change', true, true);
+  sel.dispatchEvent(evt);
+  ssClose(selId);
+}
+
+function ssRefresh(selId) {
+  // Call after programmatically updating a native select's options
+  var dd = document.getElementById(selId + '_ssd');
+  if (dd) dd.innerHTML = '';
+  ssSyncLabel(selId);
+}
+
+// Close on outside click
+document.addEventListener('mousedown', function(e) {
+  if (!e.target.closest('.ss-wrap')) {
+    document.querySelectorAll('.ss-drop.ss-open').forEach(function(d) {
+      ssClose(d.id.replace('_ssd', ''));
+    });
+  }
+});
 </script>
 </body>
 </html>
