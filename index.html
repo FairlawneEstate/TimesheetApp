@@ -950,10 +950,16 @@ function populateJobDropdown() {
   let html = '<option value="">Select a job...</option>';
 
   if (isManager) {
-    // Manager sees all active WOs + all tasks, no recurring
+    // Manager sees all active WOs + recurring jobs assigned to him + all tasks
     if (open.length) {
       html += `<optgroup label="Active Work Orders">`;
       html += open.map(j => `<option value="${j.id}">${j.id} · ${j.property} · ${j.description && j.description.length > 60 ? j.description.slice(0, 60) + '…' : (j.description || '')}</option>`).join('');
+      html += `</optgroup>`;
+    }
+    const managerRecurring = recurringJobs.filter(j => j.active !== false && j.active !== 'FALSE' && expandAssignedTo(j.assignedTo || '').includes(currentWorker));
+    if (managerRecurring.length) {
+      html += `<optgroup label="Recurring Jobs">`;
+      html += managerRecurring.map(j => `<option value="${j.id}">${j.id} · ${j.property} · ${j.description && j.description.length > 60 ? j.description.slice(0, 60) + '…' : (j.description || '')}</option>`).join('');
       html += `</optgroup>`;
     }
     const activeTasks = tasks.filter(t => t.active !== false && t.active !== 'FALSE');
