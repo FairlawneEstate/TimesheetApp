@@ -240,11 +240,6 @@ textarea { height: 60px; resize: none; }
   .ss-input { font-size:16px; padding:13px 28px 13px 11px; min-height:50px; }
   .ss-row   { padding:11px 10px; font-size:15px; }
 }
-
-/* ── Recurring Job Property Picker ──────────────────────────────── */
-.rj-prop-wrap { display: none; margin-bottom: 0.75rem; }
-.rj-prop-wrap.rj-visible { display: block; }
-.rj-prop-wrap label { font-size: 12px; font-weight: 500; color: var(--color-text-secondary); display: block; margin-bottom: 4px; }
 </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
@@ -324,7 +319,6 @@ textarea { height: 60px; resize: none; }
             <input type="number" id="entry-hours" placeholder="e.g. 4" min="0.5" max="16" step="0.5" onfocus="updateHoursPlaceholder()">
           </div>
         </div>
-        <div id="rj-prop-worker" class="rj-prop-wrap"></div>
         <label>Comments (optional)</label>
         <textarea id="entry-comments" placeholder="What was done..."></textarea>
         <div class="form-footer">
@@ -431,7 +425,7 @@ textarea { height: 60px; resize: none; }
               </div>
               <div>
                 <label style="margin-top:0;">Job</label>
-                <select id="dae-job" onchange="rjPropCheck('dae')"></select>
+                <select id="dae-job"></select>
               </div>
             </div>
             <div class="grid2" style="margin-top:10px;">
@@ -440,7 +434,6 @@ textarea { height: 60px; resize: none; }
                 <input type="number" id="dae-hours" placeholder="e.g. 4" min="0.5" max="16" step="0.5">
               </div>
               <div>
-                <div id="rj-prop-dae" class="rj-prop-wrap" style="margin-bottom:0.5rem;"></div>
                 <label style="margin-top:0;">Comments (optional)</label>
                 <input type="text" id="dae-comments" placeholder="What was done...">
               </div>
@@ -474,7 +467,7 @@ textarea { height: 60px; resize: none; }
               </div>
               <div>
                 <label style="margin-top:0;">Job</label>
-                <select id="oae-job" onchange="rjPropCheck('oae')"></select>
+                <select id="oae-job"></select>
               </div>
             </div>
             <div class="grid2" style="margin-top:10px;">
@@ -488,7 +481,6 @@ textarea { height: 60px; resize: none; }
               </div>
             </div>
             <div style="margin-top:10px;">
-              <div id="rj-prop-oae" class="rj-prop-wrap"></div>
               <label style="margin-top:0;">Comments (optional)</label>
               <textarea id="oae-comments" placeholder="What was done..."></textarea>
             </div>
@@ -638,7 +630,7 @@ textarea { height: 60px; resize: none; }
 <script>
 // ══════════════════════════════════════════════════════════════════
 // ══════════════════════════════════════════════════════════════════
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbycVZVfz5jH8ZepKgsf01lbJ-zxCvbeO6rbMvbxNEwM0BnJsUuq9G7oeG-Ks2rJMdzl0w/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbza4d99LHshx4G5CN7CkmslZlM0MCfZG79VPklFPK39U2i7BRPZXx6MKO_N_-9w9aMlZA/exec';
 const POLL_INTERVAL_MS = 60000;
 // ══════════════════════════════════════════════════════════════════
 
@@ -999,7 +991,6 @@ function populateJobDropdown() {
 
 function fillJobDetails() {
   const id = document.getElementById('job-select').value;
-  rjPropCheck('worker');
   const detail = document.getElementById('job-detail');
   if (!id) { detail.style.display = 'none'; return; }
   const job = jobs.find(j => j.id === id) || recurringJobs.find(j => j.id === id) || absenceTypes.find(a => a.id === id);
@@ -1162,14 +1153,13 @@ async function submitEntry() {
 
   if (isOvertime) {
     const jobObj = jobs.find(j => j.id === jobId) || recurringJobs.find(j => j.id === jobId) || absenceTypes.find(a => a.id === jobId);
-    const entry = { id: uid(), worker: currentWorker, jobId, date, hours, comments, amendments: [], createdAt: new Date().toISOString(), property: isRecurringJobId(jobId) ? (rjPropGetValue('rj-prop-worker') || (jobObj ? jobObj.property : '')) : (jobObj ? jobObj.property : ''), description: jobObj ? (jobObj.description || jobObj.name || '') : '' };
+    const entry = { id: uid(), worker: currentWorker, jobId, date, hours, comments, amendments: [], createdAt: new Date().toISOString(), property: jobObj ? jobObj.property : '', description: jobObj ? (jobObj.description || jobObj.name || '') : '' };
     showOvertimeModal(entry, isWeekend);
     return;
   }
 
   const jobObj = jobs.find(j => j.id === jobId) || recurringJobs.find(j => j.id === jobId) || absenceTypes.find(a => a.id === jobId);
-  const entry = { id: uid(), worker: currentWorker, jobId, date, hours, comments, amendments: [], createdAt: new Date().toISOString(), property: isRecurringJobId(jobId) ? (rjPropGetValue('rj-prop-worker') || (jobObj ? jobObj.property : '')) : (jobObj ? jobObj.property : ''), description: jobObj ? jobObj.description : '' };
-  if (isRecurringJobId(jobId) && !rjPropGetValue('rj-prop-worker')) { alert('Please select a property for this recurring job.'); return; }
+  const entry = { id: uid(), worker: currentWorker, jobId, date, hours, comments, amendments: [], createdAt: new Date().toISOString(), property: jobObj ? jobObj.property : '', description: jobObj ? jobObj.description : '' };
   entries.push(entry);
   localStorage.setItem('entries', JSON.stringify(entries));
 
@@ -1177,7 +1167,6 @@ async function submitEntry() {
   document.getElementById('job-detail').style.display = 'none';
   document.getElementById('entry-hours').value = '';
   document.getElementById('entry-comments').value = '';
-  rjPropHide('rj-prop-worker');
 
   updateHoursPlaceholder();
   renderEntriesByDate();
@@ -2366,10 +2355,9 @@ async function submitOfficeEntry() {
     id: uid(), worker, jobId, date, hours, comments,
     amendments: [{ by: 'Office', at: new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }), note: 'Created by Office' }],
     createdAt: new Date().toISOString(),
-    property: isRecurringJobId(jobId) ? (rjPropGetValue('rj-prop-oae') || (jobObj ? jobObj.property : '')) : (jobObj ? jobObj.property : ''),
+    property: jobObj ? jobObj.property : '',
     description: jobObj ? jobObj.description : ''
   };
-  if (isRecurringJobId(jobId) && !rjPropGetValue('rj-prop-oae')) { alert('Please select a property for this recurring job.'); return; }
   if (isOvertime_oe) { showOvertimeModal(entry_oe, isWeekend_oe); return; }
   const entry = entry_oe;
   entries.push(entry);
@@ -2378,7 +2366,6 @@ async function submitOfficeEntry() {
   document.getElementById('oae-job').innerHTML = '<option value="">Select worker first...</option>';
   document.getElementById('oae-hours').value = '';
   document.getElementById('oae-comments').value = '';
-  rjPropHide('rj-prop-oae');
   toggleOfficeAddEntry();
   renderOfficeEntries();
   const { synced } = await queueOrSend('addEntry', { entry: { ...entry, amendments: amendmentsToString(entry.amendments) } });
@@ -2640,8 +2627,7 @@ async function submitDailyEntry() {
   const isOvertime_de = isWeekend_de || (alreadyLogged + hours > 8);
   const allJobs = [...jobs, ...recurringJobs, ...tasks, ...absenceTypes];
   const jobObj = allJobs.find(j => j.id === jobId);
-  const entry_de = { id: uid(), worker, jobId, date, hours, comments, amendments: [{ by: 'Office', at: new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }), note: 'Created by Office' }], createdAt: new Date().toISOString(), property: isRecurringJobId(jobId) ? (rjPropGetValue('rj-prop-dae') || (jobObj ? jobObj.property : '')) : (jobObj ? jobObj.property : ''), description: jobObj ? (jobObj.description || jobObj.name || '') : '' };
-  if (isRecurringJobId(jobId) && !rjPropGetValue('rj-prop-dae')) { alert('Please select a property for this recurring job.'); return; }
+  const entry_de = { id: uid(), worker, jobId, date, hours, comments, amendments: [{ by: 'Office', at: new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }), note: 'Created by Office' }], createdAt: new Date().toISOString(), property: jobObj ? jobObj.property : '', description: jobObj ? (jobObj.description || jobObj.name || '') : '' };
   if (isOvertime_de) { showOvertimeModal(entry_de, isWeekend_de); return; }
   const entry = entry_de;
   entries.push(entry);
@@ -2650,7 +2636,6 @@ async function submitDailyEntry() {
   document.getElementById('dae-job').innerHTML = '<option value="">Select worker first...</option>';
   document.getElementById('dae-hours').value = '';
   document.getElementById('dae-comments').value = '';
-  rjPropHide('rj-prop-dae');
   toggleDailyAddEntry();
   renderDailyView();
   const { synced } = await queueOrSend('addEntry', { entry: { ...entry, amendments: amendmentsToString(entry.amendments) } });
@@ -3189,69 +3174,6 @@ async function deleteOTRequest(id) {
   renderOvertimeTab && renderOvertimeTab();
   const { synced } = await queueOrSend('deleteOTRequest', { id });
   if (synced) setSyncStatus(currentUser ? 'office' : 'worker', 'synced', 'OT request deleted');
-}
-
-// ── Recurring Job Property Picker ────────────────────────────────
-var RJ_PROPERTIES = ["Broadfield Manor House 296, Old Soar Road, Plaxtol, Sevenoaks, Kent, TN15 0QX", "Ambleside Grange- 629, Reeds Lane, Shipbourne, Tonbridge, Kent, TN11 9RR", "629, Barnard Court Reeds Lane, Shipbourne, Kent, TN11 9RR", "Tonbridge Road, 100, Hildenborough, Tonbridge, TN11 9BT", "Churchgate Cottages, 2, Stumble Hill, Shipbourne, Kent, TN11 9PF", "Wightwicks Cottages, 4, Back Lane, Shipbourne, Kent, TN11 9PR", "Granary Cottage, The Granary, Old Soar Road, Plaxtol, Sevenoaks, TN15 0QX", "Dene Park Cottages, 2, Shipbourne Road, Hadlow, Kent, TN11 9NS", "Oak View Cottages, 1, Upper Green Road, Shipbourne, Tonbridge, Kent, TN11 9PQ", "Churchgate Cottages, 3, Stumble Hill, Shipbourne, Kent, TN11 9PF", "Upper Manor Farm, Old Soar Road, Plaxtol, Sevenoaks, Kent, TN15 0QX", "Churchgate Cottage, 1, Stumble Hill, Shipbourne, Kent, TN11 9PQ", "Springhill Cottages, 1, Ightham Road, Fairlawne Estate, Shipbourne, Kent, TN11 9PT", "Springhill Cottages, 2, Shipbourne Road, School Lane, Tonbridge, Kent, TN11 9RT", "Higlers Oast, Back Lane, Shipbourne, Kent, TN11 9PP", "Stanley Lodge, Hildenborough Road, Shipbourne, Tonbridge, TN11 9QB", "Northbridge, Hildenborough Road, Fairlawne Estate, School Lane, Tonbridge, TN11 9RT", "Bull Pen, 54 London Road, Tonbridge, Kent, TN10 3DH", "Crockwell, Back Lane, Shipbourne, Kent, TN11 9PP", "Plantation Farm, Fairlawne, Shipbourne, Kent, TN11 9PT", "Home Farm House, School Lane, Shipbourne, Kent, TN11 9RT", "Chapmans Oast, Back Lane, Shipbourne, Tonbridge, TN11 9PP", "Field Place, Back Lane, Shipbourne, Tonbridge, TN11 9PP", "Lower Manor Farm, Broadfield Farm Cottage (Lower Manor Farm), Plaxtol Lane, Plaxtol, Kent, TN15 0QX", "Martins Cottages, 1, Back Lane, Shipbourne, Tonbridge, TN11 9PP", "Oak View Cottages, 2, Upper Green Road, Shipbourne, Kent, TN11 9PQ", "Tonbridge Road, 104, Tonbridge Road, Tonbridge, Kent, TN11 9JR", "Gardeners Cottage, Fairlawne Estate, Shipbourne, Tonbridge, TN11 9PT", "Bothy Cottage 234, Fairlawne Estate, Shipbourne, Tonbridge, Kent, TN11 9PT", "North Lodge, Fairlawne Estate, Shipbourne, Tonbridge, Kent, TN11 9PT", "Gate House, Fairlawne Estate, Shipbourne, Tonbridge, Kent, TN11 9PT", "Forge 217, Fairlawne Estate, Shipbourne, Tonbridge, Kent, TN11 9PT", "Hayloft, Fairlawne Estate, Shipbourne, Tonbridge, Kent, TN11 9PT", "Stable Cottage, Fairlawne Estate, Shipbourne, Tonbridge, Kent, TN11 9PT", "Pigeon Cottage, Fairlawne Estate, Shipbourne, Tonbridge, Kent, TN11 9PT", "Stable Complex Offices Inc 1st Floor Rooms, Fairlawne Estate, Shipbourne, Tonbridge, Kent, TN11 9PT", "Old Mill, Fairlawne Estate, Shipbourne, Tonbridge, Kent, TN11 9PT", "Home Farm Bungalow, School Lane, Shipbourne, Kent, TN11 9RT", "Point Corner Cottages, 1, Reeds Lane, Shipbourne, Kent, TN11 9RS", "Point Cottages, 2, Reeds Lane, Shipbourne, Kent, TN11 9RS", "Fairlawne Office, Fairlawne Estate, Shipbourne, Tonbridge, Kent", "Dene Park Cottages, 1, Shipbourne Road, Tonbridge, Kent, TN11 9NS", "The Oast House, Shipbourne Road, Tonbridge, Kent, TN11 9PE", "The Real Tennis Court, Fairlawne Estate, Shipbourne, Kent, TN11 9PT", "Keepers Cottage, Fairlawne Estate, Shipbourne, Kent, TN11 9PT", "Gatehouse, Fairlawne Estate, Shipbourne, Kent, TN11 9PT", "Home Farm Top Flat (1), Shipbourne, Tonbridge, Kent, TN11 9RT", "Home Farm Bottom Flat (2), Shipbourne, Tonbridge, Kent, TN11 9RT", "Tonbridge Road, 102, Tonbridge Road, Tonbridge, Kent, TN11 9BT", "Highbarn Farmhouse, Tonbridge Road, Hildenborough, Kent, TN11 9BT", "Highbarn Buildings, 100 Tonbridge Road, Hildenborough, Kent, TN11 9BT", "Broadfield Farm 630, Old Soar Road, Sevenoaks, Kent, TN15 0QX", "Bassam Lodge 241, Stumble Hill, Shipbourne, Kent, TN11 9PF", "Fairlawne Main House 211, Fairlawne Estate, Shipbourne, Kent, TN11 9PT", "Home Farm, Barn C, Fairlawne Estate, Shipbourne, Kent, TN11 9RT", "Home Farm, Barn B, School Lane, Shipbourne, Kent, TN11 9RT", "Home Farm Barn A, Fairlawne Estate, Shipbourne, Kent, TN11 9PT", "Hamptons, 1, Hamptons Road, Hadlow, Kent, TN11 9RE", "Staff Accommodation Complex (Garage Complex) 212, Fairlawne Estate, Shipbourne, Kent, TN11 9PT", "Mill House 227, Fairlawne Estate, Shipbourne, Kent, TN11 9PT", "Plantation Farm, Fairlawne Estate, Shipbourne, Kent, TN11 9PT", "Great Hollanden Tea Rooms, Fairlawne Estate, Kent, TN15 0SG", "Home Farm Cottage (Bungalow), Home Farm, Shipbourne, Kent, TN11 9RT", "Shipbourne Cricket Club, Shipbourne, Kent, TN11 9PT", "Home Farm Complex, School Lane, Shipbourne, Kent", "Plantation Farm Barn, Fairlawne Estate, Shipbourne, Kent, TN11 9PT", "Fairlawne Wider Estate Grounds, Fairlawne Estate, Tonbridge, Kent, TN11 9PT", "Gamekeepers Complex, Fairlawne Estate, Shipbourne, Tonbridge, TN11 9PT", "Broadfield Complex, Old Soar Road, Fairlawne, Tonbridge, Kent, TN15 0QX"];
-
-function isRecurringJobId(id) {
-  return !!recurringJobs.find(function(j) { return j.id === id; });
-}
-function rjPropGetValue(containerId) {
-  var el = document.getElementById(containerId + '-val');
-  return el ? el.value : '';
-}
-function rjPropHide(containerId) {
-  var wrap = document.getElementById(containerId);
-  if (wrap) { wrap.classList.remove('rj-visible'); var v = document.getElementById(containerId + '-val'); if (v) v.value = ''; var inp = document.getElementById(containerId + '-ssi'); if (inp) inp.value = ''; }
-}
-function rjPropShow(containerId) {
-  var wrap = document.getElementById(containerId);
-  if (wrap) { wrap.classList.add('rj-visible'); rjPropInit(containerId); }
-}
-function rjPropInit(containerId) {
-  var wrap = document.getElementById(containerId);
-  if (!wrap || wrap._rjDone) return;
-  wrap._rjDone = true;
-  wrap.innerHTML = '<label>Property <span style="color:var(--color-text-error)">*</span></label><input type="hidden" id="' + containerId + '-val"><div class="ss-wrap"><input class="ss-input" id="' + containerId + '-ssi" type="text" autocomplete="off" placeholder="Search property..." readonly onfocus="rjPropOpen('' + containerId + '')" oninput="rjPropDraw('' + containerId + '',this.value)"><div class="ss-drop" id="' + containerId + '-ssd"></div></div>';
-  rjPropDraw(containerId, '');
-}
-function rjPropDraw(containerId, q) {
-  var dd = document.getElementById(containerId + '-ssd');
-  var cur = rjPropGetValue(containerId);
-  if (!dd) return;
-  var lq = (q || '').toLowerCase();
-  var list = lq ? RJ_PROPERTIES.filter(function(p) { return p.toLowerCase().indexOf(lq) > -1; }) : RJ_PROPERTIES;
-  var h = '';
-  list.forEach(function(p) {
-    var sel = p === cur ? ' ss-sel' : '';
-    // Escape for inline handler - use data attribute approach
-    h += '<div class="ss-opt' + sel + '" data-prop="' + p.replace(/&/g,'&amp;').replace(/"/g,'&quot;') + '" onmousedown="rjPropPick('' + containerId + '',this)">' + propLabel(p, 60) + '</div>';
-  });
-  dd.innerHTML = h || '<div class="ss-none">No results</div>';
-}
-function rjPropOpen(containerId) {
-  document.querySelectorAll('.ss-drop.ss-open').forEach(function(d) { d.classList.remove('ss-open'); var i = document.getElementById(d.id.replace('_ssd','_ssi')); if(i){i.classList.remove('ss-open');i.readOnly=true;} });
-  var inp = document.getElementById(containerId + '-ssi'), dd = document.getElementById(containerId + '-ssd');
-  if (!inp || !dd) return;
-  inp.readOnly = false; inp.value = ''; inp.classList.add('ss-open'); dd.classList.add('ss-open');
-  rjPropDraw(containerId, '');
-}
-function rjPropPick(containerId, el) {
-  var value = el.getAttribute('data-prop');
-  var hidden = document.getElementById(containerId + '-val');
-  var inp    = document.getElementById(containerId + '-ssi');
-  var dd     = document.getElementById(containerId + '-ssd');
-  if (hidden) hidden.value = value;
-  if (inp)    { inp.value = propLabel(value, 60); inp.readOnly = true; inp.classList.remove('ss-open'); }
-  if (dd)     dd.classList.remove('ss-open');
-}
-function rjPropCheck(prefix) {
-  var selId = prefix === 'worker' ? 'job-select' : (prefix + '-job');
-  var id = document.getElementById(selId) ? document.getElementById(selId).value : '';
-  var containerId = 'rj-prop-' + prefix;
-  if (isRecurringJobId(id)) { rjPropShow(containerId); }
-  else { rjPropHide(containerId); }
 }
 </script>
 </body>
