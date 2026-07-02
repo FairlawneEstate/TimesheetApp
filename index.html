@@ -3155,7 +3155,8 @@ function ssPick(selId, val) {
   var sel = document.getElementById(selId);
   if (!sel) return;
   sel.value = val;
-  // Fire onchange so existing handlers run unchanged
+  // Fire onchange - call directly if inline handler exists, also dispatch event
+  if (sel.onchange) sel.onchange();
   var evt = document.createEvent('Event');
   evt.initEvent('change', true, true);
   sel.dispatchEvent(evt);
