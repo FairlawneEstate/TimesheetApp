@@ -902,6 +902,7 @@ async function pollJobs() {
     absenceTypes = data.absenceTypes || absenceTypes;
     overtimeRequests = data.overtimeRequests || overtimeRequests;
     tasks = (data.tasks || tasks).map(t => ({ ...t }));
+    rjProperties = (data.properties || rjProperties).map(function(p) { return String(p.name || p || ''); }).filter(Boolean);
     overtimeRequests = overtimeRequests.map(o => {
       if (o.property && o.description) return o;
       const job = jobs.find(j => j.id === o.jobId) || recurringJobs.find(j => j.id === o.jobId);
@@ -999,16 +1000,16 @@ function populateJobDropdown() {
 }
 
 function fillJobDetails() {
-  rjPropCheck('worker');
   const id = document.getElementById('job-select').value;
   const detail = document.getElementById('job-detail');
-  if (!id) { detail.style.display = 'none'; return; }
+  if (!id) { detail.style.display = 'none'; rjPropHide('rj-prop-worker'); return; }
   const job = jobs.find(j => j.id === id) || recurringJobs.find(j => j.id === id) || absenceTypes.find(a => a.id === id);
-  if (!job) { detail.style.display = 'none'; return; }
+  if (!job) { detail.style.display = 'none'; rjPropHide('rj-prop-worker'); return; }
   detail.style.display = 'block';
   document.getElementById('job-prop').textContent = job.property || '';
   document.getElementById('job-desc').textContent = job.description || job.name || '';
   document.getElementById('job-assigned').textContent = job.assignedTo ? 'Assigned to: ' + job.assignedTo : '';
+  rjPropCheck('worker');
 }
 
 function updateHoursPlaceholder() {
@@ -1758,6 +1759,7 @@ async function refreshOffice() {
       }));
         recurringJobs = (data.recurringJobs || []).map(j => ({ ...j, assignedTo: String(j.assignedTo || '') }));
       tasks = (data.tasks || tasks).map(t => ({ ...t }));
+    rjProperties = (data.properties || rjProperties).map(function(p) { return String(p.name || p || ''); }).filter(Boolean);
       absenceTypes = data.absenceTypes || [];
       overtimeRequests = data.overtimeRequests || [];
     overtimeRequests = overtimeRequests.map(o => {
