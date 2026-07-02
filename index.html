@@ -240,6 +240,11 @@ textarea { height: 60px; resize: none; }
   .ss-input { font-size:16px; padding:13px 28px 13px 11px; min-height:50px; }
   .ss-row   { padding:11px 10px; font-size:15px; }
 }
+
+/* ── Recurring Job Property Picker ──────────────────────────────── */
+.rj-prop-wrap { display: none; margin-bottom: 0.75rem; }
+.rj-prop-wrap.rj-visible { display: block; }
+.rj-prop-wrap > label { font-size: 12px; font-weight: 500; color: var(--color-text-secondary); display: block; margin-bottom: 4px; }
 </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
@@ -319,6 +324,7 @@ textarea { height: 60px; resize: none; }
             <input type="number" id="entry-hours" placeholder="e.g. 4" min="0.5" max="16" step="0.5" onfocus="updateHoursPlaceholder()">
           </div>
         </div>
+        <div id="rj-prop-worker" class="rj-prop-wrap"></div>
         <label>Comments (optional)</label>
         <textarea id="entry-comments" placeholder="What was done..."></textarea>
         <div class="form-footer">
@@ -425,7 +431,7 @@ textarea { height: 60px; resize: none; }
               </div>
               <div>
                 <label style="margin-top:0;">Job</label>
-                <select id="dae-job"></select>
+                <select id="dae-job" onchange="rjPropCheck('dae')"></select>
               </div>
             </div>
             <div class="grid2" style="margin-top:10px;">
@@ -434,6 +440,7 @@ textarea { height: 60px; resize: none; }
                 <input type="number" id="dae-hours" placeholder="e.g. 4" min="0.5" max="16" step="0.5">
               </div>
               <div>
+                <div id="rj-prop-dae" class="rj-prop-wrap"></div>
                 <label style="margin-top:0;">Comments (optional)</label>
                 <input type="text" id="dae-comments" placeholder="What was done...">
               </div>
@@ -467,7 +474,7 @@ textarea { height: 60px; resize: none; }
               </div>
               <div>
                 <label style="margin-top:0;">Job</label>
-                <select id="oae-job"></select>
+                <select id="oae-job" onchange="rjPropCheck('oae')"></select>
               </div>
             </div>
             <div class="grid2" style="margin-top:10px;">
@@ -481,6 +488,7 @@ textarea { height: 60px; resize: none; }
               </div>
             </div>
             <div style="margin-top:10px;">
+              <div id="rj-prop-oae" class="rj-prop-wrap"></div>
               <label style="margin-top:0;">Comments (optional)</label>
               <textarea id="oae-comments" placeholder="What was done..."></textarea>
             </div>
@@ -729,7 +737,8 @@ function loadInitialData() {
       if (!entries.find(e => e.id === q.id)) entries.push(q);
     });
     recurringJobs = (data.recurringJobs || []).map(j => ({ ...j, assignedTo: String(j.assignedTo || '') }));
-    tasks = (data.tasks || tasks).map(t => ({ ...t }));
+    tasks = (data.tasks || tasks)
+    rjProperties = (data.properties || []).map(function(p) { return String(p.name || p || ''); }).filter(Boolean);.map(t => ({ ...t }));
     absenceTypes = (data.absenceTypes || []);
     overtimeRequests = (data.overtimeRequests || []);
     overtimeRequests = overtimeRequests.map(o => {
@@ -990,6 +999,7 @@ function populateJobDropdown() {
 }
 
 function fillJobDetails() {
+  rjPropCheck('worker');
   const id = document.getElementById('job-select').value;
   const detail = document.getElementById('job-detail');
   if (!id) { detail.style.display = 'none'; return; }
@@ -1153,13 +1163,14 @@ async function submitEntry() {
 
   if (isOvertime) {
     const jobObj = jobs.find(j => j.id === jobId) || recurringJobs.find(j => j.id === jobId) || absenceTypes.find(a => a.id === jobId);
-    const entry = { id: uid(), worker: currentWorker, jobId, date, hours, comments, amendments: [], createdAt: new Date().toISOString(), property: jobObj ? jobObj.property : '', description: jobObj ? (jobObj.description || jobObj.name || '') : '' };
+    const entry = { id: uid(), worker: currentWorker, jobId, date, hours, comments, amendments: [], createdAt: new Date().toISOString(), property: isRecurringJobId(jobId) ? (rjPropGetValue('rj-prop-worker') || (jobObj ? jobObj.property : '')) : (jobObj ? jobObj.property : ''), description: jobObj ? (jobObj.description || jobObj.name || '') : '' };
     showOvertimeModal(entry, isWeekend);
     return;
   }
 
   const jobObj = jobs.find(j => j.id === jobId) || recurringJobs.find(j => j.id === jobId) || absenceTypes.find(a => a.id === jobId);
-  const entry = { id: uid(), worker: currentWorker, jobId, date, hours, comments, amendments: [], createdAt: new Date().toISOString(), property: jobObj ? jobObj.property : '', description: jobObj ? jobObj.description : '' };
+  const entry = { id: uid(), worker: currentWorker, jobId, date, hours, comments, amendments: [], createdAt: new Date().toISOString(), property: isRecurringJobId(jobId) ? (rjPropGetValue('rj-prop-worker') || (jobObj ? jobObj.property : '')) : (jobObj ? jobObj.property : ''), description: jobObj ? jobObj.description : '' };
+  if (isRecurringJobId(jobId) && !rjPropGetValue('rj-prop-worker')) { alert('Please select a property for this recurring job.'); return; }
   entries.push(entry);
   localStorage.setItem('entries', JSON.stringify(entries));
 
@@ -1167,6 +1178,7 @@ async function submitEntry() {
   document.getElementById('job-detail').style.display = 'none';
   document.getElementById('entry-hours').value = '';
   document.getElementById('entry-comments').value = '';
+  rjPropHide('rj-prop-worker');
 
   updateHoursPlaceholder();
   renderEntriesByDate();
@@ -2355,9 +2367,10 @@ async function submitOfficeEntry() {
     id: uid(), worker, jobId, date, hours, comments,
     amendments: [{ by: 'Office', at: new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }), note: 'Created by Office' }],
     createdAt: new Date().toISOString(),
-    property: jobObj ? jobObj.property : '',
+    property: isRecurringJobId(jobId) ? (rjPropGetValue('rj-prop-oae') || (jobObj ? jobObj.property : '')) : (jobObj ? jobObj.property : ''),
     description: jobObj ? jobObj.description : ''
   };
+  if (isRecurringJobId(jobId) && !rjPropGetValue('rj-prop-oae')) { alert('Please select a property for this recurring job.'); return; }
   if (isOvertime_oe) { showOvertimeModal(entry_oe, isWeekend_oe); return; }
   const entry = entry_oe;
   entries.push(entry);
@@ -2366,6 +2379,7 @@ async function submitOfficeEntry() {
   document.getElementById('oae-job').innerHTML = '<option value="">Select worker first...</option>';
   document.getElementById('oae-hours').value = '';
   document.getElementById('oae-comments').value = '';
+  rjPropHide('rj-prop-oae');
   toggleOfficeAddEntry();
   renderOfficeEntries();
   const { synced } = await queueOrSend('addEntry', { entry: { ...entry, amendments: amendmentsToString(entry.amendments) } });
@@ -2627,7 +2641,8 @@ async function submitDailyEntry() {
   const isOvertime_de = isWeekend_de || (alreadyLogged + hours > 8);
   const allJobs = [...jobs, ...recurringJobs, ...tasks, ...absenceTypes];
   const jobObj = allJobs.find(j => j.id === jobId);
-  const entry_de = { id: uid(), worker, jobId, date, hours, comments, amendments: [{ by: 'Office', at: new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }), note: 'Created by Office' }], createdAt: new Date().toISOString(), property: jobObj ? jobObj.property : '', description: jobObj ? (jobObj.description || jobObj.name || '') : '' };
+  const entry_de = { id: uid(), worker, jobId, date, hours, comments, amendments: [{ by: 'Office', at: new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }), note: 'Created by Office' }], createdAt: new Date().toISOString(), property: isRecurringJobId(jobId) ? (rjPropGetValue('rj-prop-dae') || (jobObj ? jobObj.property : '')) : (jobObj ? jobObj.property : ''), description: jobObj ? (jobObj.description || jobObj.name || '') : '' };
+  if (isRecurringJobId(jobId) && !rjPropGetValue('rj-prop-dae')) { alert('Please select a property for this recurring job.'); return; }
   if (isOvertime_de) { showOvertimeModal(entry_de, isWeekend_de); return; }
   const entry = entry_de;
   entries.push(entry);
@@ -2636,6 +2651,7 @@ async function submitDailyEntry() {
   document.getElementById('dae-job').innerHTML = '<option value="">Select worker first...</option>';
   document.getElementById('dae-hours').value = '';
   document.getElementById('dae-comments').value = '';
+  rjPropHide('rj-prop-dae');
   toggleDailyAddEntry();
   renderDailyView();
   const { synced } = await queueOrSend('addEntry', { entry: { ...entry, amendments: amendmentsToString(entry.amendments) } });
@@ -3174,6 +3190,97 @@ async function deleteOTRequest(id) {
   renderOvertimeTab && renderOvertimeTab();
   const { synced } = await queueOrSend('deleteOTRequest', { id });
   if (synced) setSyncStatus(currentUser ? 'office' : 'worker', 'synced', 'OT request deleted');
+}
+
+// ── Recurring Job Property Picker ────────────────────────────────
+var rjProperties = []; // populated from Properties sheet via getData
+
+function isRecurringJobId(id) {
+  return !!recurringJobs.find(function(j) { return j.id === id; });
+}
+function rjPropGetValue(containerId) {
+  var el = document.getElementById(containerId + '-val');
+  return el ? el.value : '';
+}
+function rjPropHide(containerId) {
+  var wrap = document.getElementById(containerId);
+  if (!wrap) return;
+  wrap.classList.remove('rj-visible');
+  var v = document.getElementById(containerId + '-val');
+  if (v) v.value = '';
+  var inp = document.getElementById(containerId + '-ssi');
+  if (inp) inp.value = '';
+}
+function rjPropShow(containerId) {
+  var wrap = document.getElementById(containerId);
+  if (!wrap) return;
+  if (!wrap._rjDone) rjPropBuild(containerId);
+  wrap.classList.add('rj-visible');
+}
+function rjPropBuild(containerId) {
+  var wrap = document.getElementById(containerId);
+  if (!wrap || wrap._rjDone) return;
+  wrap._rjDone = true;
+  wrap.innerHTML =
+    '<label>Property <span style="color:var(--color-text-error)">*</span></label>' +
+    '<input type="hidden" id="' + containerId + '-val">' +
+    '<div class="ss-wrap">' +
+    '<input class="ss-input" id="' + containerId + '-ssi" type="text"' +
+    ' autocomplete="off" placeholder="Search property..." readonly' +
+    ' onfocus="rjPropOpen('' + containerId + '')"' +
+    ' oninput="rjPropFilter('' + containerId + '')">' +
+    '<div class="ss-drop" id="' + containerId + '-ssd"></div>' +
+    '</div>';
+  rjPropDraw(containerId, '');
+}
+function rjPropDraw(containerId, q) {
+  var dd = document.getElementById(containerId + '-ssd');
+  if (!dd) return;
+  var cur = rjPropGetValue(containerId);
+  var lq = (q || '').toLowerCase();
+  var list = lq ? rjProperties.filter(function(p) { return p.toLowerCase().indexOf(lq) > -1; }) : rjProperties;
+  if (!list.length) { dd.innerHTML = '<div class="ss-none">No properties found</div>'; return; }
+  var h = '';
+  list.forEach(function(p) {
+    var sel = p === cur ? ' ss-sel' : '';
+    h += '<div class="ss-opt' + sel + '" data-p="' + p.replace(/&/g,'&amp;').replace(/"/g,'&quot;') + '" onmousedown="rjPropPick('' + containerId + '',this)">' + propLabel(p, 60) + '</div>';
+  });
+  dd.innerHTML = h;
+}
+function rjPropOpen(containerId) {
+  // Close any open ss dropdowns
+  document.querySelectorAll('.ss-drop.ss-open').forEach(function(d) {
+    d.classList.remove('ss-open');
+    var i = document.getElementById(d.id.replace('-ssd','-ssi'));
+    if (i) { i.classList.remove('ss-open'); i.readOnly = true; }
+  });
+  var inp = document.getElementById(containerId + '-ssi');
+  var dd  = document.getElementById(containerId + '-ssd');
+  if (!inp || !dd) return;
+  inp.readOnly = false; inp.value = '';
+  inp.classList.add('ss-open'); dd.classList.add('ss-open');
+  rjPropDraw(containerId, '');
+}
+function rjPropFilter(containerId) {
+  var inp = document.getElementById(containerId + '-ssi');
+  if (inp) rjPropDraw(containerId, inp.value);
+}
+function rjPropPick(containerId, el) {
+  var value = el.getAttribute('data-p');
+  var hidden = document.getElementById(containerId + '-val');
+  var inp    = document.getElementById(containerId + '-ssi');
+  var dd     = document.getElementById(containerId + '-ssd');
+  if (hidden) hidden.value = value;
+  if (inp)    { inp.value = propLabel(value, 60); inp.readOnly = true; inp.classList.remove('ss-open'); }
+  if (dd)     dd.classList.remove('ss-open');
+}
+function rjPropCheck(prefix) {
+  var selId = prefix === 'worker' ? 'job-select' : (prefix + '-job');
+  var sel = document.getElementById(selId);
+  var id  = sel ? sel.value : '';
+  var containerId = 'rj-prop-' + prefix;
+  if (isRecurringJobId(id)) { rjPropShow(containerId); }
+  else { rjPropHide(containerId); }
 }
 </script>
 </body>
