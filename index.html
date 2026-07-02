@@ -3199,17 +3199,19 @@ function isRecurringJobId(id) {
   return !!recurringJobs.find(function(j) { return j.id === id; });
 }
 function rjPropGetValue(containerId) {
-  var el = document.getElementById(containerId + '-val');
+  var el = document.getElementById(containerId + '_val');
   return el ? el.value : '';
 }
 function rjPropHide(containerId) {
   var wrap = document.getElementById(containerId);
   if (!wrap) return;
   wrap.classList.remove('rj-visible');
-  var v = document.getElementById(containerId + '-val');
+  var v = document.getElementById(containerId + '_val');
   if (v) v.value = '';
-  var inp = document.getElementById(containerId + '-ssi');
-  if (inp) inp.value = '';
+  var inp = document.getElementById(containerId + '_ssi');
+  if (inp) { inp.value = ''; inp.readOnly = true; inp.classList.remove('ss-open'); }
+  var dd = document.getElementById(containerId + '_ssd');
+  if (dd) dd.classList.remove('ss-open');
 }
 function rjPropShow(containerId) {
   var wrap = document.getElementById(containerId);
@@ -3223,18 +3225,18 @@ function rjPropBuild(containerId) {
   wrap._rjDone = true;
   wrap.innerHTML =
     '<label>Property <span style="color:var(--color-text-error)">*</span></label>' +
-    '<input type="hidden" id="' + containerId + '-val">' +
+    '<input type="hidden" id="' + containerId + '_val">' +
     '<div class="ss-wrap">' +
-    '<input class="ss-input" id="' + containerId + '-ssi" type="text"' +
+    '<input class="ss-input" id="' + containerId + '_ssi" type="text"' +
     ' autocomplete="off" placeholder="Search property..." readonly' +
     ' onfocus="rjPropOpen('' + containerId + '')"' +
     ' oninput="rjPropFilter('' + containerId + '')">' +
-    '<div class="ss-drop" id="' + containerId + '-ssd"></div>' +
+    '<div class="ss-drop" id="' + containerId + '_ssd"></div>' +
     '</div>';
   rjPropDraw(containerId, '');
 }
 function rjPropDraw(containerId, q) {
-  var dd = document.getElementById(containerId + '-ssd');
+  var dd = document.getElementById(containerId + '_ssd');
   if (!dd) return;
   var cur = rjPropGetValue(containerId);
   var lq = (q || '').toLowerCase();
@@ -3248,28 +3250,27 @@ function rjPropDraw(containerId, q) {
   dd.innerHTML = h;
 }
 function rjPropOpen(containerId) {
-  // Close any open ss dropdowns
+  // Close all other open dropdowns (both ssAttach and rjProp)
   document.querySelectorAll('.ss-drop.ss-open').forEach(function(d) {
-    d.classList.remove('ss-open');
-    var i = document.getElementById(d.id.replace('-ssd','-ssi'));
-    if (i) { i.classList.remove('ss-open'); i.readOnly = true; }
+    var id = d.id.replace('_ssd', '');
+    if (id !== containerId) ssClose(id);
   });
-  var inp = document.getElementById(containerId + '-ssi');
-  var dd  = document.getElementById(containerId + '-ssd');
+  var inp = document.getElementById(containerId + '_ssi');
+  var dd  = document.getElementById(containerId + '_ssd');
   if (!inp || !dd) return;
   inp.readOnly = false; inp.value = '';
   inp.classList.add('ss-open'); dd.classList.add('ss-open');
   rjPropDraw(containerId, '');
 }
 function rjPropFilter(containerId) {
-  var inp = document.getElementById(containerId + '-ssi');
+  var inp = document.getElementById(containerId + '_ssi');
   if (inp) rjPropDraw(containerId, inp.value);
 }
 function rjPropPick(containerId, el) {
   var value = el.getAttribute('data-p');
-  var hidden = document.getElementById(containerId + '-val');
-  var inp    = document.getElementById(containerId + '-ssi');
-  var dd     = document.getElementById(containerId + '-ssd');
+  var hidden = document.getElementById(containerId + '_val');
+  var inp    = document.getElementById(containerId + '_ssi');
+  var dd     = document.getElementById(containerId + '_ssd');
   if (hidden) hidden.value = value;
   if (inp)    { inp.value = propLabel(value, 60); inp.readOnly = true; inp.classList.remove('ss-open'); }
   if (dd)     dd.classList.remove('ss-open');
