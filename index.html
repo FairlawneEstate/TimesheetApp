@@ -3193,84 +3193,64 @@ async function deleteOTRequest(id) {
 }
 
 // ── Recurring Job Property Picker ────────────────────────────────
-var rjProperties = []; // populated from Properties sheet via getData
+var rjProperties = [];
 
 function isRecurringJobId(id) {
   return !!recurringJobs.find(function(j) { return j.id === id; });
 }
-function rjPropGetValue(containerId) {
-  var el = document.getElementById(containerId + '_val');
+function rjPropGetValue(cid) {
+  var el = document.getElementById(cid + '_val');
   return el ? el.value : '';
 }
-function rjPropHide(containerId) {
-  var wrap = document.getElementById(containerId);
+function rjPropHide(cid) {
+  var wrap = document.getElementById(cid);
   if (!wrap) return;
   wrap.classList.remove('rj-visible');
-  var v = document.getElementById(containerId + '_val');
-  if (v) v.value = '';
-  var inp = document.getElementById(containerId + '_ssi');
-  if (inp) { inp.value = ''; inp.readOnly = true; inp.classList.remove('ss-open'); }
-  var dd = document.getElementById(containerId + '_ssd');
-  if (dd) dd.classList.remove('ss-open');
+  var v = document.getElementById(cid + '_val'); if (v) v.value = '';
+  var i = document.getElementById(cid + '_ssi'); if (i) { i.value = ''; i.readOnly = true; i.classList.remove('ss-open'); }
+  var d = document.getElementById(cid + '_ssd'); if (d) d.classList.remove('ss-open');
 }
-function rjPropShow(containerId) {
-  var wrap = document.getElementById(containerId);
+function rjPropShow(cid) {
+  var wrap = document.getElementById(cid);
   if (!wrap) return;
-  if (!wrap._rjDone) rjPropBuild(containerId);
+  if (!wrap._rjDone) rjPropBuild(cid);
   wrap.classList.add('rj-visible');
 }
-function rjPropBuild(containerId) {
-  var wrap = document.getElementById(containerId);
+function rjPropBuild(cid) {
+  var wrap = document.getElementById(cid);
   if (!wrap || wrap._rjDone) return;
   wrap._rjDone = true;
-  wrap.innerHTML =
-    '<label>Property <span style="color:var(--color-text-error)">*</span></label>' +
-    '<input type="hidden" id="' + containerId + '_val">' +
-    '<div class="ss-wrap">' +
-    '<input class="ss-input" id="' + containerId + '_ssi" type="text"' +
-    ' autocomplete="off" placeholder="Search property..." readonly' +
-    ' onfocus="rjPropOpen('' + containerId + '')"' +
-    ' oninput="rjPropFilter('' + containerId + '')">' +
-    '<div class="ss-drop" id="' + containerId + '_ssd"></div>' +
-    '</div>';
-  rjPropDraw(containerId, '');
+  var html = '<label>Property <span style="color:var(--color-text-error)">*</span></label>';
+  html += '<input type="hidden" id="' + cid + '_val">';
+  html += '<div class="ss-wrap">';
+  html += '<input class="ss-input" id="' + cid + '_ssi" type="text" autocomplete="off" placeholder="Search property..." readonly';
+  html += ' onfocus="rjPropOpen(this)" oninput="rjPropFilter(this)">';
+  html += '<div class="ss-drop" id="' + cid + '_ssd"></div>';
+  html += '</div>';
+  wrap.innerHTML = html;
+  rjPropDraw(cid, '');
 }
-function rjPropDraw(containerId, q) {
-  var dd = document.getElementById(containerId + '_ssd');
-  if (!dd) return;
-  var cur = rjPropGetValue(containerId);
-  var lq = (q || '').toLowerCase();
-  var list = lq ? rjProperties.filter(function(p) { return p.toLowerCase().indexOf(lq) > -1; }) : rjProperties;
-  if (!list.length) { dd.innerHTML = '<div class="ss-none">No properties found</div>'; return; }
-  var h = '';
-  list.forEach(function(p) {
-    var sel = p === cur ? ' ss-sel' : '';
-    h += '<div class="ss-opt' + sel + '" data-p="' + p.replace(/&/g,'&amp;').replace(/"/g,'&quot;') + '" onmousedown="rjPropPick('' + containerId + '',this)">' + propLabel(p, 60) + '</div>';
-  });
-  dd.innerHTML = h;
-}
-function rjPropOpen(containerId) {
-  // Close all other open dropdowns (both ssAttach and rjProp)
+function rjPropOpen(inp) {
+  var cid = inp.id.replace('_ssi', '');
   document.querySelectorAll('.ss-drop.ss-open').forEach(function(d) {
     var id = d.id.replace('_ssd', '');
-    if (id !== containerId) ssClose(id);
+    if (id !== cid) ssClose(id);
   });
-  var inp = document.getElementById(containerId + '_ssi');
-  var dd  = document.getElementById(containerId + '_ssd');
-  if (!inp || !dd) return;
+  var dd = document.getElementById(cid + '_ssd');
+  if (!dd) return;
   inp.readOnly = false; inp.value = '';
   inp.classList.add('ss-open'); dd.classList.add('ss-open');
-  rjPropDraw(containerId, '');
+  rjPropDraw(cid, '');
 }
-function rjPropFilter(containerId) {
-  var inp = document.getElementById(containerId + '_ssi');
-  if (inp) rjPropDraw(containerId, inp.value);
+function rjPropFilter(inp) {
+  var cid = inp.id.replace('_ssi', '');
+  rjPropDraw(cid, inp.value);
 }
-function rjPropPick(containerId, el) {
+function rjPropPick(cid, el) {
   var value = el.getAttribute('data-p');
-  var hidden = document.getElementById(containerId + '_val');
-  var inp    = document.getElementById(containerId + '_ssi');
-  var dd     = document.getElementById(containerId + '_ssd');
+  var hidden = document.getElementById(cid + '_val');
+  var inp    = document.getElementById(cid + '_ssi');
+  var dd     = document.getElementById(cid + '_ssd');
   if (hidden) hidden.value = value;
   if (inp)    { inp.value = propLabel(value, 60); inp.readOnly = true; inp.classList.remove('ss-open'); }
   if (dd)     dd.classList.remove('ss-open');
@@ -3279,9 +3259,9 @@ function rjPropCheck(prefix) {
   var selId = prefix === 'worker' ? 'job-select' : (prefix + '-job');
   var sel = document.getElementById(selId);
   var id  = sel ? sel.value : '';
-  var containerId = 'rj-prop-' + prefix;
-  if (isRecurringJobId(id)) { rjPropShow(containerId); }
-  else { rjPropHide(containerId); }
+  var cid = 'rj-prop-' + prefix;
+  if (isRecurringJobId(id)) { rjPropShow(cid); }
+  else { rjPropHide(cid); }
 }
 </script>
 </body>
