@@ -737,8 +737,8 @@ function loadInitialData() {
       if (!entries.find(e => e.id === q.id)) entries.push(q);
     });
     recurringJobs = (data.recurringJobs || []).map(j => ({ ...j, assignedTo: String(j.assignedTo || '') }));
-    tasks = (data.tasks || tasks)
-    rjProperties = (data.properties || []).map(function(p) { return String(p.name || p || ''); }).filter(Boolean);.map(t => ({ ...t }));
+    tasks = (data.tasks || tasks).map(t => ({ ...t }));
+    rjProperties = (data.properties || []).map(function(p) { return String(p.name || p || ''); }).filter(Boolean);
     absenceTypes = (data.absenceTypes || []);
     overtimeRequests = (data.overtimeRequests || []);
     overtimeRequests = overtimeRequests.map(o => {
