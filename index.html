@@ -3233,6 +3233,20 @@ function rjPropBuild(cid) {
   wrap.innerHTML = html;
   rjPropDraw(cid, '');
 }
+function rjPropDraw(cid, q) {
+  var dd = document.getElementById(cid + '_ssd');
+  if (!dd) return;
+  var cur = rjPropGetValue(cid);
+  var lq = (q || '').toLowerCase();
+  var list = lq ? rjProperties.filter(function(p) { return p.toLowerCase().indexOf(lq) > -1; }) : rjProperties;
+  if (!list.length) { dd.innerHTML = '<div class="ss-none">No properties found</div>'; return; }
+  var h = '';
+  list.forEach(function(p) {
+    var sel = p === cur ? ' ss-sel' : '';
+    h += '<div class="ss-opt' + sel + '" data-p="' + p.replace(/&/g,'&amp;').replace(/"/g,'&quot;') + '" onmousedown="rjPropPick(\'' + cid + '\',this)">' + propLabel(p, 60) + '</div>';
+  });
+  dd.innerHTML = h;
+}
 function rjPropOpen(inp) {
   var cid = inp.id.replace('_ssi', '');
   document.querySelectorAll('.ss-drop.ss-open').forEach(function(d) {
