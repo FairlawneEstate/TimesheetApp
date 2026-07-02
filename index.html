@@ -1111,20 +1111,20 @@ async function confirmOvertime() {
   overtimeRequests.push(otRequest);
   localStorage.setItem('overtimeRequests', JSON.stringify(overtimeRequests));
 
-  // If entry doesn't exist yet (office add-entry context), save it now
-  if (!entries.find(e => e.id === entry.id)) {
-    entries.push(entry);
-    localStorage.setItem('entries', JSON.stringify(entries));
-    await queueOrSend('addEntry', { entry: { ...entry, amendments: amendmentsToString(entry.amendments) } });
-  }
-
   document.getElementById('overtime-modal').style.display = 'none';
   pendingOvertimeEntry = null;
   document.getElementById('job-select').value = '';
   document.getElementById('job-detail').style.display = 'none';
   document.getElementById('entry-hours').value = '';
   document.getElementById('entry-comments').value = '';
+  // Reset office add-entry forms if open
+  const oaeForm = document.getElementById('office-add-entry-form');
+  if (oaeForm && oaeForm.style.display !== 'none') toggleOfficeAddEntry();
+  const daeForm = document.getElementById('daily-add-entry-form');
+  if (daeForm && daeForm.style.display !== 'none') toggleDailyAddEntry();
   renderEntriesByDate();
+  renderOfficeEntries();
+  renderDailyView();
 
   const { synced } = await queueOrSend('saveOvertimeRequest', { request: otRequest });
   if (synced) {
