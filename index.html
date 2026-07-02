@@ -3243,7 +3243,7 @@ function rjPropDraw(cid, q) {
   var h = '';
   list.forEach(function(p) {
     var sel = p === cur ? ' ss-sel' : '';
-    h += '<div class="ss-opt' + sel + '" data-p="' + p.replace(/&/g,'&amp;').replace(/"/g,'&quot;') + '" onmousedown="rjPropPick(\'' + cid + '\',this)">' + propLabel(p, 60) + '</div>';
+    h += '<div class="ss-row' + sel + '" data-p="' + p.replace(/&/g,'&amp;').replace(/"/g,'&quot;') + '" onmousedown="rjPropPick(\'' + cid + '\',this)">' + propLabel(p, 60) + '</div>';
   });
   dd.innerHTML = h;
 }
