@@ -1336,6 +1336,10 @@ async function submitCompletedWeek(wc) {
 
 function renderWeek(wc) {
   const mine = entries.filter(e => e.worker === currentWorker);
+  const weekSub = getWeekSubmission(currentWorker, wc);
+  const fulfilled = isWeekFulfilled(currentWorker, wc);
+  const showSubmitBtn = fulfilled && (!weekSub || weekSub.status === 'declined');
+  const isLocked = weekSub && (weekSub.status === 'pending' || weekSub.status === 'approved');
   const byDay = {};
   mine.forEach(e => {
     const norm = normaliseDate(e.date);
@@ -1539,11 +1543,6 @@ function renderWeek(wc) {
 
     return entryRowsHtml + otRowsForDay;
   }).join('');
-
-  const weekSub = getWeekSubmission(currentWorker, wc);
-  const fulfilled = isWeekFulfilled(currentWorker, wc);
-  const showSubmitBtn = fulfilled && (!weekSub || weekSub.status === 'declined');
-  const isLocked = weekSub && (weekSub.status === 'pending' || weekSub.status === 'approved');
 
   return `
     <div class="week-block">
