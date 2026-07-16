@@ -2462,6 +2462,12 @@ function renderDailyView() {
       .filter(e => e.worker === worker.name && normaliseDate(e.date) === todayStr)
       .sort((a, b) => String(a.jobId).localeCompare(String(b.jobId), undefined, { numeric: true }));
 
+    // Derrick Smith works Mon-Wed only — skip his row on Thu/Fri unless he has data logged
+    const isDerrick = worker.name.trim().toLowerCase() === 'derrick smith';
+    const todayDow = new Date(todayStr + 'T12:00:00').getDay();
+    const isThuFri = todayDow === 4 || todayDow === 5;
+    if (isDerrick && isThuFri && dayEntries.length === 0) return;
+
     const hoursLogged = dayEntries.reduce((s, e) => s + parseFloat(e.hours || 0), 0);
     const absence = null;
     const isBankHoliday = BANK_HOLIDAYS.includes(todayStr);
