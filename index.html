@@ -1919,7 +1919,18 @@ function renderOfficeEntries() {
   displayWorkers.forEach(worker => {
     const workerEntries = entries.filter(e => e.worker === worker.name);
 
-    const workerRows = allDays.map(dayStr => {
+    // Derrick Smith works Mon-Wed only — hide Thu/Fri unless he already has data logged that day
+    const isDerrick = worker.name.trim().toLowerCase() === 'derrick smith';
+    const workerDays = isDerrick
+      ? allDays.filter(dayStr => {
+          const dow = new Date(dayStr + 'T12:00:00').getDay();
+          const isThuFri = dow === 4 || dow === 5;
+          if (!isThuFri) return true;
+          return workerEntries.some(e => normaliseDate(e.date) === dayStr);
+        })
+      : allDays;
+
+    const workerRows = workerDays.map(dayStr => {
       const dayEntries = workerEntries.filter(e => normaliseDate(e.date) === dayStr).sort((a, b) => String(a.jobId).localeCompare(String(b.jobId), undefined, { numeric: true }));
       const isEmpty = dayEntries.length === 0;
       const dayDate = new Date(dayStr + 'T00:00:00');
