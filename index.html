@@ -364,7 +364,6 @@ textarea { height: 60px; resize: none; }
       <div class="row-between form-section">
         <div>
           <p class="section-heading">Office dashboard</p>
-          <p class="text-muted">Manage jobs and export timesheets</p>
         </div>
         <div style="display:flex;align-items:center;gap:10px;">
           <span class="text-muted" style="font-size:13px;">Logged in as <strong id="office-user-display"></strong></span>
@@ -385,7 +384,7 @@ textarea { height: 60px; resize: none; }
         <button onclick="switchOfficeTab('workers')" id="otab-workers">Workers</button>
         <button onclick="switchOfficeTab('absences')" id="otab-absences">Absence Types</button>
         <button onclick="switchOfficeTab('recurring')" id="otab-recurring">Recurring Jobs</button>
-        <button onclick="switchOfficeTab('weekapprovals')" id="otab-weekapprovals">Week Approvals</button>
+        <button onclick="switchOfficeTab('weekapprovals')" id="otab-weekapprovals">Weekly Approvals</button>
       </div>
 
       <!-- Active Jobs tab -->
@@ -585,7 +584,7 @@ textarea { height: 60px; resize: none; }
       <!-- Week Approvals tab -->
       <div id="office-tab-weekapprovals" style="display:none;">
         <div class="card">
-          <div class="card-header"><p class="section-heading">✓ Week Approvals</p></div>
+          <div class="card-header"><p class="section-heading">✓ Weekly Approvals</p></div>
           <div id="week-approvals-content"><p class="text-muted" style="padding:1rem;">Loading...</p></div>
         </div>
       </div>
