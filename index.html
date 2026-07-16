@@ -3410,16 +3410,42 @@ function renderWeekApprovalsTab() {
         </div>
         <table class="week-table" style="width:100%;">
           <thead>
-            <tr><th>Date</th><th>W/O</th><th>Property</th><th>Hours</th></tr>
+            <tr>
+              <th style="width:100px;">Date</th>
+              <th style="width:160px;">W/O Number</th>
+              <th style="width:200px;">Property</th>
+              <th>Description</th>
+              <th style="width:46px;text-align:center;">Hrs</th>
+              <th>Comments</th>
+            </tr>
           </thead>
           <tbody>
-            ${weekEntries.sort((a,b) => normaliseDate(a.date).localeCompare(normaliseDate(b.date))).map(e => `
-            <tr>
-              <td style="padding:6px 10px;font-size:12px;">${fmtShortDate(normaliseDate(e.date))}</td>
-              <td style="padding:6px 10px;font-size:12px;font-weight:600;">${e.jobId}</td>
-              <td style="padding:6px 10px;font-size:12px;color:var(--color-text-secondary);">${propLabel(e.property, 35)}</td>
-              <td style="padding:6px 10px;font-size:12px;">${e.hours}h</td>
-            </tr>`).join('')}
+            ${weekEntries.sort((a,b) => normaliseDate(a.date).localeCompare(normaliseDate(b.date))).map(e => {
+              const job = jobs.find(j => j.id === e.jobId) || recurringJobs.find(j => j.id === e.jobId) || tasks.find(j => j.id === e.jobId);
+              const jobProperty = job ? job.property : (e.property || '');
+              const jobDescription = (job ? (job.description || '') : (e.description || '')).slice(0, 200);
+              return `
+            <tr class="day-row">
+              <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;vertical-align:middle;width:100px;">
+                <div class="day-name">${fmtShortDate(normaliseDate(e.date))}</div>
+              </td>
+              <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;vertical-align:middle;width:160px;">
+                <div style="font-weight:600;">${e.jobId}</div>
+              </td>
+              <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:middle;width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                ${propLabel(jobProperty, 35)}
+              </td>
+              <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:middle;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                ${jobDescription}
+              </td>
+              <td style="padding:5px 6px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-weight:500;text-align:center;vertical-align:middle;white-space:nowrap;width:46px;">
+                ${e.hours}h
+              </td>
+              <td style="padding:5px 10px;font-size:12px;color:var(--color-text-secondary);">
+                ${e.comments || ''}
+              </td>
+            </tr>`;
+            }).join('')}
           </tbody>
         </table>
       </div>`;
