@@ -3411,6 +3411,7 @@ function renderWeekApprovalsTab() {
         <table class="week-table" style="width:100%;">
           <thead>
             <tr>
+              <th style="width:100px;">Day</th>
               <th style="width:100px;">Date</th>
               <th style="width:160px;">W/O Number</th>
               <th style="width:200px;">Property</th>
@@ -3424,8 +3425,12 @@ function renderWeekApprovalsTab() {
               const job = jobs.find(j => j.id === e.jobId) || recurringJobs.find(j => j.id === e.jobId) || tasks.find(j => j.id === e.jobId);
               const jobProperty = job ? job.property : (e.property || '');
               const jobDescription = (job ? (job.description || '') : (e.description || '')).slice(0, 200);
+              const dayName = new Date(normaliseDate(e.date) + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'long' });
               return `
             <tr class="day-row">
+              <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;vertical-align:middle;width:100px;">
+                <div class="day-name">${dayName}</div>
+              </td>
               <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;vertical-align:middle;width:100px;">
                 <div class="day-name">${fmtShortDate(normaliseDate(e.date))}</div>
               </td>
