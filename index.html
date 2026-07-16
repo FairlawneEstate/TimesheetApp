@@ -385,6 +385,7 @@ textarea { height: 60px; resize: none; }
         <button onclick="switchOfficeTab('workers')" id="otab-workers">Workers</button>
         <button onclick="switchOfficeTab('absences')" id="otab-absences">Absence Types</button>
         <button onclick="switchOfficeTab('recurring')" id="otab-recurring">Recurring Jobs</button>
+        <button onclick="switchOfficeTab('weekapprovals')" id="otab-weekapprovals">Week Approvals</button>
       </div>
 
       <!-- Active Jobs tab -->
@@ -581,6 +582,14 @@ textarea { height: 60px; resize: none; }
         </div>
       </div>
 
+      <!-- Week Approvals tab -->
+      <div id="office-tab-weekapprovals" style="display:none;">
+        <div class="card">
+          <div class="card-header"><p class="section-heading">✓ Week Approvals</p></div>
+          <div id="week-approvals-content"><p class="text-muted" style="padding:1rem;">Loading...</p></div>
+        </div>
+      </div>
+
       <!-- Workers tab -->
       <div id="office-tab-workers" style="display:none;">
       <div class="card">
@@ -638,7 +647,7 @@ textarea { height: 60px; resize: none; }
 <script>
 // ══════════════════════════════════════════════════════════════════
 // ══════════════════════════════════════════════════════════════════
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzTasjFxyNl8T06L1qlF9pFRKLvSufnov6h6U6q3zNWNy-X-KrUU_tRcU7R6BW31RCPRw/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzHzdNvqpfh2kbAkycm2fgLZM0G9SMW5zeI59CwLOwe-QuWVVXvMhHv_z02PIeJqXFYIg/exec';
 const POLL_INTERVAL_MS = 60000;
 // ══════════════════════════════════════════════════════════════════
 
@@ -658,6 +667,7 @@ function toHHMM(val) {
 let jobs = [];
 let entries = [];
 let workers = [];
+let weekSubmissions = [];
 let recurringJobs = [];
 let tasks = [];
 let absenceTypes = [];
@@ -730,6 +740,7 @@ function loadInitialData() {
     recurringJobs = (data.recurringJobs || []).map(j => ({ ...j, assignedTo: String(j.assignedTo || '') }));
     tasks = (data.tasks || tasks).map(t => ({ ...t }));
     rjProperties = (data.properties || []).map(function(p) { return String(p.name || p || ''); }).filter(Boolean);
+    weekSubmissions = data.weekSubmissions || [];
     absenceTypes = (data.absenceTypes || []);
     overtimeRequests = (data.overtimeRequests || []);
     overtimeRequests = overtimeRequests.map(o => {
@@ -894,6 +905,7 @@ async function pollJobs() {
     overtimeRequests = data.overtimeRequests || overtimeRequests;
     tasks = (data.tasks || tasks).map(t => ({ ...t }));
     rjProperties = (data.properties || rjProperties).map(function(p) { return String(p.name || p || ''); }).filter(Boolean);
+    weekSubmissions = data.weekSubmissions || weekSubmissions;
     overtimeRequests = overtimeRequests.map(o => {
       if (o.property && o.description) return o;
       const job = jobs.find(j => j.id === o.jobId) || recurringJobs.find(j => j.id === o.jobId);
@@ -1145,6 +1157,13 @@ async function submitEntry() {
   const comments = document.getElementById('entry-comments').value;
   if (!jobId || !date || isNaN(hours)) { alert('Please fill in job, date, and hours.'); return; }
 
+  const entryWc = getWeekCommencing(date);
+  const entryWeekSub = getWeekSubmission(currentWorker, entryWc);
+  if (entryWeekSub && (entryWeekSub.status === 'pending' || entryWeekSub.status === 'approved')) {
+    alert('This week has been submitted for approval and is locked. Contact the office if changes are needed.');
+    return;
+  }
+
   const norm = normaliseDate(date);
   const dayOfWeek = new Date(date + 'T12:00:00').getDay();
   const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
@@ -1270,6 +1289,51 @@ function fmtShortDate(dateStr) {
   return parseInt(parts[2]) + ' ' + months[parseInt(parts[1]) - 1];
 }
 
+
+function isWeekFulfilled(workerName, wc) {
+  const isDerrick = workerName.trim().toLowerCase() === 'derrick smith';
+  const requiredDayCount = isDerrick ? 3 : 5; // Mon-Wed or Mon-Fri
+  const parts = wc.split('-');
+  const workerEntries = entries.filter(e => e.worker === workerName);
+
+  for (let i = 0; i < requiredDayCount; i++) {
+    const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]) + i);
+    const dayStr = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+
+    if (BANK_HOLIDAYS.includes(dayStr)) continue;
+
+    const dayEntries = workerEntries.filter(e => normaliseDate(e.date) === dayStr);
+    const hasAbsence = dayEntries.some(e => absenceTypes.some(a => a.id === e.jobId));
+    if (hasAbsence) continue;
+
+    const hoursLogged = dayEntries.reduce((s, e) => s + parseFloat(e.hours || 0), 0);
+    if (hoursLogged !== 8) return false;
+  }
+  return true;
+}
+
+function getWeekSubmission(workerName, wc) {
+  return weekSubmissions.find(w => w.worker === workerName && normaliseDate(w.weekStart) === wc) || null;
+}
+
+async function submitCompletedWeek(wc) {
+  if (!confirm('Submit this week for approval? Entries will be locked until reviewed.')) return;
+  const { synced, result } = await queueOrSend('saveWeekSubmission', { submission: { worker: currentWorker, weekStart: wc } });
+  const sub = {
+    id: (result && result.id) || ('ws' + Date.now()),
+    worker: currentWorker,
+    weekStart: wc,
+    status: 'pending',
+    submittedAt: new Date().toISOString(),
+    reviewedAt: '',
+    reviewedBy: ''
+  };
+  const existingIdx = weekSubmissions.findIndex(w => w.worker === currentWorker && normaliseDate(w.weekStart) === wc);
+  if (existingIdx > -1) weekSubmissions[existingIdx] = sub; else weekSubmissions.push(sub);
+  localStorage.setItem('weekSubmissions', JSON.stringify(weekSubmissions));
+  renderEntriesByDate();
+}
+
 function renderWeek(wc) {
   const mine = entries.filter(e => e.worker === currentWorker);
   const byDay = {};
@@ -1391,8 +1455,8 @@ function renderWeek(wc) {
           ${amended ? `<div class="audit-log-sm" style="font-style:normal;">${lastAmend.note === 'Created by Office' ? 'Created by' : e.isOvertime ? 'Approved by' : 'Amended by'} ${lastAmend.by} · ${lastAmend.at}${e.isOvertime && lastAmend.note && lastAmend.note.includes('): ') ? `<span style="font-style:italic;"> — ${lastAmend.note.slice(lastAmend.note.indexOf('): ') + 3)}</span>` : ''}</div>` : ''}
         </td>
         <td style="padding:4px 8px;text-align:right;vertical-align:middle;width:160px;white-space:nowrap;">
-          <button class="btn btn-sm" onclick="toggleEditWeek('${e.id}')">Edit</button>
-            <button class="btn btn-sm" style="color:var(--color-text-error);border-color:var(--color-border-error);margin-left:4px;" onclick="deleteEntry('${e.id}', false)">Delete</button>
+          ${isLocked ? '' : `<button class="btn btn-sm" onclick="toggleEditWeek('${e.id}')">Edit</button>
+            <button class="btn btn-sm" style="color:var(--color-text-error);border-color:var(--color-border-error);margin-left:4px;" onclick="deleteEntry('${e.id}', false)">Delete</button>`}
         </td>
       </tr>
       <tr id="editrow-w-${e.id}" style="display:none;">
@@ -1476,9 +1540,20 @@ function renderWeek(wc) {
     return entryRowsHtml + otRowsForDay;
   }).join('');
 
+  const weekSub = getWeekSubmission(currentWorker, wc);
+  const fulfilled = isWeekFulfilled(currentWorker, wc);
+  const showSubmitBtn = fulfilled && (!weekSub || weekSub.status === 'declined');
+  const isLocked = weekSub && (weekSub.status === 'pending' || weekSub.status === 'approved');
+
   return `
     <div class="week-block">
-      <p class="week-heading">W/C ${fmtDate(wc)}</p>
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <p class="week-heading" style="margin:0;">W/C ${fmtDate(wc)}</p>
+        ${showSubmitBtn ? `<button class="btn btn-primary btn-sm" onclick="submitCompletedWeek('${wc}')">Submit completed week</button>` : ''}
+        ${weekSub && weekSub.status === 'pending' ? `<span class="badge" style="background:#fff8e1;color:var(--color-text-warning);">Pending approval</span>` : ''}
+        ${weekSub && weekSub.status === 'approved' ? `<span class="badge badge-done">Approved</span>` : ''}
+        ${weekSub && weekSub.status === 'declined' ? `<span class="badge" style="background:#fdecea;color:var(--color-text-error);">Declined — resubmit when ready</span>` : ''}
+      </div>
       <div class="week-table-wrap">
       <table class="week-table">
         <thead>
@@ -1753,6 +1828,7 @@ async function refreshOffice() {
         recurringJobs = (data.recurringJobs || []).map(j => ({ ...j, assignedTo: String(j.assignedTo || '') }));
       tasks = (data.tasks || tasks).map(t => ({ ...t }));
     rjProperties = (data.properties || rjProperties).map(function(p) { return String(p.name || p || ''); }).filter(Boolean);
+    weekSubmissions = data.weekSubmissions || weekSubmissions;
       absenceTypes = data.absenceTypes || [];
       overtimeRequests = data.overtimeRequests || [];
     overtimeRequests = overtimeRequests.map(o => {
@@ -2791,7 +2867,7 @@ async function officeReviewOvertime(id, status) {
 }
 
 function switchOfficeTab(tab) {
-  const tabs = ['daily','jobs','entries','absences','workers','recurring','overtime'];
+  const tabs = ['daily','jobs','entries','absences','workers','recurring','overtime','weekapprovals'];
   tabs.forEach(t => {
     const el = document.getElementById('office-tab-' + t);
     const btn = document.getElementById('otab-' + t);
@@ -2803,6 +2879,7 @@ function switchOfficeTab(tab) {
   if (tab === 'entries') renderOfficeEntries();
   if (tab === 'recurring') renderRecurringJobsList();
   if (tab === 'overtime') renderOvertimeTab();
+  if (tab === 'weekapprovals') renderWeekApprovalsTab();
 }
 
 // ── Workers management ───────────────────────────────────────────
@@ -3294,6 +3371,77 @@ function syncDateRangeLimits() {
     toEl.value = fromEl.value;
   }
 }
+
+function renderWeekApprovalsTab() {
+  const el = document.getElementById('week-approvals-content');
+  if (!el) return;
+
+  const pending = weekSubmissions.filter(w => w.status === 'pending')
+    .sort((a, b) => normaliseDate(a.weekStart).localeCompare(normaliseDate(b.weekStart)));
+
+  if (!pending.length) {
+    el.innerHTML = '<p class="text-muted" style="padding:1rem;">No weeks awaiting approval.</p>';
+    return;
+  }
+
+  el.innerHTML = pending.map(sub => {
+    const wc = normaliseDate(sub.weekStart);
+    const weekEntries = entries.filter(e => e.worker === sub.worker && (() => {
+      const d = normaliseDate(e.date);
+      const wcDate = new Date(wc + 'T00:00:00');
+      const endDate = new Date(wcDate); endDate.setDate(endDate.getDate() + 6);
+      const dDate = new Date(d + 'T00:00:00');
+      return dDate >= wcDate && dDate <= endDate;
+    })());
+    const totalHours = weekEntries.reduce((s, e) => s + parseFloat(e.hours || 0), 0);
+    const submittedFmt = sub.submittedAt ? new Date(sub.submittedAt).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+
+    return `
+      <div class="card" style="margin-bottom:1rem;">
+        <div class="row-between" style="padding:0.75rem 1rem;border-bottom:0.5px solid var(--color-border-tertiary);">
+          <div>
+            <p style="font-weight:600;margin:0;">${sub.worker}</p>
+            <p class="text-muted" style="margin:2px 0 0;font-size:12px;">W/C ${fmtDate(wc)} · ${weekEntries.length} entries · ${totalHours}h total</p>
+            <p class="text-muted" style="margin:2px 0 0;font-size:11px;">Submitted ${submittedFmt}</p>
+          </div>
+          <div>
+            <button class="btn btn-primary btn-sm" onclick="reviewWeek('${sub.id}','approved')">Approve</button>
+            <button class="btn btn-sm" style="color:var(--color-text-error);border-color:var(--color-border-error);margin-left:6px;" onclick="reviewWeek('${sub.id}','declined')">Decline</button>
+          </div>
+        </div>
+        <table class="week-table" style="width:100%;">
+          <thead>
+            <tr><th>Date</th><th>W/O</th><th>Property</th><th>Hours</th></tr>
+          </thead>
+          <tbody>
+            ${weekEntries.sort((a,b) => normaliseDate(a.date).localeCompare(normaliseDate(b.date))).map(e => `
+            <tr>
+              <td style="padding:6px 10px;font-size:12px;">${fmtShortDate(normaliseDate(e.date))}</td>
+              <td style="padding:6px 10px;font-size:12px;font-weight:600;">${e.jobId}</td>
+              <td style="padding:6px 10px;font-size:12px;color:var(--color-text-secondary);">${propLabel(e.property, 35)}</td>
+              <td style="padding:6px 10px;font-size:12px;">${e.hours}h</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  }).join('');
+}
+
+async function reviewWeek(id, status) {
+  const label = status === 'approved' ? 'approve' : 'decline';
+  if (!confirm('Are you sure you want to ' + label + ' this week?')) return;
+  const reviewedBy = currentOfficeUser || 'Office';
+  const { synced } = await queueOrSend('reviewWeekSubmission', { id, status, reviewedBy });
+  const sub = weekSubmissions.find(w => w.id === id);
+  if (sub) {
+    sub.status = status;
+    sub.reviewedAt = new Date().toISOString();
+    sub.reviewedBy = reviewedBy;
+    localStorage.setItem('weekSubmissions', JSON.stringify(weekSubmissions));
+  }
+  renderWeekApprovalsTab();
+}
+
 </script>
 </body>
 </html>
