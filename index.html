@@ -1881,18 +1881,6 @@ function renderOfficeEntries() {
 
   const allDays = [];
   const cursor = new Date(fromDate);
-  const entriesInRange = entries.filter(e => {
-    const d = normaliseDate(e.date);
-    return d >= (fromVal || '') && d <= (toVal || '9999');
-  });
-  const otInRange = overtimeRequests.filter(o => {
-    const d = normaliseDate(o.date);
-    return d >= (fromVal || '') && d <= (toVal || '9999');
-  });
-  const weekendDatesWithData = new Set([
-    ...entriesInRange.map(e => normaliseDate(e.date)),
-    ...otInRange.map(o => normaliseDate(o.date))
-  ].filter(ds => { const dow = new Date(ds + 'T12:00:00').getDay(); return dow === 0 || dow === 6; }));
 
   while (cursor <= toDate) {
     const y = cursor.getFullYear();
@@ -1902,10 +1890,22 @@ function renderOfficeEntries() {
     const dow = new Date(dayStr + 'T12:00:00').getDay();
     if (dow !== 0 && dow !== 6) {
       allDays.push(dayStr);
-    } else if (weekendDatesWithData.has(dayStr)) {
-      allDays.push(dayStr);
     }
     cursor.setDate(cursor.getDate() + 1);
+  }
+
+  const weekendDays = [];
+  {
+    const wCursor = new Date(fromDate);
+    while (wCursor <= toDate) {
+      const y = wCursor.getFullYear();
+      const m = String(wCursor.getMonth()+1).padStart(2,'0');
+      const d = String(wCursor.getDate()).padStart(2,'0');
+      const dayStr = y + '-' + m + '-' + d;
+      const dow = new Date(dayStr + 'T12:00:00').getDay();
+      if (dow === 0 || dow === 6) weekendDays.push(dayStr);
+      wCursor.setDate(wCursor.getDate() + 1);
+    }
   }
 
   const activeWorkers = workers.filter(w => w.active !== false && w.active !== 'FALSE');
@@ -1920,17 +1920,24 @@ function renderOfficeEntries() {
 
   displayWorkers.forEach(worker => {
     const workerEntries = entries.filter(e => e.worker === worker.name);
+    const workerOT = overtimeRequests.filter(o => o.worker === worker.name);
+
+    const workerWeekendDays = weekendDays.filter(dayStr =>
+      workerEntries.some(e => normaliseDate(e.date) === dayStr) ||
+      workerOT.some(o => normaliseDate(o.date) === dayStr)
+    );
 
     // Derrick Smith works Mon-Wed only — hide Thu/Fri unless he already has data logged that day
     const isDerrick = worker.name.trim().toLowerCase() === 'derrick smith';
-    const workerDays = isDerrick
+    const workerDays = (isDerrick
       ? allDays.filter(dayStr => {
           const dow = new Date(dayStr + 'T12:00:00').getDay();
           const isThuFri = dow === 4 || dow === 5;
           if (!isThuFri) return true;
           return workerEntries.some(e => normaliseDate(e.date) === dayStr);
         })
-      : allDays;
+      : allDays
+    ).concat(workerWeekendDays).sort();
 
     const workerRows = workerDays.map(dayStr => {
       const dayEntries = workerEntries.filter(e => normaliseDate(e.date) === dayStr).sort((a, b) => String(a.jobId).localeCompare(String(b.jobId), undefined, { numeric: true }));
