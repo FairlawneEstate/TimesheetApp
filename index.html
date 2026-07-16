@@ -1425,7 +1425,7 @@ function renderWeek(wc) {
     }
 
     const entryRowsHtml = dayEntries.map((e, idx) => {
-      const job = jobs.find(j => j.id === e.jobId) || recurringJobs.find(j => j.id === e.jobId) || tasks.find(j => j.id === e.jobId); const jobProperty = job ? job.property : (e.property || ''); const jobDescription = (job ? (job.description || '') : (e.description || '')).slice(0, 200);
+      const job = jobs.find(j => j.id === e.jobId) || recurringJobs.find(j => j.id === e.jobId) || tasks.find(j => j.id === e.jobId); const isRJ = recurringJobs.some(j => j.id === e.jobId); const jobProperty = isRJ ? (e.property || (job ? job.property : '')) : (job ? job.property : (e.property || '')); const jobDescription = (job ? (job.description || '') : (e.description || '')).slice(0, 200);
       const amended = e.amendments && e.amendments.length > 0;
       const lastAmend = amended ? e.amendments[e.amendments.length - 1] : null;
       const isPending = syncQueue.some(q => q.payload?.entry?.id === e.id);
@@ -1643,7 +1643,7 @@ function groupByDate(arr) {
 }
 
 function renderEntryRow(e, isOffice) {
-  const job = jobs.find(j => j.id === e.jobId) || recurringJobs.find(j => j.id === e.jobId) || tasks.find(j => j.id === e.jobId); const jobProperty = job ? job.property : (e.property || ''); const jobDescription = job ? (job.description || '') : (e.description || '');
+  const job = jobs.find(j => j.id === e.jobId) || recurringJobs.find(j => j.id === e.jobId) || tasks.find(j => j.id === e.jobId); const isRJ = recurringJobs.some(j => j.id === e.jobId); const jobProperty = isRJ ? (e.property || (job ? job.property : '')) : (job ? job.property : (e.property || '')); const jobDescription = job ? (job.description || '') : (e.description || '');
   const amended = e.amendments && e.amendments.length > 0;
   const lastAmend = amended ? e.amendments[e.amendments.length - 1] : null;
   const isPending = syncQueue.some(q => q.payload?.entry?.id === e.id);
@@ -1653,7 +1653,7 @@ function renderEntryRow(e, isOffice) {
       <div class="entry-display">
         <div class="entry-info">
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-            <span class="entry-job">${e.jobId} — ${propLabel(job ? job.property : e.jobId, 35)}</span>
+            <span class="entry-job">${e.jobId} — ${propLabel((recurringJobs.some(j => j.id === e.jobId) ? (e.property || (job ? job.property : '')) : (job ? job.property : e.property)) || e.jobId, 35)}</span>
             ${amended && !e.isOvertime ? `<span class="badge badge-amended">Amended</span>` : ''}
             ${e.isOvertime ? `<span class="badge" style="background:var(--color-background-success);color:var(--color-text-success);">⏱ Overtime</span>` : ''}
             ${isPending ? `<span class="badge badge-pending">Pending sync</span>` : ''}
@@ -2092,7 +2092,7 @@ function renderOfficeEntries() {
       }
 
       return dayEntries.map((e, idx) => {
-        const job = jobs.find(j => j.id === e.jobId) || recurringJobs.find(j => j.id === e.jobId) || tasks.find(j => j.id === e.jobId); const jobProperty = job ? job.property : (e.property || ''); const jobDescription = (job ? (job.description || '') : (e.description || '')).slice(0, 200);
+        const job = jobs.find(j => j.id === e.jobId) || recurringJobs.find(j => j.id === e.jobId) || tasks.find(j => j.id === e.jobId); const isRJ = recurringJobs.some(j => j.id === e.jobId); const jobProperty = isRJ ? (e.property || (job ? job.property : '')) : (job ? job.property : (e.property || '')); const jobDescription = (job ? (job.description || '') : (e.description || '')).slice(0, 200);
         const amended = e.amendments && e.amendments.length > 0;
         const lastAmend = amended ? e.amendments[e.amendments.length - 1] : null;
         const isPending = syncQueue.some(q => q.payload?.entry?.id === e.id);
@@ -2566,7 +2566,8 @@ function renderDailyView() {
       ? `<tr><td colspan="6" style="padding:10px 12px;font-size:12px;color:var(--color-text-secondary);width:100%;">No entries</td></tr>`
       : dayEntries.map((e, idx) => {
           const job = jobs.find(j => j.id === e.jobId) || recurringJobs.find(j => j.id === e.jobId) || tasks.find(j => j.id === e.jobId);
-          const jobProperty = job ? job.property : (e.property || '');
+          const isRJ = recurringJobs.some(j => j.id === e.jobId);
+          const jobProperty = isRJ ? (e.property || (job ? job.property : '')) : (job ? job.property : (e.property || ''));
           const jobDescription = (job ? (job.description || '') : (e.description || '')).slice(0, 200);
           const amended = e.amendments && e.amendments.length > 0;
           const lastAmend = amended ? e.amendments[e.amendments.length - 1] : null;
@@ -2745,7 +2746,8 @@ function renderOvertimeTab() {
 
   function otRow(o, showActions) {
     const job = jobs.find(j => j.id === o.jobId) || recurringJobs.find(j => j.id === o.jobId);
-    const property = (job ? job.property : '') || o.property || '';
+    const isRJ = recurringJobs.some(j => j.id === o.jobId);
+    const property = isRJ ? (o.property || (job ? job.property : '')) : ((job ? job.property : '') || o.property || '');
     const desc     = (job ? (job.description || '') : '') || o.description || '';
     return `<tr>
       <td style="padding:6px 10px;font-size:12px;font-weight:500;">${o.worker}</td>
@@ -2839,6 +2841,7 @@ async function officeReviewOvertime(id, status) {
       const otStart = otParts[0] ? otParts[0].trim() : '';
       const otEnd   = otParts[1] ? otParts[1].trim() : '';
       const job = jobs.find(j => j.id === otReq.jobId) || recurringJobs.find(j => j.id === otReq.jobId);
+      const isRJ = recurringJobs.some(j => j.id === otReq.jobId);
       const newEntry = {
         id: 'ot_local_' + Date.now(),
         worker: otReq.worker,
@@ -2848,7 +2851,7 @@ async function officeReviewOvertime(id, status) {
         comments: '',
         createdAt: new Date().toISOString(),
         amendments: [{ by: reviewedBy, at: new Date().toLocaleString('en-GB', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }), note: 'Overtime approved (' + (otReq.timeRange || '') + ')' + (reviewComment ? ': ' + reviewComment : '') }],
-        property: job ? job.property : '',
+        property: isRJ ? (otReq.property || (job ? job.property : '')) : (job ? job.property : (otReq.property || '')),
         description: job ? (job.description || '') : '',
         isOvertime: true,
         overtimeStart: otStart,
@@ -3007,7 +3010,8 @@ function exportXLSX() {
     for (const jobId of woOrder) {
       const jobEntries = woMap[jobId];
       const job = jobs.find(j => j.id === jobId) || recurringJobs.find(j => j.id === jobId);
-      const prop = (job ? job.property : '') || jobEntries[0].property || '';
+      const isRJ = recurringJobs.some(j => j.id === jobId);
+      const prop = isRJ ? (jobEntries[0].property || (job ? job.property : '')) : ((job ? job.property : '') || jobEntries[0].property || '');
       const desc = (job ? (job.description || '') : '') || jobEntries[0].description || '';
 
       // Separate regular and OT entries
@@ -3093,10 +3097,11 @@ function exportCSV() {
   const headers = ['Worker', 'Job ID', 'Property', 'Description', 'Date', 'Hours', 'Is Overtime', 'Overtime Start', 'Overtime End', 'Comments', 'Reported Date', 'Assigned To', 'Amended', 'Amendment Count', 'Last Amended By', 'Last Amended At', 'Last Reason'];
   const rows = filtered.map(e => {
     const job = jobs.find(j => j.id === e.jobId) || recurringJobs.find(j => j.id === e.jobId) || tasks.find(j => j.id === e.jobId);
+    const isRJ = recurringJobs.some(j => j.id === e.jobId);
     const last = e.amendments && e.amendments.length ? e.amendments[e.amendments.length - 1] : null;
     return [
       e.worker, e.jobId,
-      job ? job.property : (e.property || ''),
+      isRJ ? (e.property || (job ? job.property : '')) : (job ? job.property : (e.property || '')),
       (job ? (job.description || '') : (e.description || '')).slice(0, 200),
       e.date, e.hours,
       e.isOvertime ? 'Yes' : 'No',
@@ -3422,7 +3427,8 @@ function renderWeekApprovalsTab() {
           <tbody>
             ${weekEntries.sort((a,b) => normaliseDate(a.date).localeCompare(normaliseDate(b.date))).map(e => {
               const job = jobs.find(j => j.id === e.jobId) || recurringJobs.find(j => j.id === e.jobId) || tasks.find(j => j.id === e.jobId);
-              const jobProperty = job ? job.property : (e.property || '');
+              const isRJ = recurringJobs.some(j => j.id === e.jobId);
+              const jobProperty = isRJ ? (e.property || (job ? job.property : '')) : (job ? job.property : (e.property || ''));
               const jobDescription = (job ? (job.description || '') : (e.description || '')).slice(0, 200);
               const dayName = new Date(normaliseDate(e.date) + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'long' });
               return `
