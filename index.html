@@ -1365,13 +1365,14 @@ function renderWeek(wc) {
   // Derrick Smith works Mon-Wed only — hide Thu/Fri unless he already has data logged that day
   const isDerrickWorker = currentWorker.trim().toLowerCase() === 'derrick smith';
   const requiredDayCount = isDerrickWorker ? 3 : 5;
-  const daysWithData = new Set(
+  const thuFriWithData = new Set(
     overtimeRequests
       .filter(o => o.worker === currentWorker)
       .map(o => normaliseDate(o.date))
       .concat(Object.keys(byDay))
+      .filter(ds => { const dow = new Date(ds + 'T12:00:00').getDay(); return dow === 4 || dow === 5; })
   );
-  const weekDays = allWeekDays.filter((ds, i) => i < requiredDayCount || weekendDaysWithData.has(ds) || (isDerrickWorker && daysWithData.has(ds)));
+  const weekDays = allWeekDays.filter((ds, i) => i < requiredDayCount || weekendDaysWithData.has(ds) || (isDerrickWorker && thuFriWithData.has(ds)));
   const dayNames = weekDays.map((_, i) => allDayNames[allWeekDays.indexOf(weekDays[i])]);
 
   const rows = weekDays.map((dayStr, i) => {
