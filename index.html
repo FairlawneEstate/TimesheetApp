@@ -506,11 +506,11 @@ textarea { height: 60px; resize: none; }
             </div>
             <div>
               <label style="margin-top:0;">From</label>
-              <input type="date" id="oe-date-from">
+              <input type="date" id="oe-date-from" onchange="syncDateRangeLimits()">
             </div>
             <div>
               <label style="margin-top:0;">To</label>
-              <input type="date" id="oe-date-to">
+              <input type="date" id="oe-date-to" onchange="syncDateRangeLimits()">
             </div>
             <div>
               <button class="btn btn-primary" onclick="renderOfficeEntries()" style="width:100%;margin-top:0;">Search</button>
@@ -1853,6 +1853,7 @@ function renderOfficeDashboard() {
   const toEl = document.getElementById('oe-date-to');
   if (fromEl && !fromEl.value) fromEl.value = prev7Str;
   if (toEl && !toEl.value) toEl.value = todayStr;
+  syncDateRangeLimits();
   const overtimeTab = document.getElementById('office-tab-overtime');
   if (overtimeTab && overtimeTab.style.display !== 'none') renderOvertimeTab();
   const dailyTab = document.getElementById('office-tab-daily');
@@ -3280,6 +3281,18 @@ function rjPropCheck(prefix) {
   var cid = 'rj-prop-' + prefix;
   if (isRecurringJobId(id)) { rjPropShow(cid); }
   else { rjPropHide(cid); }
+}
+
+function syncDateRangeLimits() {
+  const fromEl = document.getElementById('oe-date-from');
+  const toEl   = document.getElementById('oe-date-to');
+  if (!fromEl || !toEl) return;
+  if (fromEl.value) toEl.min = fromEl.value;
+  if (toEl.value)   fromEl.max = toEl.value;
+  // If from is now after to, pull to forward to match
+  if (fromEl.value && toEl.value && fromEl.value > toEl.value) {
+    toEl.value = fromEl.value;
+  }
 }
 </script>
 </body>
