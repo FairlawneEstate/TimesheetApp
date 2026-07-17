@@ -577,6 +577,19 @@ textarea { height: 60px; resize: none; }
       <div id="office-tab-overtime" style="display:none;">
         <div class="card">
           <div class="card-header"><p class="section-heading">⏱ Overtime Requests</p></div>
+          <div style="padding:0 1rem;display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;margin-bottom:1rem;">
+            <div>
+              <label style="margin-top:0;">Approved / Declined from</label>
+              <input type="date" id="ot-date-from">
+            </div>
+            <div>
+              <label style="margin-top:0;">To</label>
+              <input type="date" id="ot-date-to">
+            </div>
+            <div>
+              <button class="btn btn-primary" onclick="renderOvertimeTab()" style="width:100%;margin-top:0;">Search</button>
+            </div>
+          </div>
           <div id="overtime-tab-content"><p class="text-muted" style="padding:1rem;">Loading...</p></div>
         </div>
       </div>
@@ -2777,9 +2790,10 @@ function renderOvertimeTab() {
     return (!fromVal || d >= fromVal) && (!toVal || d <= toVal);
   };
 
-  const pending  = overtimeRequests.filter(o => o.status === 'pending');
-  const approved = overtimeRequests.filter(o => o.status === 'approved').filter(inRange);
-  const declined = overtimeRequests.filter(o => o.status === 'declined').filter(inRange);
+  const byDateAsc = (a, b) => normaliseDate(a.date).localeCompare(normaliseDate(b.date));
+  const pending  = overtimeRequests.filter(o => o.status === 'pending').sort(byDateAsc);
+  const approved = overtimeRequests.filter(o => o.status === 'approved').filter(inRange).sort(byDateAsc);
+  const declined = overtimeRequests.filter(o => o.status === 'declined').filter(inRange).sort(byDateAsc);
 
   function otRow(o, showActions) {
     const job = jobs.find(j => j.id === o.jobId) || recurringJobs.find(j => j.id === o.jobId);
@@ -2832,19 +2846,6 @@ function renderOvertimeTab() {
     <div style="margin-bottom:1.5rem;">
       <p style="font-size:13px;font-weight:600;margin-bottom:0.5rem;color:#856404;">⏳ Pending (${pending.length})</p>
       ${otTable(pending, 'pending')}
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;margin-bottom:1.5rem;padding-top:0.5rem;border-top:0.5px solid var(--color-border-tertiary);">
-      <div>
-        <label style="margin-top:0;">Approved / Declined from</label>
-        <input type="date" id="ot-date-from" value="${fromVal}">
-      </div>
-      <div>
-        <label style="margin-top:0;">To</label>
-        <input type="date" id="ot-date-to" value="${toVal}">
-      </div>
-      <div>
-        <button class="btn btn-primary" onclick="renderOvertimeTab()" style="width:100%;margin-top:0;">Search</button>
-      </div>
     </div>
     <div style="margin-bottom:1.5rem;">
       <p style="font-size:13px;font-weight:600;margin-bottom:0.5rem;color:var(--color-text-success);">✓ Approved (${approved.length}) — in range</p>
