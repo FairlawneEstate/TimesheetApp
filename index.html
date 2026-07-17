@@ -577,6 +577,19 @@ textarea { height: 60px; resize: none; }
       <div id="office-tab-overtime" style="display:none;">
         <div class="card">
           <div class="card-header"><p class="section-heading">⏱ Overtime Requests</p></div>
+          <div style="padding:0 1rem;display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;margin-bottom:1rem;">
+            <div>
+              <label style="margin-top:0;">Approved / Declined from</label>
+              <input type="date" id="ot-date-from">
+            </div>
+            <div>
+              <label style="margin-top:0;">To</label>
+              <input type="date" id="ot-date-to">
+            </div>
+            <div>
+              <button class="btn btn-primary" onclick="renderOvertimeTab()" style="width:100%;margin-top:0;">Search</button>
+            </div>
+          </div>
           <div id="overtime-tab-content"><p class="text-muted" style="padding:1rem;">Loading...</p></div>
         </div>
       </div>
@@ -1404,8 +1417,7 @@ function renderWeek(wc) {
           : '';
 
     if (isEmpty) {
-      const dayOT = overtimeRequests.filter(o => o.worker === currentWorker && normaliseDate(o.date) === dayStr && (o.status === 'pending' || o.status === 'declined'));
-      const emptyRowHtml = dayOT.length === 0 ? `
+      const emptyRowHtml = `
       <tr class="day-row">
         <td class="day-cell">
           <div class="day-name">${dayNames[i]}</div>
@@ -1413,8 +1425,9 @@ function renderWeek(wc) {
           ${dayCellContent}
         </td>
         <td colspan="6" style="padding:10px 12px;font-size:12px;color:var(--color-text-secondary);">—</td>
-      </tr>` : '';
-      const otRowsForDay = dayOT.map((o, otIdx) => {
+      </tr>`;
+      const dayOT = overtimeRequests.filter(o => o.worker === currentWorker && normaliseDate(o.date) === dayStr && (o.status === 'pending' || o.status === 'declined'));
+      const otRowsForDay = dayOT.map(o => {
         const statusStyle = o.status === 'pending' ? 'background:#fff3cd;color:#856404;' : 'background:#fdecea;color:var(--color-text-error);';
         const statusLabel = o.status === 'pending' ? '⏱ OT Pending' : '⏱ OT Declined';
         return `
@@ -1422,7 +1435,6 @@ function renderWeek(wc) {
         <td class="day-cell" style="vertical-align:top;">
           <div class="day-name">${dayNames[i]}</div>
           <div class="day-date">${fmtShortDate(dayStr)}</div>
-          ${otIdx === 0 ? dayCellContent : ''}
         </td>
         <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;vertical-align:middle;width:160px;">
           <div style="font-weight:600;">${o.jobId}</div>
@@ -2761,9 +2773,26 @@ async function submitDailyEntry() {
 function renderOvertimeTab() {
   const el = document.getElementById('overtime-tab-content');
   if (!el) return;
+
+  const fromEl = document.getElementById('ot-date-from');
+  const toEl   = document.getElementById('ot-date-to');
+  const today  = new Date(); today.setHours(0,0,0,0);
+  const defaultFrom = new Date(today); defaultFrom.setDate(defaultFrom.getDate() - 31);
+  const toDateStr = d => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+
+  if (fromEl && !fromEl.value) fromEl.value = toDateStr(defaultFrom);
+  if (toEl && !toEl.value) toEl.value = toDateStr(today);
+
+  const fromVal = fromEl ? fromEl.value : toDateStr(defaultFrom);
+  const toVal   = toEl ? toEl.value : toDateStr(today);
+  const inRange = o => {
+    const d = normaliseDate(o.date);
+    return (!fromVal || d >= fromVal) && (!toVal || d <= toVal);
+  };
+
   const pending  = overtimeRequests.filter(o => o.status === 'pending');
-  const approved = overtimeRequests.filter(o => o.status === 'approved');
-  const declined = overtimeRequests.filter(o => o.status === 'declined');
+  const approved = overtimeRequests.filter(o => o.status === 'approved').filter(inRange);
+  const declined = overtimeRequests.filter(o => o.status === 'declined').filter(inRange);
 
   function otRow(o, showActions) {
     const job = jobs.find(j => j.id === o.jobId) || recurringJobs.find(j => j.id === o.jobId);
@@ -2818,11 +2847,11 @@ function renderOvertimeTab() {
       ${otTable(pending, 'pending')}
     </div>
     <div style="margin-bottom:1.5rem;">
-      <p style="font-size:13px;font-weight:600;margin-bottom:0.5rem;color:var(--color-text-success);">✓ Approved (${approved.length})</p>
+      <p style="font-size:13px;font-weight:600;margin-bottom:0.5rem;color:var(--color-text-success);">✓ Approved (${approved.length}) — in range</p>
       ${otTable(approved, 'approved')}
     </div>
     <div>
-      <p style="font-size:13px;font-weight:600;margin-bottom:0.5rem;color:var(--color-text-error);">✕ Declined (${declined.length})</p>
+      <p style="font-size:13px;font-weight:600;margin-bottom:0.5rem;color:var(--color-text-error);">✕ Declined (${declined.length}) — in range</p>
       ${otTable(declined, 'declined')}
     </div>`;
 }
