@@ -273,7 +273,7 @@ textarea { height: 60px; resize: none; }
             <option value="">Select worker...</option>
           </select>
           <label>PIN</label>
-          <input type="password" id="worker-pin" placeholder="••••" maxlength="4" class="pin-input">
+          <input type="password" id="worker-pin" placeholder="••••" maxlength="4" class="pin-input" onkeydown="if(event.key==='Enter'){event.preventDefault();workerLogin();}">
           <div class="form-footer">
             <button class="btn btn-primary full-width" onclick="workerLogin()">Sign in</button>
           </div>
@@ -352,7 +352,7 @@ textarea { height: 60px; resize: none; }
             <option value="Admin">Admin</option>
           </select>
           <label>Password</label>
-          <input type="password" id="office-pin" placeholder="Enter password">
+          <input type="password" id="office-pin" placeholder="Enter password" onkeydown="if(event.key==='Enter'){event.preventDefault();officeLogin();}">
           <div class="form-footer">
             <button class="btn btn-primary full-width" onclick="officeLogin()">Sign in</button>
           </div>
@@ -601,11 +601,11 @@ textarea { height: 60px; resize: none; }
           <div class="grid2">
             <div>
               <label style="margin-top:0;">Name</label>
-              <input type="text" id="new-worker-name" placeholder="e.g. Dave S">
+              <input type="text" id="new-worker-name" placeholder="e.g. Dave S" onkeydown="if(event.key==='Enter'){event.preventDefault();addWorker();}">
             </div>
             <div>
               <label style="margin-top:0;">PIN</label>
-              <input type="text" id="new-worker-pin" placeholder="4 digits" maxlength="4" style="letter-spacing:4px;">
+              <input type="text" id="new-worker-pin" placeholder="4 digits" maxlength="4" style="letter-spacing:4px;" onkeydown="if(event.key==='Enter'){event.preventDefault();addWorker();}">
             </div>
           </div>
           <div class="form-footer">
