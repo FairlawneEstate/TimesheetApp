@@ -646,7 +646,7 @@ textarea { height: 60px; resize: none; }
 <script>
 // ══════════════════════════════════════════════════════════════════
 // ══════════════════════════════════════════════════════════════════
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz0rFTBO9hcrYnDBkJL5mvs8KeExyU7fV1luQ7ocga5lxYaG6vypoWC47zZdU8XL6mEog/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxIo9H9pQiwsNd8HyZLAoXjN_o3jvLLyvmxtyMpRr8WJQBiRniJgtEEIvG5zjF9TCtRdg/exec';
 const POLL_INTERVAL_MS = 60000;
 // ══════════════════════════════════════════════════════════════════
 
@@ -2108,6 +2108,7 @@ function renderOfficeEntries() {
         const lastAmend = amended ? e.amendments[e.amendments.length - 1] : null;
         const isPending = syncQueue.some(q => q.payload?.entry?.id === e.id);
         const hasPendingOT = overtimeRequests.some(o => o.worker === e.worker && normaliseDate(o.date) === normaliseDate(e.date) && o.jobId === e.jobId && o.status === 'pending');
+        const isWeekApproved = e.approved === true || e.approved === 'TRUE';
         return `
         <tr class="day-row" id="row-o-${e.id}" ${idx === 0 ? 'style="border-top:1.5px solid var(--color-border-secondary);"' : ''}>
           ${idx === 0 ? `
@@ -2122,6 +2123,7 @@ function renderOfficeEntries() {
             ${isPending ? `<span class="badge-amended-sm" style="background:var(--color-background-info);color:var(--color-text-info);">Pending</span>` : ''}
             ${hasPendingOT ? `<span class="badge-amended-sm" style="background:#fff3cd;color:#856404;">⏱ OT Pending</span>` : ''}
             ${e.isOvertime ? `<span class="badge-amended-sm" style="background:var(--color-background-success);color:var(--color-text-success);">⏱ Overtime</span>` : ''}
+            ${isWeekApproved ? `<span class="badge-amended-sm" style="background:var(--color-background-success);color:var(--color-text-success);">✓ Approved</span>` : ''}
           </td>
           <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:middle;width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
             ${propLabel(jobProperty, 35)}
