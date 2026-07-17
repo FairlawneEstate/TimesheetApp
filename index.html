@@ -1404,7 +1404,8 @@ function renderWeek(wc) {
           : '';
 
     if (isEmpty) {
-      const emptyRowHtml = `
+      const dayOT = overtimeRequests.filter(o => o.worker === currentWorker && normaliseDate(o.date) === dayStr && (o.status === 'pending' || o.status === 'declined'));
+      const emptyRowHtml = dayOT.length === 0 ? `
       <tr class="day-row">
         <td class="day-cell">
           <div class="day-name">${dayNames[i]}</div>
@@ -1412,9 +1413,8 @@ function renderWeek(wc) {
           ${dayCellContent}
         </td>
         <td colspan="6" style="padding:10px 12px;font-size:12px;color:var(--color-text-secondary);">—</td>
-      </tr>`;
-      const dayOT = overtimeRequests.filter(o => o.worker === currentWorker && normaliseDate(o.date) === dayStr && (o.status === 'pending' || o.status === 'declined'));
-      const otRowsForDay = dayOT.map(o => {
+      </tr>` : '';
+      const otRowsForDay = dayOT.map((o, otIdx) => {
         const statusStyle = o.status === 'pending' ? 'background:#fff3cd;color:#856404;' : 'background:#fdecea;color:var(--color-text-error);';
         const statusLabel = o.status === 'pending' ? '⏱ OT Pending' : '⏱ OT Declined';
         return `
@@ -1422,6 +1422,7 @@ function renderWeek(wc) {
         <td class="day-cell" style="vertical-align:top;">
           <div class="day-name">${dayNames[i]}</div>
           <div class="day-date">${fmtShortDate(dayStr)}</div>
+          ${otIdx === 0 ? dayCellContent : ''}
         </td>
         <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;vertical-align:middle;width:160px;">
           <div style="font-weight:600;">${o.jobId}</div>
