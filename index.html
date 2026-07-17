@@ -576,7 +576,10 @@ textarea { height: 60px; resize: none; }
       <!-- Workers tab -->
       <div id="office-tab-overtime" style="display:none;">
         <div class="card">
-          <div class="card-header"><p class="section-heading">⏱ Overtime Requests</p></div>
+          <div class="row-between card-header">
+            <p class="section-heading">⏱ Overtime Requests</p>
+            <button class="btn btn-primary btn-sm" onclick="exportOvertimeXLSX()">↓ Export XLSX</button>
+          </div>
           <div style="padding:0 1rem;display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;margin-bottom:1rem;">
             <div>
               <label style="margin-top:0;">Approved / Declined from</label>
@@ -3154,6 +3157,60 @@ function exportXLSX() {
   const fromPart   = fromVal || 'start';
   const toPart     = toVal   || 'today';
   XLSX.writeFile(wb, `Fairlawne_Timesheet${workerPart}_${fromPart}_to_${toPart}.xlsx`);
+}
+
+function exportOvertimeXLSX() {
+  const fromVal = document.getElementById('ot-date-from')?.value || '';
+  const toVal   = document.getElementById('ot-date-to')?.value || '';
+  const inRange = o => {
+    const d = normaliseDate(o.date);
+    return (!fromVal || d >= fromVal) && (!toVal || d <= toVal);
+  };
+
+  // Same scope as what's currently on screen: Pending always included in full,
+  // Approved/Declined limited to the active date range filter.
+  const pending  = overtimeRequests.filter(o => o.status === 'pending');
+  const approved = overtimeRequests.filter(o => o.status === 'approved').filter(inRange);
+  const declined = overtimeRequests.filter(o => o.status === 'declined').filter(inRange);
+  const all = [...pending, ...approved, ...declined];
+
+  if (!all.length) { alert('No overtime requests match the current filters.'); return; }
+
+  const byDateAsc = (a, b) => normaliseDate(a.date).localeCompare(normaliseDate(b.date));
+  all.sort(byDateAsc);
+
+  const wb   = XLSX.utils.book_new();
+  const rows = [];
+
+  rows.push(['Worker', 'Date', 'W/O Number', 'Property', 'Description', 'Hours', 'Time Range', 'Status', 'Submitted', 'Reviewed By', 'Reviewed At', 'Comment']);
+
+  for (const o of all) {
+    const job = jobs.find(j => j.id === o.jobId) || recurringJobs.find(j => j.id === o.jobId);
+    const isRJ = recurringJobs.some(j => j.id === o.jobId);
+    const property    = isRJ ? (o.property || (job ? job.property : '')) : ((job ? job.property : '') || o.property || '');
+    const description = (job ? (job.description || '') : '') || o.description || '';
+    const submittedFmt = o.submittedAt ? new Date(o.submittedAt).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+    const reviewedFmt  = o.reviewedAt  ? new Date(o.reviewedAt).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+    const comment = o.status === 'pending' ? (o.workerComment || '') : (o.reviewComment || o.workerComment || '');
+
+    rows.push([
+      o.worker, normaliseDate(o.date), o.jobId, property, description,
+      parseFloat(o.hours) || 0, o.timeRange || '', o.status,
+      submittedFmt, o.reviewedBy || '', reviewedFmt, comment
+    ]);
+  }
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [
+    { wch: 16 }, { wch: 12 }, { wch: 14 }, { wch: 30 }, { wch: 35 },
+    { wch: 8 }, { wch: 16 }, { wch: 10 }, { wch: 20 }, { wch: 16 }, { wch: 20 }, { wch: 30 }
+  ];
+
+  XLSX.utils.book_append_sheet(wb, ws, 'Overtime');
+
+  const fromPart = fromVal || 'start';
+  const toPart   = toVal   || 'today';
+  XLSX.writeFile(wb, `Fairlawne_Overtime_${fromPart}_to_${toPart}.xlsx`);
 }
 
 
