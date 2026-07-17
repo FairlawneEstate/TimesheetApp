@@ -650,7 +650,7 @@ textarea { height: 60px; resize: none; }
     </div>
     <p id="ot-duration" style="font-size:13px;color:var(--color-text-secondary);margin-bottom:1rem;"></p>
     <div style="display:flex;gap:8px;">
-      <button class="btn btn-primary" onclick="confirmOvertime()">Submit overtime request</button>
+      <button class="btn btn-primary" id="confirm-overtime-btn" onclick="confirmOvertime()">Submit overtime request</button>
       <button class="btn" onclick="cancelOvertime()">Cancel</button>
     </div>
   </div>
@@ -686,6 +686,8 @@ let absenceTypes = [];
 let currentOfficeUser = null;
 let overtimeRequests = [];
 let pendingOvertimeEntry = null;
+let isSubmittingEntry = false;
+let isSubmittingOvertime = false;
 let currentWorker = null;
 let syncQueue = JSON.parse(localStorage.getItem('syncQueue') || '[]');
 let pollTimer = null;
@@ -1099,6 +1101,10 @@ function cancelOvertime() {
 
 async function confirmOvertime() {
   if (!pendingOvertimeEntry) return;
+  if (isSubmittingOvertime) return;
+  const btn = document.getElementById('confirm-overtime-btn');
+  if (btn && btn.disabled) return;
+
   const start = document.getElementById('ot-start').value;
   const end = document.getElementById('ot-end').value;
   const [sh, sm] = start.split(':').map(Number);
@@ -1135,35 +1141,46 @@ async function confirmOvertime() {
     reviewedBy: ''
   };
 
-  overtimeRequests.push(otRequest);
-  localStorage.setItem('overtimeRequests', JSON.stringify(overtimeRequests));
+  if (btn) { btn.disabled = true; btn.textContent = 'Submitting…'; }
+  isSubmittingOvertime = true;
+  try {
+    overtimeRequests.push(otRequest);
+    localStorage.setItem('overtimeRequests', JSON.stringify(overtimeRequests));
 
-  document.getElementById('overtime-modal').style.display = 'none';
-  pendingOvertimeEntry = null;
-  document.getElementById('job-select').value = '';
-  document.getElementById('job-detail').style.display = 'none';
-  document.getElementById('entry-hours').value = '';
-  document.getElementById('entry-comments').value = '';
-  // Reset office add-entry forms if open
-  const oaeForm = document.getElementById('office-add-entry-form');
-  if (oaeForm && oaeForm.style.display !== 'none') toggleOfficeAddEntry();
-  const daeForm = document.getElementById('daily-add-entry-form');
-  if (daeForm && daeForm.style.display !== 'none') toggleDailyAddEntry();
-  renderEntriesByDate();
-  renderOfficeEntries();
-  renderDailyView();
+    document.getElementById('overtime-modal').style.display = 'none';
+    pendingOvertimeEntry = null;
+    document.getElementById('job-select').value = '';
+    document.getElementById('job-detail').style.display = 'none';
+    document.getElementById('entry-hours').value = '';
+    document.getElementById('entry-comments').value = '';
+    // Reset office add-entry forms if open
+    const oaeForm = document.getElementById('office-add-entry-form');
+    if (oaeForm && oaeForm.style.display !== 'none') toggleOfficeAddEntry();
+    const daeForm = document.getElementById('daily-add-entry-form');
+    if (daeForm && daeForm.style.display !== 'none') toggleDailyAddEntry();
+    renderEntriesByDate();
+    renderOfficeEntries();
+    renderDailyView();
 
-  const { synced } = await queueOrSend('saveOvertimeRequest', { request: otRequest });
-  if (synced) {
-    showToast('toast-worker');
-    setSyncStatus('worker', 'synced', 'Overtime request submitted');
-  } else {
-    showToast('toast-error');
-    setSyncStatus('worker', 'pending', syncQueue.length + ' entries pending sync');
+    const { synced } = await queueOrSend('saveOvertimeRequest', { request: otRequest });
+    if (synced) {
+      showToast('toast-worker');
+      setSyncStatus('worker', 'synced', 'Overtime request submitted');
+    } else {
+      showToast('toast-error');
+      setSyncStatus('worker', 'pending', syncQueue.length + ' entries pending sync');
+    }
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Submit overtime request'; }
+    isSubmittingOvertime = false;
   }
 }
 
 async function submitEntry() {
+  if (isSubmittingEntry) return;
+  const btn = document.getElementById('save-btn');
+  if (btn && btn.disabled) return;
+
   const jobId = document.getElementById('job-select').value;
   const date = document.getElementById('entry-date').value;
   const hours = parseFloat(document.getElementById('entry-hours').value);
@@ -1195,25 +1212,33 @@ async function submitEntry() {
   const jobObj = jobs.find(j => j.id === jobId) || recurringJobs.find(j => j.id === jobId) || absenceTypes.find(a => a.id === jobId);
   const entry = { id: uid(), worker: currentWorker, jobId, date, hours, comments, amendments: [], createdAt: new Date().toISOString(), property: isRecurringJobId(jobId) ? (rjPropGetValue('rj-prop-worker') || (jobObj ? jobObj.property : '')) : (jobObj ? jobObj.property : ''), description: jobObj ? jobObj.description : '' };
   if (isRecurringJobId(jobId) && !rjPropGetValue('rj-prop-worker')) { alert('Please select a property for this recurring job.'); return; }
-  entries.push(entry);
-  localStorage.setItem('entries', JSON.stringify(entries));
 
-  document.getElementById('job-select').value = '';
-  document.getElementById('job-detail').style.display = 'none';
-  document.getElementById('entry-hours').value = '';
-  document.getElementById('entry-comments').value = '';
-  rjPropHide('rj-prop-worker');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  isSubmittingEntry = true;
+  try {
+    entries.push(entry);
+    localStorage.setItem('entries', JSON.stringify(entries));
 
-  updateHoursPlaceholder();
-  renderEntriesByDate();
+    document.getElementById('job-select').value = '';
+    document.getElementById('job-detail').style.display = 'none';
+    document.getElementById('entry-hours').value = '';
+    document.getElementById('entry-comments').value = '';
+    rjPropHide('rj-prop-worker');
 
-  const { synced } = await queueOrSend('addEntry', { entry: { ...entry, amendments: amendmentsToString(entry.amendments) } });
-  if (synced) {
-    showToast('toast-worker');
-    setSyncStatus('worker', 'synced', 'Synced');
-  } else {
-    showToast('toast-error');
-    setSyncStatus('worker', 'pending', syncQueue.length + ' entries pending sync');
+    updateHoursPlaceholder();
+    renderEntriesByDate();
+
+    const { synced } = await queueOrSend('addEntry', { entry: { ...entry, amendments: amendmentsToString(entry.amendments) } });
+    if (synced) {
+      showToast('toast-worker');
+      setSyncStatus('worker', 'synced', 'Synced');
+    } else {
+      showToast('toast-error');
+      setSyncStatus('worker', 'pending', syncQueue.length + ' entries pending sync');
+    }
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Save entry'; }
+    isSubmittingEntry = false;
   }
 }
 
