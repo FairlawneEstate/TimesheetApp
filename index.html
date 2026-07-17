@@ -273,7 +273,7 @@ textarea { height: 60px; resize: none; }
             <option value="">Select worker...</option>
           </select>
           <label>PIN</label>
-          <input type="password" id="worker-pin" placeholder="••••" maxlength="4" class="pin-input" onkeydown="if(event.key==='Enter'){event.preventDefault();workerLogin();}">
+          <input type="password" id="worker-pin" placeholder="••••" maxlength="4" class="pin-input">
           <div class="form-footer">
             <button class="btn btn-primary full-width" onclick="workerLogin()">Sign in</button>
           </div>
@@ -352,7 +352,7 @@ textarea { height: 60px; resize: none; }
             <option value="Admin">Admin</option>
           </select>
           <label>Password</label>
-          <input type="password" id="office-pin" placeholder="Enter password" onkeydown="if(event.key==='Enter'){event.preventDefault();officeLogin();}">
+          <input type="password" id="office-pin" placeholder="Enter password">
           <div class="form-footer">
             <button class="btn btn-primary full-width" onclick="officeLogin()">Sign in</button>
           </div>
@@ -380,11 +380,11 @@ textarea { height: 60px; resize: none; }
         <button class="active" onclick="switchOfficeTab('daily')" id="otab-daily">Daily View</button>
         <button onclick="switchOfficeTab('entries')" id="otab-entries">Time Entries</button>
         <button onclick="switchOfficeTab('overtime')" id="otab-overtime">Overtime</button>
+        <button onclick="switchOfficeTab('weekapprovals')" id="otab-weekapprovals">Weekly Approvals</button>
         <button onclick="switchOfficeTab('jobs')" id="otab-jobs">Active Jobs</button>
         <button onclick="switchOfficeTab('workers')" id="otab-workers">Workers</button>
         <button onclick="switchOfficeTab('absences')" id="otab-absences">Absence Types</button>
         <button onclick="switchOfficeTab('recurring')" id="otab-recurring">Recurring Jobs</button>
-        <button onclick="switchOfficeTab('weekapprovals')" id="otab-weekapprovals">Weekly Approvals</button>
       </div>
 
       <!-- Active Jobs tab -->
@@ -601,11 +601,11 @@ textarea { height: 60px; resize: none; }
           <div class="grid2">
             <div>
               <label style="margin-top:0;">Name</label>
-              <input type="text" id="new-worker-name" placeholder="e.g. Dave S" onkeydown="if(event.key==='Enter'){event.preventDefault();addWorker();}">
+              <input type="text" id="new-worker-name" placeholder="e.g. Dave S">
             </div>
             <div>
               <label style="margin-top:0;">PIN</label>
-              <input type="text" id="new-worker-pin" placeholder="4 digits" maxlength="4" style="letter-spacing:4px;" onkeydown="if(event.key==='Enter'){event.preventDefault();addWorker();}">
+              <input type="text" id="new-worker-pin" placeholder="4 digits" maxlength="4" style="letter-spacing:4px;">
             </div>
           </div>
           <div class="form-footer">
@@ -1316,22 +1316,29 @@ function getWeekSubmission(workerName, wc) {
   return weekSubmissions.find(w => w.worker === workerName && normaliseDate(w.weekStart) === wc) || null;
 }
 
-async function submitCompletedWeek(wc) {
+async function submitCompletedWeek(wc, btn) {
+  if (btn && btn.disabled) return;
   if (!confirm('Submit this week for approval? Entries will be locked until reviewed.')) return;
-  const { synced, result } = await queueOrSend('saveWeekSubmission', { submission: { worker: currentWorker, weekStart: wc } });
-  const sub = {
-    id: (result && result.id) || ('ws' + Date.now()),
-    worker: currentWorker,
-    weekStart: wc,
-    status: 'pending',
-    submittedAt: new Date().toISOString(),
-    reviewedAt: '',
-    reviewedBy: ''
-  };
-  const existingIdx = weekSubmissions.findIndex(w => w.worker === currentWorker && normaliseDate(w.weekStart) === wc);
-  if (existingIdx > -1) weekSubmissions[existingIdx] = sub; else weekSubmissions.push(sub);
-  localStorage.setItem('weekSubmissions', JSON.stringify(weekSubmissions));
-  renderEntriesByDate();
+  if (btn) { btn.disabled = true; btn.textContent = 'Submitting…'; }
+  try {
+    const { synced, result } = await queueOrSend('saveWeekSubmission', { submission: { worker: currentWorker, weekStart: wc } });
+    const sub = {
+      id: (result && result.id) || ('ws' + Date.now()),
+      worker: currentWorker,
+      weekStart: wc,
+      status: 'pending',
+      submittedAt: new Date().toISOString(),
+      reviewedAt: '',
+      reviewedBy: ''
+    };
+    const existingIdx = weekSubmissions.findIndex(w => w.worker === currentWorker && normaliseDate(w.weekStart) === wc);
+    if (existingIdx > -1) weekSubmissions[existingIdx] = sub; else weekSubmissions.push(sub);
+    localStorage.setItem('weekSubmissions', JSON.stringify(weekSubmissions));
+    renderEntriesByDate();
+  } catch (err) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Submit completed week'; }
+    throw err;
+  }
 }
 
 function renderWeek(wc) {
@@ -1558,7 +1565,7 @@ function renderWeek(wc) {
     <div class="week-block">
       <div style="display:flex;justify-content:space-between;align-items:center;">
         <p class="week-heading" style="margin:0;">W/C ${fmtDate(wc)}</p>
-        ${showSubmitBtn ? `<button class="btn btn-primary btn-sm" onclick="submitCompletedWeek('${wc}')">Submit completed week</button>` : ''}
+        ${showSubmitBtn ? `<button class="btn btn-primary btn-sm" onclick="submitCompletedWeek('${wc}', this)">Submit completed week</button>` : ''}
         ${weekSub && weekSub.status === 'pending' ? `<span class="badge" style="background:#fff8e1;color:var(--color-text-warning);">Pending approval</span>` : ''}
         ${weekSub && weekSub.status === 'approved' ? `<span class="badge badge-done">Approved</span>` : ''}
         ${weekSub && weekSub.status === 'declined' ? `<span class="badge" style="background:#fdecea;color:var(--color-text-error);">Declined — resubmit when ready</span>` : ''}
@@ -3421,8 +3428,8 @@ function renderWeekApprovalsTab() {
             <p class="text-muted" style="margin:2px 0 0;font-size:11px;">Submitted ${submittedFmt}</p>
           </div>
           <div>
-            <button class="btn btn-primary btn-sm" onclick="reviewWeek('${sub.id}','approved')">Approve</button>
-            <button class="btn btn-sm" style="color:var(--color-text-error);border-color:var(--color-border-error);margin-left:6px;" onclick="reviewWeek('${sub.id}','declined')">Decline</button>
+            <button class="btn btn-primary btn-sm" onclick="reviewWeek('${sub.id}','approved', this)">Approve</button>
+            <button class="btn btn-sm" style="color:var(--color-text-error);border-color:var(--color-border-error);margin-left:6px;" onclick="reviewWeek('${sub.id}','declined', this)">Decline</button>
           </div>
         </div>
         <table class="week-table" style="width:100%;">
@@ -3475,19 +3482,29 @@ function renderWeekApprovalsTab() {
   }).join('');
 }
 
-async function reviewWeek(id, status) {
+async function reviewWeek(id, status, btn) {
+  if (btn && btn.disabled) return;
   const label = status === 'approved' ? 'approve' : 'decline';
   if (!confirm('Are you sure you want to ' + label + ' this week?')) return;
-  const reviewedBy = currentOfficeUser || 'Office';
-  const { synced } = await queueOrSend('reviewWeekSubmission', { id, status, reviewedBy });
-  const sub = weekSubmissions.find(w => w.id === id);
-  if (sub) {
-    sub.status = status;
-    sub.reviewedAt = new Date().toISOString();
-    sub.reviewedBy = reviewedBy;
-    localStorage.setItem('weekSubmissions', JSON.stringify(weekSubmissions));
+  const buttonsInRow = btn ? btn.parentElement.querySelectorAll('button') : [];
+  buttonsInRow.forEach(b => b.disabled = true);
+  if (btn) btn.textContent = status === 'approved' ? 'Approving…' : 'Declining…';
+  try {
+    const reviewedBy = currentOfficeUser || 'Office';
+    const { synced } = await queueOrSend('reviewWeekSubmission', { id, status, reviewedBy });
+    const sub = weekSubmissions.find(w => w.id === id);
+    if (sub) {
+      sub.status = status;
+      sub.reviewedAt = new Date().toISOString();
+      sub.reviewedBy = reviewedBy;
+      localStorage.setItem('weekSubmissions', JSON.stringify(weekSubmissions));
+    }
+    renderWeekApprovalsTab();
+  } catch (err) {
+    buttonsInRow.forEach(b => b.disabled = false);
+    if (btn) btn.textContent = status === 'approved' ? 'Approve' : 'Decline';
+    throw err;
   }
-  renderWeekApprovalsTab();
 }
 
 </script>
