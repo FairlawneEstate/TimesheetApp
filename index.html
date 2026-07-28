@@ -1196,6 +1196,7 @@ async function confirmOvertime() {
     document.getElementById('overtime-modal').style.display = 'none';
     pendingOvertimeEntry = null;
     document.getElementById('job-select').value = '';
+    if (typeof ssSyncLabel === 'function') ssSyncLabel('job-select');
     document.getElementById('job-detail').style.display = 'none';
     document.getElementById('entry-hours').value = '';
     document.getElementById('entry-comments').value = '';
@@ -1266,6 +1267,7 @@ async function submitEntry() {
     localStorage.setItem('entries', JSON.stringify(entries));
 
     document.getElementById('job-select').value = '';
+    if (typeof ssSyncLabel === 'function') ssSyncLabel('job-select');
     document.getElementById('job-detail').style.display = 'none';
     document.getElementById('entry-hours').value = '';
     document.getElementById('entry-comments').value = '';
@@ -2551,6 +2553,7 @@ async function submitOfficeEntry() {
   localStorage.setItem('entries', JSON.stringify(entries));
   document.getElementById('oae-worker').value = '';
   document.getElementById('oae-job').innerHTML = '<option value="">Select worker first...</option>';
+  if (typeof ssSyncLabel === 'function') ssSyncLabel('oae-job');
   document.getElementById('oae-hours').value = '';
   document.getElementById('oae-comments').value = '';
   rjPropHide('rj-prop-oae');
@@ -2837,6 +2840,7 @@ async function submitDailyEntry() {
   localStorage.setItem('entries', JSON.stringify(entries));
   document.getElementById('dae-worker').value = '';
   document.getElementById('dae-job').innerHTML = '<option value="">Select worker first...</option>';
+  if (typeof ssSyncLabel === 'function') ssSyncLabel('dae-job');
   document.getElementById('dae-hours').value = '';
   document.getElementById('dae-comments').value = '';
   rjPropHide('rj-prop-dae');
