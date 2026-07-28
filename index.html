@@ -943,11 +943,19 @@ async function pollJobs() {
     localStorage.setItem('tasks', JSON.stringify(tasks));
     const currentJobSel = document.getElementById('job-select');
     const savedJobId = currentJobSel ? currentJobSel.value : '';
-    populateJobDropdown();
-    if (savedJobId && currentJobSel) {
-      currentJobSel.value = savedJobId;
-      if (!currentJobSel.value) currentJobSel.value = '';
+    const jobPickerOpen = document.getElementById('job-select_ssd')?.classList.contains('ss-open');
+    if (!jobPickerOpen) {
+      populateJobDropdown();
+      if (savedJobId && currentJobSel) {
+        currentJobSel.value = savedJobId;
+        if (!currentJobSel.value) currentJobSel.value = '';
+      }
     }
+    // If the picker is open (worker is actively searching/selecting a WO), the data
+    // above has still refreshed in the background — we just leave the dropdown UI
+    // alone this cycle so their in-progress search isn't wiped. It'll pick up the
+    // latest jobs list next time populateJobDropdown() runs (next poll, or once
+    // they close/reselect).
     renderEntriesByDate();
     updateHoursPlaceholder();
     setSyncStatus('worker', 'synced', 'Updated ' + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }));
