@@ -974,6 +974,11 @@ async function pollJobs() {
         currentJobSel.value = savedJobId;
         if (!currentJobSel.value) currentJobSel.value = '';
       }
+      // populateJobDropdown() calls ssRefresh() internally, but that runs
+      // BEFORE the value restore above — so the overlay's visible search
+      // text gets synced against the select's momentarily-blank state and
+      // never updated again. Re-sync it now the value is actually correct.
+      if (typeof ssSyncLabel === 'function') ssSyncLabel('job-select');
     }
     // If the picker is open (worker is actively searching/selecting a WO), the data
     // above has still refreshed in the background — we just leave the dropdown UI
