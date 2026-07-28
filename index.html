@@ -778,12 +778,19 @@ function loadInitialData() {
     localStorage.setItem('workers', JSON.stringify(workers));
     localStorage.setItem('tasks', JSON.stringify(tasks));
     const serverEntryIds = new Set(entries.map(e => String(e.id)));
+    const serverOTIds = new Set((overtimeRequests || []).map(o => String(o.id)));
     syncQueue = syncQueue.filter(q => {
       if ((q.action === 'addEntry' || q.action === 'updateEntry') && q.payload && q.payload.entry) {
         return !serverEntryIds.has(String(q.payload.entry.id));
       }
       if (q.action === 'deleteEntry' && q.payload && q.payload.id) {
         return serverEntryIds.has(String(q.payload.id));
+      }
+      if (q.action === 'deleteOTRequest' && q.payload && q.payload.id) {
+        // If it's already gone from the server (deleted successfully before,
+        // or removed manually), the goal is achieved — drop the queue item
+        // rather than retrying an action that can never succeed again.
+        return serverOTIds.has(String(q.payload.id));
       }
       return true;
     });
@@ -819,9 +826,17 @@ async function flushQueue() {
       syncQueue = syncQueue.filter(q => q._qid !== item._qid);
       localStorage.setItem('syncQueue', JSON.stringify(syncQueue));
     } catch (e) {
-      // Don't let one bad/failing item block everything queued behind it —
-      // skip it for this pass and keep trying the rest. It stays in the
-      // queue and will be retried again on the next flush.
+      // A delete action failing because the thing is already gone means the
+      // desired end state is already achieved — treat as done, not a retry.
+      const isDeleteAction = item.action === 'deleteEntry' || item.action === 'deleteOTRequest';
+      const isNotFoundError = /not found/i.test(e.message || '');
+      if (isDeleteAction && isNotFoundError) {
+        syncQueue = syncQueue.filter(q => q._qid !== item._qid);
+        localStorage.setItem('syncQueue', JSON.stringify(syncQueue));
+        continue;
+      }
+      // Otherwise leave it queued and try the rest — don't let one bad
+      // item block everything behind it.
       continue;
     }
   }
