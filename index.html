@@ -689,6 +689,7 @@ let absenceTypes = [];
 let currentOfficeUser = null;
 let overtimeRequests = [];
 let pendingOvertimeEntry = null;
+let pendingDeleteEntryIds = new Set();
 let isSubmittingEntry = false;
 let isSubmittingOvertime = false;
 let currentWorker = null;
@@ -939,7 +940,7 @@ async function pollJobs() {
       isOvertime: e.isOvertime === true || e.isOvertime === 'TRUE' || e.isOvertime === 1,
       overtimeStart: toHHMM(e.overtimeStart),
       overtimeEnd: toHHMM(e.overtimeEnd)
-    }));
+    })).filter(e => !pendingDeleteEntryIds.has(String(e.id)));
     syncQueue.forEach(q => { if (q.payload?.entry && !entries.find(e => e.id === q.payload.entry.id)) entries.push(q.payload.entry); });
     recurringJobs = (data.recurringJobs || recurringJobs).map(j => ({ ...j, assignedTo: String(j.assignedTo || '') }));
     absenceTypes = data.absenceTypes || absenceTypes;
@@ -1923,7 +1924,7 @@ async function refreshOffice() {
         isOvertime: e.isOvertime === true || e.isOvertime === 'TRUE' || e.isOvertime === 1,
         overtimeStart: toHHMM(e.overtimeStart),
         overtimeEnd: toHHMM(e.overtimeEnd)
-      }));
+      })).filter(e => !pendingDeleteEntryIds.has(String(e.id)));
         recurringJobs = (data.recurringJobs || []).map(j => ({ ...j, assignedTo: String(j.assignedTo || '') }));
       tasks = (data.tasks || tasks).map(t => ({ ...t }));
     rjProperties = (data.properties || rjProperties).map(function(p) { return String(p.name || p || ''); }).filter(Boolean);
@@ -2561,6 +2562,7 @@ async function submitOfficeEntry() {
 
 async function deleteEntry(id, isOffice) {
   if (!confirm('Are you sure you want to delete this entry? This cannot be undone.')) return;
+  pendingDeleteEntryIds.add(String(id));
   entries = entries.filter(e => e.id !== id);
   localStorage.setItem('entries', JSON.stringify(entries));
   if (isOffice) {
@@ -2571,8 +2573,12 @@ async function deleteEntry(id, isOffice) {
     renderEntriesByDate();
     updateHoursPlaceholder();
   }
-  const { synced } = await queueOrSend('deleteEntry', { id });
-  if (synced) setSyncStatus(isOffice ? 'office' : 'worker', 'synced', 'Entry deleted');
+  try {
+    const { synced } = await queueOrSend('deleteEntry', { id });
+    if (synced) setSyncStatus(isOffice ? 'office' : 'worker', 'synced', 'Entry deleted');
+  } finally {
+    pendingDeleteEntryIds.delete(String(id));
+  }
 }
 
 function renderAbsenceTypesList() {
