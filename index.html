@@ -818,9 +818,18 @@ async function flushQueue() {
       await api(item.action, item.payload);
       syncQueue = syncQueue.filter(q => q._qid !== item._qid);
       localStorage.setItem('syncQueue', JSON.stringify(syncQueue));
-    } catch (e) { break; }
+    } catch (e) {
+      // Don't let one bad/failing item block everything queued behind it —
+      // skip it for this pass and keep trying the rest. It stays in the
+      // queue and will be retried again on the next flush.
+      continue;
+    }
   }
-  setSyncStatus('worker', 'synced', 'All entries synced');
+  if (syncQueue.length) {
+    setSyncStatus('worker', 'pending', syncQueue.length + ' entries pending sync');
+  } else {
+    setSyncStatus('worker', 'synced', 'All entries synced');
+  }
   renderEntriesByDate();
 }
 
@@ -958,7 +967,12 @@ async function pollJobs() {
     // they close/reselect).
     renderEntriesByDate();
     updateHoursPlaceholder();
-    setSyncStatus('worker', 'synced', 'Updated ' + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }));
+    await flushQueue();
+    if (syncQueue.length) {
+      setSyncStatus('worker', 'pending', syncQueue.length + ' entries pending sync');
+    } else {
+      setSyncStatus('worker', 'synced', 'Updated ' + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }));
+    }
   } catch (e) { setSyncStatus('worker', 'error', 'Could not refresh'); }
 }
 
