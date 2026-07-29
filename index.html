@@ -2190,7 +2190,7 @@ function renderOfficeEntries() {
 
       const pendingOTRows_oe = overtimeRequests.filter(o =>
         o.worker === worker.name && normaliseDate(o.date) === dayStr && (o.status === 'pending' || o.status === 'declined')
-      ).map(o => {
+      ).map((o, otIdx) => {
         const otJob = jobs.find(j => j.id === o.jobId) || recurringJobs.find(j => j.id === o.jobId) || tasks.find(j => j.id === o.jobId);
         const otProp = propLabel((otJob ? otJob.property : '') || o.property || '', 35);
         const otDesc = ((otJob ? (otJob.description || '') : '') || o.description || '').slice(0, 200);
@@ -2201,6 +2201,7 @@ function renderOfficeEntries() {
           <td class="day-cell" style="vertical-align:top;">
             <div class="day-name">${dayName}</div>
             <div class="day-date">${fmtShortDate(dayStr)}</div>
+            ${isEmpty && otIdx === 0 ? dayCellContent : ''}
           </td>
           <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;vertical-align:middle;width:110px;">
             <div style="font-weight:600;">${o.jobId}</div>
@@ -2216,7 +2217,7 @@ function renderOfficeEntries() {
         </tr>`;
       }).join('');
 
-      if (isEmpty) {
+      if (isEmpty && !pendingOTRows_oe) {
         return `
         <tr class="day-row" style="border-top:1.5px solid var(--color-border-secondary);border-bottom:1.5px solid var(--color-border-secondary);">
           <td class="day-cell">
@@ -2225,7 +2226,10 @@ function renderOfficeEntries() {
             ${dayCellContent}
           </td>
           <td colspan="6" style="padding:10px 12px;font-size:12px;color:var(--color-text-secondary);">—</td>
-        </tr>` + pendingOTRows_oe;
+        </tr>`;
+      }
+      if (isEmpty) {
+        return pendingOTRows_oe;
       }
 
       return dayEntries.map((e, idx) => {
@@ -3501,6 +3505,7 @@ function ssAttach(selId, placeholder) {
   sel.parentNode.insertBefore(wrap, sel.nextSibling);
 
   document.getElementById(selId + '_ssi').addEventListener('focus', function() { ssOpen(selId); });
+  document.getElementById(selId + '_ssi').addEventListener('click', function() { ssOpen(selId); });
   document.getElementById(selId + '_ssi').addEventListener('input',  function() { ssDraw(selId, this.value); });
 
   ssSyncLabel(selId);
