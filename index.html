@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<!-- BUILD MARKER: v79-3 (worker-view weekend/OT duplicate-date fix reapplied, in addition to office Time Entries fix + searchable-picker click-to-reopen fix) — check this line via view-source against the file uploaded to Claude to confirm they match -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Timesheet App</title>
@@ -1533,7 +1534,7 @@ function renderWeek(wc) {
         <td colspan="6" style="padding:10px 12px;font-size:12px;color:var(--color-text-secondary);">—</td>
       </tr>`;
       const dayOT = overtimeRequests.filter(o => o.worker === currentWorker && normaliseDate(o.date) === dayStr && (o.status === 'pending' || o.status === 'declined'));
-      const otRowsForDay = dayOT.map(o => {
+      const otRowsForDay = dayOT.map((o, otIdx) => {
         const statusStyle = o.status === 'pending' ? 'background:#fff3cd;color:#856404;' : 'background:#fdecea;color:var(--color-text-error);';
         const statusLabel = o.status === 'pending' ? '⏱ OT Pending' : '⏱ OT Declined';
         return `
@@ -1541,6 +1542,7 @@ function renderWeek(wc) {
         <td class="day-cell" style="vertical-align:top;">
           <div class="day-name">${dayNames[i]}</div>
           <div class="day-date">${fmtShortDate(dayStr)}</div>
+          ${otIdx === 0 ? dayCellContent : ''}
         </td>
         <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;vertical-align:middle;width:160px;">
           <div style="font-weight:600;">${o.jobId}</div>
@@ -1558,7 +1560,7 @@ function renderWeek(wc) {
         </td>
       </tr>`;
       }).join('');
-      return emptyRowHtml + otRowsForDay;
+      return dayOT.length === 0 ? emptyRowHtml : otRowsForDay;
     }
 
     const entryRowsHtml = dayEntries.map((e, idx) => {
