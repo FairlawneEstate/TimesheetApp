@@ -3345,6 +3345,7 @@ function ssAttach(selId, placeholder) {
   sel.parentNode.insertBefore(wrap, sel.nextSibling);
 
   document.getElementById(selId + '_ssi').addEventListener('focus', function() { ssOpen(selId); });
+  document.getElementById(selId + '_ssi').addEventListener('click', function() { ssOpen(selId); });
   document.getElementById(selId + '_ssi').addEventListener('input',  function() { ssDraw(selId, this.value); });
 
   ssSyncLabel(selId);
