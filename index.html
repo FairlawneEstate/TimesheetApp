@@ -3709,8 +3709,8 @@ function syncDateRangeLimits() {
   const toEl   = document.getElementById('oe-date-to');
   if (!fromEl || !toEl) return;
   if (fromEl.value) toEl.min = fromEl.value;
-  if (toEl.value)   fromEl.max = toEl.value;
-  // If from is now after to, pull to forward to match
+  // If From is moved past the current To, push To forward to match —
+  // From is never restricted from moving forward in the first place.
   if (fromEl.value && toEl.value && fromEl.value > toEl.value) {
     toEl.value = fromEl.value;
   }
