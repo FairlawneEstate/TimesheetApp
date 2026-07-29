@@ -500,7 +500,6 @@ textarea { height: 60px; resize: none; }
           </div>
           <div id="office-multi-add-form" style="display:none;margin-bottom:1rem;padding:1rem;background:var(--color-background-secondary);border-radius:var(--border-radius-md);">
             <p style="font-size:13px;font-weight:500;margin-bottom:0.75rem;">Multi-Add Entries (absence / leave)</p>
-            <p style="font-size:12px;color:var(--color-text-secondary);margin-bottom:0.75rem;">Logs 8 hours per working day across the date range below — Mon–Fri (Mon–Wed for Derrick Smith), weekends skipped automatically. Same comment applies to every day created.</p>
             <div class="grid2">
               <div>
                 <label style="margin-top:0;">Worker</label>
@@ -523,7 +522,7 @@ textarea { height: 60px; resize: none; }
             </div>
             <div style="margin-top:10px;">
               <label style="margin-top:0;">Comments (optional)</label>
-              <textarea id="mae-comments" placeholder="e.g. Signed doctor's note received..."></textarea>
+              <textarea id="mae-comments" placeholder=""></textarea>
             </div>
             <div style="display:flex;gap:8px;margin-top:0.75rem;">
               <button class="btn btn-primary btn-sm" id="mae-save-btn" onclick="submitMultiAddEntries()">Save entries</button>
