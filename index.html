@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- BUILD MARKER: v79-5 (CRITICAL FIX: ReferenceError on undefined 'dayOT' in renderOfficeEntries that broke the whole Time Entries tab, stuck on Loading) — check this line via view-source against the file uploaded to Claude to confirm they match -->
+<!-- BUILD MARKER: v79-6 (added Refresh button to Time Entries tab) — check this line via view-source against the file uploaded to Claude to confirm they match -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Timesheet App</title>
@@ -461,6 +461,7 @@ textarea { height: 60px; resize: none; }
           <div class="row-between card-header">
             <p class="section-heading">Time entries &amp; audit trail</p>
             <div style="display:flex;gap:8px;">
+              <button class="btn btn-sm" onclick="refreshOffice().then(() => renderOfficeEntries())">↻ Refresh</button>
               <button class="btn btn-sm" id="office-add-entry-toggle" onclick="toggleOfficeAddEntry()">+ Add entry</button>
               <button class="btn btn-sm" id="office-multi-add-toggle" onclick="toggleMultiAddEntry()">+ Multi-Add Entries</button>
               <button class="btn btn-primary btn-sm" onclick="exportXLSX()">↓ Export XLSX</button>
