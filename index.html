@@ -513,7 +513,7 @@ textarea { height: 60px; resize: none; }
             <div class="grid2" style="margin-top:10px;">
               <div>
                 <label style="margin-top:0;">From date</label>
-                <input type="date" id="mae-date-from">
+                <input type="date" id="mae-date-from" onchange="document.getElementById('mae-date-to').min = this.value; if (document.getElementById('mae-date-to').value && document.getElementById('mae-date-to').value < this.value) document.getElementById('mae-date-to').value = this.value;">
               </div>
               <div>
                 <label style="margin-top:0;">To date</label>
@@ -2549,6 +2549,7 @@ function toggleMultiAddEntry() {
     const today = new Date().toISOString().slice(0,10);
     document.getElementById('mae-date-from').value = today;
     document.getElementById('mae-date-to').value = today;
+    document.getElementById('mae-date-to').min = today;
     document.getElementById('mae-comments').value = '';
     const workerSel = document.getElementById('mae-worker');
     const active = workers.filter(w => w.active !== false && w.active !== 'FALSE');
@@ -2593,7 +2594,7 @@ async function submitMultiAddEntries() {
 
   // Skip any day that falls inside an already pending/approved week — same lock rule as normal entry
   const lockedDates = [];
-  const datesToLog = candidateDates.filter(ds => {
+  const afterLockFilter = candidateDates.filter(ds => {
     const wc = getWeekCommencing(ds);
     const sub = getWeekSubmission(worker, wc);
     const locked = sub && (sub.status === 'pending' || sub.status === 'approved');
@@ -2601,8 +2602,23 @@ async function submitMultiAddEntries() {
     return !locked;
   });
 
+  // Skip any day that already has any hours logged for this worker — never stack on top of existing time
+  const alreadyLoggedDates = [];
+  const datesToLog = afterLockFilter.filter(ds => {
+    const existingHours = entries
+      .filter(e => e.worker === worker && normaliseDate(e.date) === ds)
+      .reduce((sum, e) => sum + (parseFloat(e.hours) || 0), 0);
+    const hasHours = existingHours > 0;
+    if (hasHours) alreadyLoggedDates.push(ds);
+    return !hasHours;
+  });
+
   if (!datesToLog.length) {
-    alert('Every day in this range falls within a week that is already submitted/approved and locked. Nothing was added.');
+    if (lockedDates.length && !alreadyLoggedDates.length) {
+      alert('Every day in this range falls within a week that is already submitted/approved and locked. Nothing was added.');
+    } else {
+      alert('Every day in this range already has hours logged, or is locked. Nothing was added.');
+    }
     return;
   }
 
@@ -2631,7 +2647,10 @@ async function submitMultiAddEntries() {
     toggleMultiAddEntry();
 
     let msg = datesToLog.length + ' entr' + (datesToLog.length === 1 ? 'y' : 'ies') + ' added';
-    if (lockedDates.length) msg += ' (' + lockedDates.length + ' skipped — locked week)';
+    const skipParts = [];
+    if (lockedDates.length) skipParts.push(lockedDates.length + ' locked week');
+    if (alreadyLoggedDates.length) skipParts.push(alreadyLoggedDates.length + ' already has hours');
+    if (skipParts.length) msg += ' (' + skipParts.join(', ') + ' — skipped)';
     if (failedCount) msg += ' — ' + failedCount + ' pending sync';
     setSyncStatus('office', failedCount ? 'pending' : 'synced', msg);
   } finally {
