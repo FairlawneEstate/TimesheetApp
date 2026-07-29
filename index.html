@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- BUILD MARKER: v79-4 (multiple pending/declined OT entries on the same day now grouped under one date cell, worker view + office Time Entries) — check this line via view-source against the file uploaded to Claude to confirm they match -->
+<!-- BUILD MARKER: v79-5 (CRITICAL FIX: ReferenceError on undefined 'dayOT' in renderOfficeEntries that broke the whole Time Entries tab, stuck on Loading) — check this line via view-source against the file uploaded to Claude to confirm they match -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Timesheet App</title>
@@ -2191,9 +2191,10 @@ function renderOfficeEntries() {
           <td colspan="2"></td>
         </tr>`;
 
-      const pendingOTRows_oe = overtimeRequests.filter(o =>
+      const dayOT_oe = overtimeRequests.filter(o =>
         o.worker === worker.name && normaliseDate(o.date) === dayStr && (o.status === 'pending' || o.status === 'declined')
-      ).map((o, otIdx) => {
+      );
+      const pendingOTRows_oe = dayOT_oe.map((o, otIdx) => {
         const otJob = jobs.find(j => j.id === o.jobId) || recurringJobs.find(j => j.id === o.jobId) || tasks.find(j => j.id === o.jobId);
         const otProp = propLabel((otJob ? otJob.property : '') || o.property || '', 35);
         const otDesc = ((otJob ? (otJob.description || '') : '') || o.description || '').slice(0, 200);
@@ -2202,7 +2203,7 @@ function renderOfficeEntries() {
         return `
         <tr class="day-row" style="opacity:0.85;border-top:0.5px solid var(--color-border-tertiary);">
           ${isEmpty ? (otIdx === 0 ? `
-          <td class="day-cell" rowspan="${dayOT.length}" style="vertical-align:top;">
+          <td class="day-cell" rowspan="${dayOT_oe.length}" style="vertical-align:top;">
             <div class="day-name">${dayName}</div>
             <div class="day-date">${fmtShortDate(dayStr)}</div>
             ${dayCellContent}
