@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- BUILD MARKER: v79-6 (added Refresh button to Time Entries tab) — check this line via view-source against the file uploaded to Claude to confirm they match -->
+<!-- BUILD MARKER: v79-7 (office Add entry form stays open after save, preserving worker+date, for batch-adding forgotten days) — check this line via view-source against the file uploaded to Claude to confirm they match -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Timesheet App</title>
@@ -2721,16 +2721,21 @@ async function submitOfficeEntry() {
   const entry = entry_oe;
   entries.push(entry);
   localStorage.setItem('entries', JSON.stringify(entries));
-  document.getElementById('oae-worker').value = '';
-  document.getElementById('oae-job').innerHTML = '<option value="">Select worker first...</option>';
-  if (typeof ssSyncLabel === 'function') ssSyncLabel('oae-job');
+
+  // Keep the form open and keep worker + date as-is — office staff are usually
+  // catching up several entries in a row for the same worker (often across
+  // a few different days), so re-picking the worker every time is unnecessary.
+  // Only the per-entry fields (job, hours, comments) get cleared.
   document.getElementById('oae-hours').value = '';
   document.getElementById('oae-comments').value = '';
   rjPropHide('rj-prop-oae');
-  toggleOfficeAddEntry();
+  populateOfficeEntryJobDropdown();
+  document.getElementById('oae-job').value = '';
+  if (typeof ssSyncLabel === 'function') ssSyncLabel('oae-job');
+
   renderOfficeEntries();
   const { synced } = await queueOrSend('addEntry', { entry: { ...entry, amendments: amendmentsToString(entry.amendments) } });
-  if (synced) setSyncStatus('office', 'synced', 'Entry saved to Sheets');
+  if (synced) setSyncStatus('office', 'synced', 'Entry saved to Sheets — add another or click Cancel when done');
 }
 
 async function deleteEntry(id, isOffice) {
