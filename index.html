@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- BUILD MARKER: v79-3 (worker-view weekend/OT duplicate-date fix reapplied, in addition to office Time Entries fix + searchable-picker click-to-reopen fix) — check this line via view-source against the file uploaded to Claude to confirm they match -->
+<!-- BUILD MARKER: v79-4 (multiple pending/declined OT entries on the same day now grouped under one date cell, worker view + office Time Entries) — check this line via view-source against the file uploaded to Claude to confirm they match -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Timesheet App</title>
@@ -1539,12 +1539,13 @@ function renderWeek(wc) {
         const statusLabel = o.status === 'pending' ? '⏱ OT Pending' : '⏱ OT Declined';
         return `
       <tr class="day-row" style="opacity:0.85;">
-        <td class="day-cell" style="vertical-align:top;">
+        ${otIdx === 0 ? `
+        <td class="day-cell" rowspan="${dayOT.length}" style="vertical-align:top;">
           <div class="day-name">${dayNames[i]}</div>
           <div class="day-date">${fmtShortDate(dayStr)}</div>
-          ${otIdx === 0 ? dayCellContent : ''}
-        </td>
-        <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;vertical-align:middle;width:160px;">
+          ${dayCellContent}
+        </td>` : ''}
+        <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);${otIdx === 0 ? '' : 'border-left:0.5px solid var(--color-border-tertiary);'}font-size:12px;vertical-align:middle;width:160px;">
           <div style="font-weight:600;">${o.jobId}</div>
           <span class="badge-amended-sm" style="${statusStyle}">${statusLabel}</span>
         </td>
@@ -2200,12 +2201,17 @@ function renderOfficeEntries() {
         const statusLabel = o.status === 'pending' ? '⏱ OT Pending' : '⏱ OT Declined';
         return `
         <tr class="day-row" style="opacity:0.85;border-top:0.5px solid var(--color-border-tertiary);">
+          ${isEmpty ? (otIdx === 0 ? `
+          <td class="day-cell" rowspan="${dayOT.length}" style="vertical-align:top;">
+            <div class="day-name">${dayName}</div>
+            <div class="day-date">${fmtShortDate(dayStr)}</div>
+            ${dayCellContent}
+          </td>` : '') : `
           <td class="day-cell" style="vertical-align:top;">
             <div class="day-name">${dayName}</div>
             <div class="day-date">${fmtShortDate(dayStr)}</div>
-            ${isEmpty && otIdx === 0 ? dayCellContent : ''}
-          </td>
-          <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;vertical-align:middle;width:110px;">
+          </td>`}
+          <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);${isEmpty && otIdx > 0 ? 'border-left:0.5px solid var(--color-border-tertiary);' : ''}font-size:12px;vertical-align:middle;width:110px;">
             <div style="font-weight:600;">${o.jobId}</div>
             <span class="badge-amended-sm" style="${statusStyle}">${statusLabel}</span>
           </td>
