@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- BUILD MARKER: v79-7 (office Add entry form stays open after save, preserving worker+date, for batch-adding forgotten days) — check this line via view-source against the file uploaded to Claude to confirm they match -->
+<!-- BUILD MARKER: v79-8 (Time Entries tables now use fixed, consistent column widths across all workers; Comments no longer squeezed by long Description) — check this line via view-source against the file uploaded to Claude to confirm they match -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Timesheet App</title>
@@ -2213,15 +2213,15 @@ function renderOfficeEntries() {
             <div class="day-name">${dayName}</div>
             <div class="day-date">${fmtShortDate(dayStr)}</div>
           </td>`}
-          <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);${isEmpty && otIdx > 0 ? 'border-left:0.5px solid var(--color-border-tertiary);' : ''}font-size:12px;vertical-align:middle;width:110px;">
+          <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);${isEmpty && otIdx > 0 ? 'border-left:0.5px solid var(--color-border-tertiary);' : ''}font-size:12px;vertical-align:middle;width:130px;overflow:hidden;">
             <div style="font-weight:600;">${o.jobId}</div>
             <span class="badge-amended-sm" style="${statusStyle}">${statusLabel}</span>
           </td>
-          <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:middle;width:200px;">${otProp}</td>
-          <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:middle;">${otDesc}</td>
+          <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:middle;width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${otProp}</td>
+          <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:middle;width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${otDesc}</td>
           <td style="padding:5px 6px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-weight:500;text-align:center;vertical-align:middle;width:46px;">${o.hours}h</td>
-          <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-style:italic;color:var(--color-text-secondary);vertical-align:middle;">${o.timeRange || ''}</td>
-          <td style="padding:4px 8px;vertical-align:middle;text-align:right;">
+          <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-style:italic;color:var(--color-text-secondary);vertical-align:middle;width:200px;overflow:hidden;">${o.timeRange || ''}</td>
+          <td style="padding:4px 8px;vertical-align:middle;text-align:right;width:160px;">
             ${o.status === 'pending' ? `<button class="btn btn-sm" style="color:var(--color-text-error);border-color:var(--color-border-error);" onclick="deleteOTRequest('${o.id}')">Delete</button>` : ''}
           </td>
         </tr>`;
@@ -2257,7 +2257,7 @@ function renderOfficeEntries() {
             <div class="day-date">${fmtShortDate(dayStr)}</div>
             ${dayCellContent}
           </td>` : ''}
-          <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);${idx === 0 ? '' : 'border-left:0.5px solid var(--color-border-tertiary);'}font-size:12px;vertical-align:middle;width:160px;">
+          <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);${idx === 0 ? '' : 'border-left:0.5px solid var(--color-border-tertiary);'}font-size:12px;vertical-align:middle;width:130px;overflow:hidden;">
             <div style="font-weight:600;">${e.jobId}</div>
             ${amended && !e.isOvertime ? `<span class="badge-amended-sm">Amended</span>` : ''}
             ${isPending ? `<span class="badge-amended-sm" style="background:var(--color-background-info);color:var(--color-text-info);">Pending</span>` : ''}
@@ -2265,16 +2265,16 @@ function renderOfficeEntries() {
             ${e.isOvertime ? `<span class="badge-amended-sm" style="background:var(--color-background-success);color:var(--color-text-success);">⏱ Overtime</span>` : ''}
             ${isWeekApproved ? `<span class="badge-amended-sm" style="background:var(--color-background-success);color:var(--color-text-success);">✓ Approved</span>` : ''}
           </td>
-          <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:middle;width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+          <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:middle;width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
             ${propLabel(jobProperty, 35)}
           </td>
-          <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:middle;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+          <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:middle;width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
             ${jobDescription}
           </td>
           <td style="padding:5px 6px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-weight:500;text-align:center;vertical-align:middle;white-space:nowrap;width:46px;">
             ${e.hours}h
           </td>
-          <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-style:italic;color:var(--color-text-secondary);vertical-align:middle;">
+          <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-style:italic;color:var(--color-text-secondary);vertical-align:middle;width:200px;overflow:hidden;word-wrap:break-word;">
             ${e.isOvertime && e.overtimeStart ? `<span style="font-style:normal;font-weight:500;color:var(--color-text-success);">${e.overtimeStart} – ${e.overtimeEnd}</span> ` : ''}${e.comments || ''}
             ${amended ? `<div class="audit-log-sm" style="font-style:normal;">${lastAmend.note === 'Created by Office' ? 'Created by' : e.isOvertime ? 'Approved by' : 'Amended by'} ${lastAmend.by} · ${lastAmend.at}${e.isOvertime && lastAmend.note && lastAmend.note.includes('): ') ? `<span style="font-style:italic;"> — ${lastAmend.note.slice(lastAmend.note.indexOf('): ') + 3)}</span>` : ''}</div>` : ''}
           </td>
@@ -2332,16 +2332,16 @@ function renderOfficeEntries() {
     html += `
       <div style="margin-bottom:1.5rem;width:100%;">
         <p style="font-size:13px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem;">${worker.name}</p>
-        <table class="week-table">
+        <table class="week-table" style="table-layout:fixed;width:100%;">
           <thead>
             <tr>
-              <th style="width:100px;">Day</th>
-              <th style="width:160px;">W/O Number</th>
-              <th style="width:200px;">Property</th>
-              <th>Description</th>
+              <th style="width:90px;">Day</th>
+              <th style="width:130px;">W/O Number</th>
+              <th style="width:180px;">Property</th>
+              <th style="width:280px;">Description</th>
               <th style="width:46px;text-align:center;">Hrs</th>
-              <th>Comments</th>
-              <th style="width:80px;"></th>
+              <th style="width:200px;">Comments</th>
+              <th style="width:160px;"></th>
             </tr>
           </thead>
           <tbody>${workerRows}</tbody>
