@@ -1219,7 +1219,8 @@ async function confirmOvertime() {
     status: 'pending',
     submittedAt: entry.overtimeSubmittedAt,
     reviewedAt: '',
-    reviewedBy: ''
+    reviewedBy: '',
+    performedBy: entry.performedBy || entry.worker
   };
 
   if (btn) { btn.disabled = true; btn.textContent = 'Submitting…'; }
@@ -2644,11 +2645,12 @@ async function submitMultiAddEntries() {
       const entry = {
         id: uid(),
         worker, jobId, date: ds, hours: 8, comments: comments || '',
-        amendments: [{ by: 'Office', at: new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }), note: 'Created via Multi-Add Entries' }],
+        amendments: [{ by: currentOfficeUser || 'Office', at: new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }), note: 'Created via Multi-Add Entries' }],
         createdAt: new Date().toISOString(),
         property: '',
         description: absType ? (absType.name || absType.id) : jobId,
-        isOvertime: false
+        isOvertime: false,
+        performedBy: currentOfficeUser || 'Office'
       };
       entries.push(entry);
       localStorage.setItem('entries', JSON.stringify(entries));
@@ -2711,10 +2713,11 @@ async function submitOfficeEntry() {
   const jobObj = allJobs.find(j => j.id === jobId);
   const entry_oe = {
     id: uid(), worker, jobId, date, hours, comments,
-    amendments: [{ by: 'Office', at: new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }), note: 'Created by Office' }],
+    amendments: [{ by: currentOfficeUser || 'Office', at: new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }), note: 'Created by Office' }],
     createdAt: new Date().toISOString(),
     property: isRecurringJobId(jobId) ? (rjPropGetValue('rj-prop-oae') || (jobObj ? jobObj.property : '')) : (jobObj ? jobObj.property : ''),
-    description: jobObj ? jobObj.description : ''
+    description: jobObj ? jobObj.description : '',
+    performedBy: currentOfficeUser || 'Office'
   };
   if (isRecurringJobId(jobId) && !rjPropGetValue('rj-prop-oae')) { alert('Please select a property for this recurring job.'); return; }
   if (isOvertime_oe) { showOvertimeModal(entry_oe, isWeekend_oe); return; }
@@ -2752,7 +2755,7 @@ async function deleteEntry(id, isOffice) {
     updateHoursPlaceholder();
   }
   try {
-    const { synced } = await queueOrSend('deleteEntry', { id });
+    const { synced } = await queueOrSend('deleteEntry', { id, performedBy: isOffice ? (currentOfficeUser || 'Office') : undefined });
     if (synced) setSyncStatus(isOffice ? 'office' : 'worker', 'synced', 'Entry deleted');
   } finally {
     pendingDeleteEntryIds.delete(String(id));
@@ -3007,7 +3010,7 @@ async function submitDailyEntry() {
   const isOvertime_de = isWeekend_de || (alreadyLogged + hours > 8);
   const allJobs = [...jobs, ...recurringJobs, ...tasks, ...absenceTypes];
   const jobObj = allJobs.find(j => j.id === jobId);
-  const entry_de = { id: uid(), worker, jobId, date, hours, comments, amendments: [{ by: 'Office', at: new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }), note: 'Created by Office' }], createdAt: new Date().toISOString(), property: isRecurringJobId(jobId) ? (rjPropGetValue('rj-prop-dae') || (jobObj ? jobObj.property : '')) : (jobObj ? jobObj.property : ''), description: jobObj ? (jobObj.description || jobObj.name || '') : '' };
+  const entry_de = { id: uid(), worker, jobId, date, hours, comments, amendments: [{ by: currentOfficeUser || 'Office', at: new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }), note: 'Created by Office' }], createdAt: new Date().toISOString(), property: isRecurringJobId(jobId) ? (rjPropGetValue('rj-prop-dae') || (jobObj ? jobObj.property : '')) : (jobObj ? jobObj.property : ''), description: jobObj ? (jobObj.description || jobObj.name || '') : '', performedBy: currentOfficeUser || 'Office' };
   if (isRecurringJobId(jobId) && !rjPropGetValue('rj-prop-dae')) { alert('Please select a property for this recurring job.'); return; }
   if (isOvertime_de) { showOvertimeModal(entry_de, isWeekend_de); return; }
   const entry = entry_de;
@@ -3634,8 +3637,8 @@ async function deleteOTRequest(id) {
   renderEntriesByDate();
   renderOfficeEntries && renderOfficeEntries();
   renderOvertimeTab && renderOvertimeTab();
-  const { synced } = await queueOrSend('deleteOTRequest', { id });
-  if (synced) setSyncStatus(currentUser ? 'office' : 'worker', 'synced', 'OT request deleted');
+  const { synced } = await queueOrSend('deleteOTRequest', { id, performedBy: currentOfficeUser || undefined });
+  if (synced) setSyncStatus(currentOfficeUser ? 'office' : 'worker', 'synced', 'OT request deleted');
 }
 
 // ── Recurring Job Property Picker ────────────────────────────────
