@@ -1859,6 +1859,27 @@ async function saveDailyViewEdit(id) {
   entry.jobId    = newJob;
   entry.hours    = newHours;
   entry.comments = newComments;
+
+  // Recalculate property/description for the new job selection — previously
+  // left untouched, so switching e.g. a WO entry to an absence type silently
+  // kept showing the old WO's property/description.
+  const newJobObj_dv = jobs.find(j => j.id === newJob) || tasks.find(j => j.id === newJob);
+  const newRecurringObj_dv = recurringJobs.find(j => j.id === newJob);
+  const newAbsTypeObj_dv = absenceTypes.find(a => a.id === newJob);
+  if (newJobObj_dv) {
+    entry.property = newJobObj_dv.property || '';
+    entry.description = newJobObj_dv.description || '';
+  } else if (newRecurringObj_dv) {
+    entry.property = newRecurringObj_dv.property || '';
+    entry.description = newRecurringObj_dv.description || '';
+  } else if (newAbsTypeObj_dv) {
+    entry.property = '';
+    entry.description = newAbsTypeObj_dv.name || newAbsTypeObj_dv.id;
+  } else {
+    entry.property = '';
+    entry.description = '';
+  }
+
   localStorage.setItem('entries', JSON.stringify(entries));
 
   renderDailyView();
@@ -1898,6 +1919,27 @@ async function saveEdit(id, isOffice) {
   entry.jobId = newJob;
   entry.hours = newHours;
   entry.comments = newComments;
+
+  // Recalculate property/description for the new job selection — previously
+  // left untouched, so switching e.g. a WO entry to an absence type silently
+  // kept showing the old WO's property/description.
+  const newJobObj_se = jobs.find(j => j.id === newJob) || tasks.find(j => j.id === newJob);
+  const newRecurringObj_se = recurringJobs.find(j => j.id === newJob);
+  const newAbsTypeObj_se = absenceTypes.find(a => a.id === newJob);
+  if (newJobObj_se) {
+    entry.property = newJobObj_se.property || '';
+    entry.description = newJobObj_se.description || '';
+  } else if (newRecurringObj_se) {
+    entry.property = newRecurringObj_se.property || '';
+    entry.description = newRecurringObj_se.description || '';
+  } else if (newAbsTypeObj_se) {
+    entry.property = '';
+    entry.description = newAbsTypeObj_se.name || newAbsTypeObj_se.id;
+  } else {
+    entry.property = '';
+    entry.description = '';
+  }
+
   localStorage.setItem('entries', JSON.stringify(entries));
 
   if (isOffice) { renderOfficeDashboard(); renderDailyView(); }
@@ -2376,6 +2418,27 @@ async function saveEditOfficeEntries(id) {
   entry.jobId = newJob;
   entry.hours = newHours;
   entry.comments = newComments;
+
+  // Recalculate property/description for the new job selection — previously
+  // left untouched, so switching e.g. a WO entry to an absence type silently
+  // kept showing the old WO's property/description.
+  const newJobObj_oe = jobs.find(j => j.id === newJob) || tasks.find(j => j.id === newJob);
+  const newRecurringObj_oe = recurringJobs.find(j => j.id === newJob);
+  const newAbsTypeObj_oe = absenceTypes.find(a => a.id === newJob);
+  if (newJobObj_oe) {
+    entry.property = newJobObj_oe.property || '';
+    entry.description = newJobObj_oe.description || '';
+  } else if (newRecurringObj_oe) {
+    entry.property = newRecurringObj_oe.property || '';
+    entry.description = newRecurringObj_oe.description || '';
+  } else if (newAbsTypeObj_oe) {
+    entry.property = '';
+    entry.description = newAbsTypeObj_oe.name || newAbsTypeObj_oe.id;
+  } else {
+    entry.property = '';
+    entry.description = '';
+  }
+
   localStorage.setItem('entries', JSON.stringify(entries));
   renderOfficeEntries();
   const { synced } = await queueOrSend('updateEntry', { entry: { ...entry, amendments: amendmentsToString(entry.amendments) } });
