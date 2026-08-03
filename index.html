@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- BUILD MARKER: v79-11 (edit-entry property/description now recalculated on job change incl. absence types; Weekly Approvals table given fixed column widths + Property/Description rebalance + overtime entries excluded from week review/totals) -->
+<!-- BUILD MARKER: v79-12 (Overtime export now excludes Pending entirely — only Approved/Declined within the selected date range) — check this line via view-source against the file uploaded to Claude to confirm they match -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Timesheet App</title>
@@ -3460,12 +3460,13 @@ function exportOvertimeXLSX() {
     return (!fromVal || d >= fromVal) && (!toVal || d <= toVal);
   };
 
-  // Same scope as what's currently on screen: Pending always included in full,
-  // Approved/Declined limited to the active date range filter.
-  const pending  = overtimeRequests.filter(o => o.status === 'pending');
+  // Export scope differs from the on-screen view: Pending is deliberately
+  // excluded here, since a pending request has no confirmed date/outcome yet
+  // and was previously slipping into exports regardless of the range picked.
+  // Only Approved/Declined, both respecting the active date range, are exported.
   const approved = overtimeRequests.filter(o => o.status === 'approved').filter(inRange);
   const declined = overtimeRequests.filter(o => o.status === 'declined').filter(inRange);
-  const all = [...pending, ...approved, ...declined];
+  const all = [...approved, ...declined];
 
   if (!all.length) { alert('No overtime requests match the current filters.'); return; }
 
