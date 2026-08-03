@@ -3839,16 +3839,16 @@ function renderWeekApprovalsTab() {
             <button class="btn btn-sm" style="color:var(--color-text-error);border-color:var(--color-border-error);margin-left:6px;" onclick="reviewWeek('${sub.id}','declined', this)">Decline</button>
           </div>
         </div>
-        <table class="week-table" style="width:100%;">
+        <table class="week-table" style="table-layout:fixed;width:100%;">
           <thead>
             <tr>
-              <th style="width:100px;">Day</th>
-              <th style="width:100px;">Date</th>
-              <th style="width:160px;">W/O Number</th>
-              <th style="width:200px;">Property</th>
-              <th>Description</th>
+              <th style="width:60px;">Day</th>
+              <th style="width:70px;">Date</th>
+              <th style="width:65px;">W/O Number</th>
+              <th style="width:240px;">Property</th>
+              <th style="width:390px;">Description</th>
               <th style="width:46px;text-align:center;">Hrs</th>
-              <th>Comments</th>
+              <th style="width:200px;">Comments</th>
             </tr>
           </thead>
           <tbody>
@@ -3860,25 +3860,25 @@ function renderWeekApprovalsTab() {
               const dayName = new Date(normaliseDate(e.date) + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'long' });
               return `
             <tr class="day-row">
-              <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;vertical-align:middle;width:100px;">
+              <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;vertical-align:middle;width:60px;">
                 <div class="day-name">${dayName}</div>
               </td>
-              <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;vertical-align:middle;width:100px;">
+              <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;vertical-align:middle;width:70px;">
                 <div class="day-name">${fmtShortDate(normaliseDate(e.date))}</div>
               </td>
-              <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;vertical-align:middle;width:160px;">
+              <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;vertical-align:middle;width:65px;overflow:hidden;">
                 <div style="font-weight:600;">${e.jobId}</div>
               </td>
-              <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:middle;width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+              <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:middle;width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
                 ${propLabel(jobProperty, 35)}
               </td>
-              <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:middle;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+              <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:middle;width:390px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
                 ${jobDescription}
               </td>
               <td style="padding:5px 6px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-weight:500;text-align:center;vertical-align:middle;white-space:nowrap;width:46px;">
                 ${e.hours}h
               </td>
-              <td style="padding:5px 10px;font-size:12px;color:var(--color-text-secondary);">
+              <td style="padding:5px 10px;font-size:12px;color:var(--color-text-secondary);width:200px;">
                 ${e.comments || ''}
               </td>
             </tr>`;
