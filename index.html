@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- BUILD MARKER: v79-17 (WO Hours: zero-hour WOs now show "No hours allocated" instead of vanishing; fixed click-to-reopen suggestions after picking; input clears after selecting so you can type a fresh search immediately) — check this line via view-source against the file uploaded to Claude to confirm they match -->
+<!-- BUILD MARKER: v79-18 (WO Hours search: box now keeps showing the selected WO after picking, and only clears itself when you click back into it to start a new search) — check this line via view-source against the file uploaded to Claude to confirm they match -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Timesheet App</title>
@@ -424,8 +424,8 @@ textarea { height: 60px; resize: none; }
               <label style="margin-top:0;">Search a specific W/O</label>
               <input type="text" id="wo-hours-search" placeholder="WO number, property, or description..." autocomplete="off"
                 oninput="woHoursSearchSuggest()"
-                onfocus="woHoursSearchSuggest()"
-                onclick="woHoursSearchSuggest()"
+                onfocus="woHoursSearchFocus()"
+                onclick="woHoursSearchFocus()"
                 onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('wo-hours-suggest').style.display='none';woHoursActiveFilter=this.value.trim().toLowerCase();renderWOHoursTab();}if(event.key==='Escape'){document.getElementById('wo-hours-suggest').style.display='none';}">
               <div id="wo-hours-suggest" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--color-background-primary);border:1px solid var(--color-border-secondary);border-radius:var(--border-radius-md);max-height:260px;overflow-y:auto;z-index:20;box-shadow:0 4px 12px rgba(0,0,0,0.1);"></div>
             </div>
@@ -3810,6 +3810,15 @@ document.addEventListener('mousedown', function(e) {
   }
 });
 
+function woHoursSearchFocus() {
+  // Clears the box the moment it's clicked/focused (so a previously-picked
+  // WO doesn't have to be manually deleted before typing a new search) —
+  // but this must NOT run on every keystroke, only when re-engaging the box.
+  const input = document.getElementById('wo-hours-search');
+  if (input && input.value) input.value = '';
+  woHoursSearchSuggest();
+}
+
 function woHoursSearchSuggest() {
   const box = document.getElementById('wo-hours-suggest');
   const input = document.getElementById('wo-hours-search');
@@ -3844,7 +3853,7 @@ function woHoursSearchSuggest() {
 
 function woHoursPickSuggestion(id) {
   woHoursActiveFilter = String(id).trim().toLowerCase();
-  document.getElementById('wo-hours-search').value = '';
+  document.getElementById('wo-hours-search').value = id;
   document.getElementById('wo-hours-suggest').style.display = 'none';
   renderWOHoursTab();
 }
