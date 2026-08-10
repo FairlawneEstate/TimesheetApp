@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- BUILD MARKER: v79-14 (added WO Hours tab — totals hours per real WO, last 2 weeks by default, search for any WO all-time, excludes Recurring Jobs) — check this line via view-source against the file uploaded to Claude to confirm they match -->
+<!-- BUILD MARKER: v79-15 (WO Hours: added live search suggestions dropdown, sort changed to WO number high-to-low) — check this line via view-source against the file uploaded to Claude to confirm they match -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Timesheet App</title>
@@ -420,9 +420,13 @@ textarea { height: 60px; resize: none; }
         <div class="card">
           <div class="card-header"><p class="section-heading">WO Hours</p></div>
           <div style="padding:0 1rem;display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end;margin-bottom:1rem;">
-            <div>
+            <div style="position:relative;">
               <label style="margin-top:0;">Search a specific W/O</label>
-              <input type="text" id="wo-hours-search" placeholder="WO number, property, or description..." onkeydown="if(event.key==='Enter'){event.preventDefault();renderWOHoursTab();}">
+              <input type="text" id="wo-hours-search" placeholder="WO number, property, or description..." autocomplete="off"
+                oninput="woHoursSearchSuggest()"
+                onfocus="woHoursSearchSuggest()"
+                onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('wo-hours-suggest').style.display='none';renderWOHoursTab();}if(event.key==='Escape'){document.getElementById('wo-hours-suggest').style.display='none';}">
+              <div id="wo-hours-suggest" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--color-background-primary);border:1px solid var(--color-border-secondary);border-radius:var(--border-radius-md);max-height:260px;overflow-y:auto;z-index:20;box-shadow:0 4px 12px rgba(0,0,0,0.1);"></div>
             </div>
             <div>
               <button class="btn btn-primary" onclick="renderWOHoursTab()" style="width:100%;margin-top:0;">Search</button>
@@ -2180,7 +2184,12 @@ function renderWOHoursTab() {
     grouped[jid].byWorker[e.worker] = (grouped[jid].byWorker[e.worker] || 0) + h;
   });
 
-  const jobIds = Object.keys(grouped).sort((a, b) => grouped[b].total - grouped[a].total);
+  const jobIds = Object.keys(grouped).sort((a, b) => {
+    const na = parseFloat(String(a).replace(/[^0-9.-]/g, ''));
+    const nb = parseFloat(String(b).replace(/[^0-9.-]/g, ''));
+    if (isNaN(na) || isNaN(nb)) return String(b).localeCompare(String(a));
+    return nb - na;
+  });
 
   if (!jobIds.length) {
     el.innerHTML = '<p class="text-muted">' + (searchVal ? 'No work orders match that search.' : 'No work orders have hours logged in the last 2 weeks.') + '</p>';
@@ -3779,7 +3788,49 @@ document.addEventListener('mousedown', function(e) {
       ssClose(d.id.replace('_ssd', ''));
     });
   }
+  if (!e.target.closest('#wo-hours-search') && !e.target.closest('#wo-hours-suggest')) {
+    const woSuggest = document.getElementById('wo-hours-suggest');
+    if (woSuggest) woSuggest.style.display = 'none';
+  }
 });
+
+function woHoursSearchSuggest() {
+  const box = document.getElementById('wo-hours-suggest');
+  const input = document.getElementById('wo-hours-search');
+  if (!box || !input) return;
+  const q = input.value.trim().toLowerCase();
+
+  const matches = jobs.filter(j => {
+    if (!q) return true;
+    return String(j.id).toLowerCase().includes(q) ||
+           String(j.property || '').toLowerCase().includes(q) ||
+           String(j.description || '').toLowerCase().includes(q);
+  }).sort((a, b) => {
+    const na = parseFloat(String(a.id).replace(/[^0-9.-]/g, ''));
+    const nb = parseFloat(String(b.id).replace(/[^0-9.-]/g, ''));
+    if (isNaN(na) || isNaN(nb)) return String(b.id).localeCompare(String(a.id));
+    return nb - na;
+  }).slice(0, 30);
+
+  if (!matches.length) {
+    box.innerHTML = '<div style="padding:10px 12px;font-size:12px;color:var(--color-text-secondary);">No matching work orders.</div>';
+    box.style.display = 'block';
+    return;
+  }
+
+  box.innerHTML = matches.map(j => `
+    <div onmousedown="event.preventDefault();woHoursPickSuggestion('${j.id}')" style="padding:8px 12px;cursor:pointer;border-bottom:0.5px solid var(--color-border-tertiary);" onmouseover="this.style.background='var(--color-background-secondary)'" onmouseout="this.style.background='transparent'">
+      <div style="font-size:12px;font-weight:600;">${j.id}</div>
+      <div style="font-size:11px;color:var(--color-text-secondary);">${propLabel(j.property, 45)}${j.description ? ' · ' + propLabel(j.description, 45) : ''}</div>
+    </div>`).join('');
+  box.style.display = 'block';
+}
+
+function woHoursPickSuggestion(id) {
+  document.getElementById('wo-hours-search').value = id;
+  document.getElementById('wo-hours-suggest').style.display = 'none';
+  renderWOHoursTab();
+}
 
 // Truncate property for display in dropdowns (full value stored/shown in tables)
 function propLabel(p, max) { max = max || 40; p = p || ''; return p.length > max ? p.slice(0, max) + '…' : p; }
