@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- BUILD MARKER: v79-16 (WO Hours: search suggestion description truncation raised to 100 chars, results cards now show full untruncated property) — check this line via view-source against the file uploaded to Claude to confirm they match -->
+<!-- BUILD MARKER: v79-17 (WO Hours: zero-hour WOs now show "No hours allocated" instead of vanishing; fixed click-to-reopen suggestions after picking; input clears after selecting so you can type a fresh search immediately) — check this line via view-source against the file uploaded to Claude to confirm they match -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Timesheet App</title>
@@ -425,11 +425,12 @@ textarea { height: 60px; resize: none; }
               <input type="text" id="wo-hours-search" placeholder="WO number, property, or description..." autocomplete="off"
                 oninput="woHoursSearchSuggest()"
                 onfocus="woHoursSearchSuggest()"
-                onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('wo-hours-suggest').style.display='none';renderWOHoursTab();}if(event.key==='Escape'){document.getElementById('wo-hours-suggest').style.display='none';}">
+                onclick="woHoursSearchSuggest()"
+                onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('wo-hours-suggest').style.display='none';woHoursActiveFilter=this.value.trim().toLowerCase();renderWOHoursTab();}if(event.key==='Escape'){document.getElementById('wo-hours-suggest').style.display='none';}">
               <div id="wo-hours-suggest" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--color-background-primary);border:1px solid var(--color-border-secondary);border-radius:var(--border-radius-md);max-height:260px;overflow-y:auto;z-index:20;box-shadow:0 4px 12px rgba(0,0,0,0.1);"></div>
             </div>
             <div>
-              <button class="btn btn-primary" onclick="renderWOHoursTab()" style="width:100%;margin-top:0;">Search</button>
+              <button class="btn btn-primary" onclick="woHoursActiveFilter=document.getElementById('wo-hours-search').value.trim().toLowerCase();document.getElementById('wo-hours-suggest').style.display='none';renderWOHoursTab();" style="width:100%;margin-top:0;">Search</button>
             </div>
           </div>
           <p class="text-muted" id="wo-hours-scope-note" style="padding:0 1rem;font-size:12px;margin-bottom:0.5rem;"></p>
@@ -751,6 +752,7 @@ let pendingDeleteEntryIds = new Set();
 let isSubmittingEntry = false;
 let isSubmittingOvertime = false;
 let isSubmittingMultiAdd = false;
+let woHoursActiveFilter = '';
 let currentWorker = null;
 let syncQueue = JSON.parse(localStorage.getItem('syncQueue') || '[]');
 let pollTimer = null;
@@ -2151,7 +2153,7 @@ function renderWOHoursTab() {
   const scopeNote = document.getElementById('wo-hours-scope-note');
   if (!el) return;
 
-  const searchVal = (document.getElementById('wo-hours-search')?.value || '').trim().toLowerCase();
+  const searchVal = woHoursActiveFilter;
 
   // Real work orders only — deliberately excludes RecurringJobs (which
   // accumulate far more hours over time and would swamp this view) and
@@ -2184,6 +2186,19 @@ function renderWOHoursTab() {
     grouped[jid].byWorker[e.worker] = (grouped[jid].byWorker[e.worker] || 0) + h;
   });
 
+  // When searching, also surface WOs that match but have zero hours logged
+  // at all — previously these silently vanished into "no results" instead
+  // of showing up with a clear "no hours allocated" state.
+  if (searchVal) {
+    jobs.filter(j =>
+      String(j.id).toLowerCase().includes(searchVal) ||
+      String(j.property || '').toLowerCase().includes(searchVal) ||
+      String(j.description || '').toLowerCase().includes(searchVal)
+    ).forEach(j => {
+      if (!grouped[String(j.id)]) grouped[String(j.id)] = { total: 0, byWorker: {} };
+    });
+  }
+
   const jobIds = Object.keys(grouped).sort((a, b) => {
     const na = parseFloat(String(a).replace(/[^0-9.-]/g, ''));
     const nb = parseFloat(String(b).replace(/[^0-9.-]/g, ''));
@@ -2213,11 +2228,12 @@ function renderWOHoursTab() {
             <p class="text-muted" style="font-size:12px;">${job ? (job.description || '') : ''}</p>
           </div>
           <div style="text-align:right;white-space:nowrap;">
-            <p style="font-size:22px;font-weight:700;">${g.total}h</p>
-            <p class="text-muted" style="font-size:11px;">total across ${workerNames.length} worker${workerNames.length === 1 ? '' : 's'}</p>
+            ${workerNames.length
+              ? `<p style="font-size:22px;font-weight:700;">${g.total}h</p><p class="text-muted" style="font-size:11px;">total across ${workerNames.length} worker${workerNames.length === 1 ? '' : 's'}</p>`
+              : `<p style="font-size:14px;font-weight:600;color:var(--color-text-secondary);">No hours allocated</p>`}
           </div>
         </div>
-        <div style="padding:2px 12px 8px;">${workerRows}</div>
+        ${workerNames.length ? `<div style="padding:2px 12px 8px;">${workerRows}</div>` : ''}
       </div>`;
   }).join('');
 }
@@ -3827,7 +3843,8 @@ function woHoursSearchSuggest() {
 }
 
 function woHoursPickSuggestion(id) {
-  document.getElementById('wo-hours-search').value = id;
+  woHoursActiveFilter = String(id).trim().toLowerCase();
+  document.getElementById('wo-hours-search').value = '';
   document.getElementById('wo-hours-suggest').style.display = 'none';
   renderWOHoursTab();
 }
