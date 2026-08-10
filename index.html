@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- BUILD MARKER: v79-18 (WO Hours search: box now keeps showing the selected WO after picking, and only clears itself when you click back into it to start a new search) — check this line via view-source against the file uploaded to Claude to confirm they match -->
+<!-- BUILD MARKER: v79-19 (Daily View: added prev/next day arrows + Today shortcut, add-entry now logs against viewed day; WO Hours: shows WO's raised/reported date next to WO number) — check this line via view-source against the file uploaded to Claude to confirm they match -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Timesheet App</title>
@@ -442,7 +442,12 @@ textarea { height: 60px; resize: none; }
       <div id="office-tab-daily">
         <div class="card">
           <div class="row-between card-header">
-            <p class="section-heading" id="daily-view-heading">Today's entries</p>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <button class="btn btn-sm" onclick="changeDailyViewDate(-1)" title="Previous day" style="padding:4px 10px;">‹</button>
+              <p class="section-heading" id="daily-view-heading" style="margin:0;">Today's entries</p>
+              <button class="btn btn-sm" onclick="changeDailyViewDate(1)" title="Next day" style="padding:4px 10px;">›</button>
+              <button class="btn btn-sm" id="daily-view-today-btn" onclick="jumpToTodayDailyView()" style="display:none;">Today</button>
+            </div>
             <div style="display:flex;gap:8px;">
               <button class="btn btn-sm" id="daily-add-entry-toggle" onclick="toggleDailyAddEntry()">+ Add entry</button>
               <button class="btn btn-sm" onclick="refreshOffice().then(() => renderDailyView())">↻ Refresh</button>
@@ -753,6 +758,7 @@ let isSubmittingEntry = false;
 let isSubmittingOvertime = false;
 let isSubmittingMultiAdd = false;
 let woHoursActiveFilter = '';
+let dailyViewDate = new Date().toISOString().slice(0, 10);
 let currentWorker = null;
 let syncQueue = JSON.parse(localStorage.getItem('syncQueue') || '[]');
 let pollTimer = null;
@@ -2223,7 +2229,7 @@ function renderWOHoursTab() {
       <div class="card" style="margin-bottom:0.75rem;">
         <div class="row-between card-header">
           <div>
-            <p class="section-heading" style="margin-bottom:2px;">${jid}</p>
+            <p class="section-heading" style="margin-bottom:2px;">${jid}${job && job.reportedDate ? ` <span style="font-size:11px;font-weight:400;color:var(--color-text-secondary);">· raised ${fmtShortDate(job.reportedDate)}</span>` : ''}</p>
             <p class="text-muted" style="font-size:12px;margin-bottom:1px;">${job ? (job.property || '') : ''}</p>
             <p class="text-muted" style="font-size:12px;">${job ? (job.description || '') : ''}</p>
           </div>
@@ -2984,14 +2990,29 @@ async function toggleAbsenceType(id, currentlyActive) {
   if (synced) setSyncStatus('office', 'synced', 'Absence type updated');
 }
 
+function changeDailyViewDate(delta) {
+  const d = new Date(dailyViewDate + 'T12:00:00');
+  d.setDate(d.getDate() + delta);
+  dailyViewDate = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  renderDailyView();
+}
+
+function jumpToTodayDailyView() {
+  dailyViewDate = new Date().toISOString().slice(0, 10);
+  renderDailyView();
+}
+
 function renderDailyView() {
   const el = document.getElementById('daily-view-list');
   const heading = document.getElementById('daily-view-heading');
+  const todayBtn = document.getElementById('daily-view-today-btn');
   if (!el) return;
 
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = dailyViewDate;
+  const isActuallyToday = todayStr === new Date().toISOString().slice(0, 10);
   const todayFmt = fmtDate(todayStr);
   if (heading) heading.textContent = todayFmt;
+  if (todayBtn) todayBtn.style.display = isActuallyToday ? 'none' : 'inline-block';
 
   const today = new Date(); today.setHours(0,0,0,0);
   const prevMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
@@ -3179,7 +3200,7 @@ function populateDailyEntryJobDropdown() {
 async function submitDailyEntry() {
   const worker   = document.getElementById('dae-worker').value;
   const jobId    = document.getElementById('dae-job').value;
-  const date     = new Date().toISOString().slice(0,10);
+  const date     = dailyViewDate;
   const hours    = parseFloat(document.getElementById('dae-hours').value);
   const comments = document.getElementById('dae-comments').value;
   if (!worker || !jobId || isNaN(hours)) { alert('Please fill in all required fields.'); return; }
