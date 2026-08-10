@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- BUILD MARKER: v79-15 (WO Hours: added live search suggestions dropdown, sort changed to WO number high-to-low) — check this line via view-source against the file uploaded to Claude to confirm they match -->
+<!-- BUILD MARKER: v79-16 (WO Hours: search suggestion description truncation raised to 100 chars, results cards now show full untruncated property) — check this line via view-source against the file uploaded to Claude to confirm they match -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Timesheet App</title>
@@ -2209,7 +2209,7 @@ function renderWOHoursTab() {
         <div class="row-between card-header">
           <div>
             <p class="section-heading" style="margin-bottom:2px;">${jid}</p>
-            <p class="text-muted" style="font-size:12px;margin-bottom:1px;">${propLabel(job ? job.property : '', 60)}</p>
+            <p class="text-muted" style="font-size:12px;margin-bottom:1px;">${job ? (job.property || '') : ''}</p>
             <p class="text-muted" style="font-size:12px;">${job ? (job.description || '') : ''}</p>
           </div>
           <div style="text-align:right;white-space:nowrap;">
@@ -3821,7 +3821,7 @@ function woHoursSearchSuggest() {
   box.innerHTML = matches.map(j => `
     <div onmousedown="event.preventDefault();woHoursPickSuggestion('${j.id}')" style="padding:8px 12px;cursor:pointer;border-bottom:0.5px solid var(--color-border-tertiary);" onmouseover="this.style.background='var(--color-background-secondary)'" onmouseout="this.style.background='transparent'">
       <div style="font-size:12px;font-weight:600;">${j.id}</div>
-      <div style="font-size:11px;color:var(--color-text-secondary);">${propLabel(j.property, 45)}${j.description ? ' · ' + propLabel(j.description, 45) : ''}</div>
+      <div style="font-size:11px;color:var(--color-text-secondary);">${propLabel(j.property, 45)}${j.description ? ' · ' + propLabel(j.description, 100) : ''}</div>
     </div>`).join('');
   box.style.display = 'block';
 }
