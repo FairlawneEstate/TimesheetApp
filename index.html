@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- BUILD MARKER: v79-24 (found the real cause of the "From works, To doesn't" typing bug: native .min attribute was only ever set on To fields, never From — removed it, ordering now enforced purely in JS after the fact) — check this line via view-source against the file uploaded to Claude to confirm they match -->
+<!-- BUILD MARKER: v79-25 (added autocomplete="off" to all date fields — the year "autofill fighting your typing" symptom is Chrome's field-history autofill, not a rendering bug) — check this line via view-source against the file uploaded to Claude to confirm they match -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Timesheet App</title>
@@ -332,7 +332,7 @@ textarea { height: 60px; resize: none; }
         <div class="grid2">
           <div>
             <label>Date</label>
-            <input type="date" id="entry-date" onchange="renderEntriesByDate(); updateHoursPlaceholder()">
+            <input type="date" id="entry-date" autocomplete="off" onchange="renderEntriesByDate(); updateHoursPlaceholder()">
           </div>
           <div>
             <label>Hours</label>
@@ -527,7 +527,7 @@ textarea { height: 60px; resize: none; }
             <div class="grid2" style="margin-top:10px;">
               <div>
                 <label style="margin-top:0;">Date</label>
-                <input type="date" id="oae-date">
+                <input type="date" id="oae-date" autocomplete="off">
               </div>
               <div>
                 <label style="margin-top:0;">Hours</label>
@@ -559,11 +559,11 @@ textarea { height: 60px; resize: none; }
             <div class="grid2" style="margin-top:10px;">
               <div>
                 <label style="margin-top:0;">From date</label>
-                <input type="date" id="mae-date-from" onchange="if (document.getElementById('mae-date-to').value && document.getElementById('mae-date-to').value < this.value) document.getElementById('mae-date-to').value = this.value;">
+                <input type="date" id="mae-date-from" autocomplete="off" onchange="if (document.getElementById('mae-date-to').value && document.getElementById('mae-date-to').value < this.value) document.getElementById('mae-date-to').value = this.value;">
               </div>
               <div>
                 <label style="margin-top:0;">To date</label>
-                <input type="date" id="mae-date-to">
+                <input type="date" id="mae-date-to" autocomplete="off">
               </div>
             </div>
             <div style="margin-top:10px;">
@@ -584,11 +584,11 @@ textarea { height: 60px; resize: none; }
             </div>
             <div>
               <label style="margin-top:0;">From</label>
-              <input type="date" id="oe-date-from" onchange="syncDateRangeLimits()">
+              <input type="date" id="oe-date-from" autocomplete="off" onchange="syncDateRangeLimits()">
             </div>
             <div>
               <label style="margin-top:0;">To</label>
-              <input type="date" id="oe-date-to" onchange="syncDateRangeLimits()">
+              <input type="date" id="oe-date-to" autocomplete="off" onchange="syncDateRangeLimits()">
             </div>
             <div>
               <button class="btn btn-primary" onclick="renderOfficeEntries()" style="width:100%;margin-top:0;">Search</button>
@@ -661,11 +661,11 @@ textarea { height: 60px; resize: none; }
           <div style="padding:0 1rem;display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;margin-bottom:1rem;">
             <div>
               <label style="margin-top:0;">Approved / Declined from</label>
-              <input type="date" id="ot-date-from">
+              <input type="date" id="ot-date-from" autocomplete="off">
             </div>
             <div>
               <label style="margin-top:0;">To</label>
-              <input type="date" id="ot-date-to">
+              <input type="date" id="ot-date-to" autocomplete="off">
             </div>
             <div>
               <button class="btn btn-primary" onclick="renderOvertimeTab()" style="width:100%;margin-top:0;">Search</button>
