@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- BUILD MARKER: v79-23 (CSS-only attempt at native date input typing glitch — hides spin buttons, repositions calendar icon to free up internal segment space) — check this line via view-source against the file uploaded to Claude to confirm they match -->
+<!-- BUILD MARKER: v79-24 (found the real cause of the "From works, To doesn't" typing bug: native .min attribute was only ever set on To fields, never From — removed it, ordering now enforced purely in JS after the fact) — check this line via view-source against the file uploaded to Claude to confirm they match -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Timesheet App</title>
@@ -559,7 +559,7 @@ textarea { height: 60px; resize: none; }
             <div class="grid2" style="margin-top:10px;">
               <div>
                 <label style="margin-top:0;">From date</label>
-                <input type="date" id="mae-date-from" onchange="document.getElementById('mae-date-to').min = this.value; if (document.getElementById('mae-date-to').value && document.getElementById('mae-date-to').value < this.value) document.getElementById('mae-date-to').value = this.value;">
+                <input type="date" id="mae-date-from" onchange="if (document.getElementById('mae-date-to').value && document.getElementById('mae-date-to').value < this.value) document.getElementById('mae-date-to').value = this.value;">
               </div>
               <div>
                 <label style="margin-top:0;">To date</label>
@@ -2763,7 +2763,6 @@ function toggleMultiAddEntry() {
     const today = new Date().toISOString().slice(0,10);
     document.getElementById('mae-date-from').value = today;
     document.getElementById('mae-date-to').value = today;
-    document.getElementById('mae-date-to').min = today;
     document.getElementById('mae-comments').value = '';
     const workerSel = document.getElementById('mae-worker');
     const active = workers.filter(w => w.active !== false && w.active !== 'FALSE');
@@ -3999,9 +3998,10 @@ function syncDateRangeLimits() {
   const fromEl = document.getElementById('oe-date-from');
   const toEl   = document.getElementById('oe-date-to');
   if (!fromEl || !toEl) return;
-  if (fromEl.value) toEl.min = fromEl.value;
-  // If From is moved past the current To, push To forward to match —
-  // From is never restricted from moving forward in the first place.
+  // Deliberately no native .min constraint here — setting one on "To" was
+  // interfering with typing a date into it (Chromium's date control gets
+  // glitchy when a partially-typed value momentarily looks out of range).
+  // Ordering is enforced purely in JS instead, after the fact:
   if (fromEl.value && toEl.value && fromEl.value > toEl.value) {
     toEl.value = fromEl.value;
   }
