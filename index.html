@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- BUILD MARKER: v79-25 (added autocomplete="off" to all date fields — the year "autofill fighting your typing" symptom is Chrome's field-history autofill, not a rendering bug) — check this line via view-source against the file uploaded to Claude to confirm they match -->
+<!-- BUILD MARKER: v79-26 (fixed To-date resetting mid-typing: our own push-forward correction was firing on Chromium's premature/garbage year value during typing — now guarded to only trust plausible-looking years, shared via one enforceDateOrder helper) — check this line via view-source against the file uploaded to Claude to confirm they match -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Timesheet App</title>
@@ -559,7 +559,7 @@ textarea { height: 60px; resize: none; }
             <div class="grid2" style="margin-top:10px;">
               <div>
                 <label style="margin-top:0;">From date</label>
-                <input type="date" id="mae-date-from" autocomplete="off" onchange="if (document.getElementById('mae-date-to').value && document.getElementById('mae-date-to').value < this.value) document.getElementById('mae-date-to').value = this.value;">
+                <input type="date" id="mae-date-from" autocomplete="off" onchange="enforceDateOrder('mae-date-from', 'mae-date-to')">
               </div>
               <div>
                 <label style="margin-top:0;">To date</label>
@@ -3994,17 +3994,29 @@ function rjPropCheck(prefix) {
   else { rjPropHide(cid); }
 }
 
-function syncDateRangeLimits() {
-  const fromEl = document.getElementById('oe-date-from');
-  const toEl   = document.getElementById('oe-date-to');
+// Chromium's native date input fires 'change' as soon as day+month+year all
+// have SOME value — including while the year is only partially typed, which
+// can briefly report a garbage year like "0002". Treating that as a real
+// date and auto-correcting against it was the actual cause of "To" resetting
+// to match "From" mid-typing. This guard only trusts values with a
+// plausible-looking year before applying any correction.
+function isPlausibleDate(iso) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return false;
+  const year = parseInt(iso.slice(0, 4), 10);
+  return year >= 1900 && year <= 2100;
+}
+
+function enforceDateOrder(fromId, toId) {
+  const fromEl = document.getElementById(fromId);
+  const toEl   = document.getElementById(toId);
   if (!fromEl || !toEl) return;
-  // Deliberately no native .min constraint here — setting one on "To" was
-  // interfering with typing a date into it (Chromium's date control gets
-  // glitchy when a partially-typed value momentarily looks out of range).
-  // Ordering is enforced purely in JS instead, after the fact:
-  if (fromEl.value && toEl.value && fromEl.value > toEl.value) {
+  if (isPlausibleDate(fromEl.value) && isPlausibleDate(toEl.value) && fromEl.value > toEl.value) {
     toEl.value = fromEl.value;
   }
+}
+
+function syncDateRangeLimits() {
+  enforceDateOrder('oe-date-from', 'oe-date-to');
 }
 
 function renderWeekApprovalsTab() {
