@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- BUILD MARKER: v79-19 (Daily View: added prev/next day arrows + Today shortcut, add-entry now logs against viewed day; WO Hours: shows WO's raised/reported date next to WO number) — check this line via view-source against the file uploaded to Claude to confirm they match -->
+<!-- BUILD MARKER: v79-20 (Worker's own week table: applied fixed column widths across header, real entries, and both OT-row variants — Description no longer scales sideways, Comments no longer grows tall unbounded) — check this line via view-source against the file uploaded to Claude to confirm they match -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Timesheet App</title>
@@ -1579,18 +1579,18 @@ function renderWeek(wc) {
           <div class="day-date">${fmtShortDate(dayStr)}</div>
           ${dayCellContent}
         </td>` : ''}
-        <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);${otIdx === 0 ? '' : 'border-left:0.5px solid var(--color-border-tertiary);'}font-size:12px;vertical-align:middle;width:160px;">
+        <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);${otIdx === 0 ? '' : 'border-left:0.5px solid var(--color-border-tertiary);'}font-size:12px;vertical-align:middle;width:90px;overflow:hidden;">
           <div style="font-weight:600;">${o.jobId}</div>
           <span class="badge-amended-sm" style="${statusStyle}">${statusLabel}</span>
         </td>
-        <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:middle;width:200px;">${propLabel(o.property, 35)}</td>
-        <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:middle;">${o.description || ''}</td>
+        <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:middle;width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${propLabel(o.property, 35)}</td>
+        <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:middle;width:380px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${o.description || ''}</td>
         <td style="padding:5px 6px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-weight:500;text-align:center;vertical-align:middle;white-space:nowrap;width:46px;">${o.hours}h</td>
-        <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-style:italic;color:var(--color-text-secondary);vertical-align:middle;">
+        <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-style:italic;color:var(--color-text-secondary);vertical-align:middle;width:220px;overflow:hidden;">
           ${o.timeRange || ''}
           ${o.reviewComment ? `<div style="font-style:italic;font-size:10px;margin-top:2px;color:var(--color-text-secondary);">${o.reviewComment}</div>` : ''}
         </td>
-        <td style="padding:4px 8px;vertical-align:middle;width:60px;text-align:right;">
+        <td style="padding:4px 8px;vertical-align:middle;width:110px;text-align:right;">
           ${o.status === 'pending' ? `<button class="btn btn-sm" style="color:var(--color-text-error);border-color:var(--color-border-error);font-size:11px;" onclick="deleteOTRequest('${o.id}')">Delete</button>` : ''}
         </td>
       </tr>`;
@@ -1611,27 +1611,27 @@ function renderWeek(wc) {
           <div class="day-date">${fmtShortDate(dayStr)}</div>
           ${dayCellContent}
         </td>` : ''}
-        <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;vertical-align:middle;width:160px;">
+        <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;vertical-align:middle;width:90px;overflow:hidden;">
           <div style="font-weight:600;">${e.jobId}</div>
           ${amended && !e.isOvertime ? `<span class="badge-amended-sm">Amended</span>` : ''}
           ${isPending ? `<span class="badge-amended-sm" style="background:var(--color-background-info);color:var(--color-text-info);">Pending</span>` : ''}
           ${e.isOvertime ? `<span class="badge-amended-sm" style="background:var(--color-background-success);color:var(--color-text-success);">⏱ Overtime</span>` : ''}
         </td>
-        <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:middle;width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+        <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:middle;width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
           ${propLabel(jobProperty, 35)}
         </td>
-        <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:middle;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+        <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:middle;width:380px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
           ${jobDescription}
         </td>
         <td style="padding:5px 6px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-weight:500;text-align:center;vertical-align:middle;white-space:nowrap;width:46px;">
           ${e.hours}h
         </td>
-        <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-style:italic;color:var(--color-text-secondary);vertical-align:middle;">
+        <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-style:italic;color:var(--color-text-secondary);vertical-align:middle;width:220px;overflow:hidden;word-wrap:break-word;">
           ${e.overtimeStart ? `<span style="font-style:normal;font-weight:500;color:var(--color-text-success);">${e.overtimeStart} – ${e.overtimeEnd}</span> ` : ''}
           ${e.comments || ''}
           ${amended ? `<div class="audit-log-sm" style="font-style:normal;">${lastAmend.note === 'Created by Office' ? 'Created by' : e.isOvertime ? 'Approved by' : 'Amended by'} ${lastAmend.by} · ${lastAmend.at}${e.isOvertime && lastAmend.note && lastAmend.note.includes('): ') ? `<span style="font-style:italic;"> — ${lastAmend.note.slice(lastAmend.note.indexOf('): ') + 3)}</span>` : ''}</div>` : ''}
         </td>
-        <td style="padding:4px 8px;text-align:right;vertical-align:middle;width:160px;white-space:nowrap;">
+        <td style="padding:4px 8px;text-align:right;vertical-align:middle;width:110px;white-space:nowrap;">
           ${isLocked ? '' : `<button class="btn btn-sm" onclick="toggleEditWeek('${e.id}')">Edit</button>
             <button class="btn btn-sm" style="color:var(--color-text-error);border-color:var(--color-border-error);margin-left:4px;" onclick="deleteEntry('${e.id}', false)">Delete</button>`}
         </td>
@@ -1697,18 +1697,18 @@ function renderWeek(wc) {
           <div class="day-name">${dayNames[i]}</div>
           <div class="day-date">${fmtShortDate(dayStr)}</div>
         </td>
-        <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;vertical-align:middle;width:160px;">
+        <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;vertical-align:middle;width:90px;overflow:hidden;">
           <div style="font-weight:600;">${o.jobId}</div>
           <span class="badge-amended-sm" style="${statusStyle}">${statusLabel}</span>
         </td>
-        <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:middle;width:200px;">${propLabel(o.property, 35)}</td>
-        <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:middle;">${o.description || ''}</td>
+        <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:middle;width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${propLabel(o.property, 35)}</td>
+        <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-secondary);vertical-align:middle;width:380px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${o.description || ''}</td>
         <td style="padding:5px 6px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-weight:500;text-align:center;vertical-align:middle;white-space:nowrap;width:46px;">${o.hours}h</td>
-        <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-style:italic;color:var(--color-text-secondary);vertical-align:middle;">
+        <td style="padding:5px 10px;border-right:0.5px solid var(--color-border-tertiary);font-size:12px;font-style:italic;color:var(--color-text-secondary);vertical-align:middle;width:220px;overflow:hidden;">
           ${o.timeRange || ''}
           ${o.reviewComment ? `<div style="font-style:italic;font-size:10px;margin-top:2px;color:var(--color-text-secondary);">${o.reviewComment}</div>` : ''}
         </td>
-        <td style="padding:4px 8px;vertical-align:middle;width:60px;text-align:right;">
+        <td style="padding:4px 8px;vertical-align:middle;width:110px;text-align:right;">
           ${o.status === 'pending' ? `<button class="btn btn-sm" style="color:var(--color-text-error);border-color:var(--color-border-error);font-size:11px;" onclick="deleteOTRequest('${o.id}')">Delete</button>` : ''}
         </td>
       </tr>`;
@@ -1727,16 +1727,16 @@ function renderWeek(wc) {
         ${weekSub && weekSub.status === 'declined' ? `<span class="badge" style="background:#fdecea;color:var(--color-text-error);">Declined — resubmit when ready</span>` : ''}
       </div>
       <div class="week-table-wrap">
-      <table class="week-table">
+      <table class="week-table" style="table-layout:fixed;width:100%;">
         <thead>
           <tr>
-            <th style="width:100px;">Day</th>
-            <th style="width:160px;">W/O Number</th>
-            <th style="width:130px;">Property</th>
-            <th>Description</th>
+            <th style="width:70px;">Day</th>
+            <th style="width:90px;">W/O Number</th>
+            <th style="width:180px;">Property</th>
+            <th style="width:380px;">Description</th>
             <th style="width:46px;text-align:center;">Hrs</th>
-            <th>Comments</th>
-            <th style="width:60px;"></th>
+            <th style="width:220px;">Comments</th>
+            <th style="width:110px;"></th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
