@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- BUILD MARKER: v79-26 (fixed To-date resetting mid-typing: our own push-forward correction was firing on Chromium's premature/garbage year value during typing — now guarded to only trust plausible-looking years, shared via one enforceDateOrder helper) — check this line via view-source against the file uploaded to Claude to confirm they match -->
+<!-- BUILD MARKER: v79-27 (switched date-range correction from onchange to onblur on Time Entries + Multi-Add From/To fields — onchange fires prematurely mid-typing in Chromium, blur only fires once editing is actually done; Search button already handles applying the filter separately, unaffected) — check this line via view-source against the file uploaded to Claude to confirm they match -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Timesheet App</title>
@@ -559,7 +559,7 @@ textarea { height: 60px; resize: none; }
             <div class="grid2" style="margin-top:10px;">
               <div>
                 <label style="margin-top:0;">From date</label>
-                <input type="date" id="mae-date-from" autocomplete="off" onchange="enforceDateOrder('mae-date-from', 'mae-date-to')">
+                <input type="date" id="mae-date-from" autocomplete="off" onblur="enforceDateOrder('mae-date-from', 'mae-date-to')">
               </div>
               <div>
                 <label style="margin-top:0;">To date</label>
@@ -584,11 +584,11 @@ textarea { height: 60px; resize: none; }
             </div>
             <div>
               <label style="margin-top:0;">From</label>
-              <input type="date" id="oe-date-from" autocomplete="off" onchange="syncDateRangeLimits()">
+              <input type="date" id="oe-date-from" autocomplete="off" onblur="syncDateRangeLimits()">
             </div>
             <div>
               <label style="margin-top:0;">To</label>
-              <input type="date" id="oe-date-to" autocomplete="off" onchange="syncDateRangeLimits()">
+              <input type="date" id="oe-date-to" autocomplete="off" onblur="syncDateRangeLimits()">
             </div>
             <div>
               <button class="btn btn-primary" onclick="renderOfficeEntries()" style="width:100%;margin-top:0;">Search</button>
