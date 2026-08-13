@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- BUILD MARKER: v79-21 (all 7 office date fields converted to masked dd/mm/yyyy inputs with a calendar-picker button, fixing the native Chromium year-typing bug) — check this line via view-source against the file uploaded to Claude to confirm they match -->
+<!-- BUILD MARKER: v79-22 (masked date fields now select-all on focus/click, fixing the cursor-jumps-to-end bug when editing mid-string — click and type overwrites cleanly instead) — check this line via view-source against the file uploaded to Claude to confirm they match -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Timesheet App</title>
@@ -3797,6 +3797,17 @@ function makeMaskedDateInput(id) {
       isoVal = '';
     }
   });
+
+  // Select the whole value on focus/click so typing anywhere in the field
+  // simply overwrites it and starts a fresh date, rather than requiring
+  // precise mid-string cursor editing (which masked inputs handle badly).
+  // Deferred a tick because the browser's own click-to-place-caret behavior
+  // runs after 'focus' and would otherwise immediately undo the selection.
+  function selectAllDeferred() {
+    setTimeout(function () { input.select(); }, 0);
+  }
+  input.addEventListener('focus', selectAllDeferred);
+  input.addEventListener('click', selectAllDeferred);
 
   Object.defineProperty(input, 'value', {
     configurable: true,
