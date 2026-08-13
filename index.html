@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- BUILD MARKER: v79-22 (masked date fields now select-all on focus/click, fixing the cursor-jumps-to-end bug when editing mid-string — click and type overwrites cleanly instead) — check this line via view-source against the file uploaded to Claude to confirm they match -->
+<!-- BUILD MARKER: v79-20-rollback (reverted the masked date input experiment — back to native browser date pickers on all fields, everything else from v79-20 retained) — check this line via view-source against the file uploaded to Claude to confirm they match -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Timesheet App</title>
@@ -513,10 +513,7 @@ textarea { height: 60px; resize: none; }
             <div class="grid2" style="margin-top:10px;">
               <div>
                 <label style="margin-top:0;">Date</label>
-                <div style="position:relative;display:flex;gap:4px;">
-                  <input type="date" id="oae-date" style="flex:1;">
-                  <button type="button" id="oae-date-btn" class="btn btn-sm" style="padding:0 10px;">📅</button>
-                </div>
+                <input type="date" id="oae-date">
               </div>
               <div>
                 <label style="margin-top:0;">Hours</label>
@@ -548,17 +545,11 @@ textarea { height: 60px; resize: none; }
             <div class="grid2" style="margin-top:10px;">
               <div>
                 <label style="margin-top:0;">From date</label>
-                <div style="position:relative;display:flex;gap:4px;">
-                  <input type="date" id="mae-date-from" style="flex:1;" onchange="document.getElementById('mae-date-to').min = this.value; if (document.getElementById('mae-date-to').value && document.getElementById('mae-date-to').value < this.value) document.getElementById('mae-date-to').value = this.value;">
-                  <button type="button" id="mae-date-from-btn" class="btn btn-sm" style="padding:0 10px;">📅</button>
-                </div>
+                <input type="date" id="mae-date-from" onchange="document.getElementById('mae-date-to').min = this.value; if (document.getElementById('mae-date-to').value && document.getElementById('mae-date-to').value < this.value) document.getElementById('mae-date-to').value = this.value;">
               </div>
               <div>
                 <label style="margin-top:0;">To date</label>
-                <div style="position:relative;display:flex;gap:4px;">
-                  <input type="date" id="mae-date-to" style="flex:1;">
-                  <button type="button" id="mae-date-to-btn" class="btn btn-sm" style="padding:0 10px;">📅</button>
-                </div>
+                <input type="date" id="mae-date-to">
               </div>
             </div>
             <div style="margin-top:10px;">
@@ -579,17 +570,11 @@ textarea { height: 60px; resize: none; }
             </div>
             <div>
               <label style="margin-top:0;">From</label>
-              <div style="position:relative;display:flex;gap:4px;">
-                <input type="date" id="oe-date-from" style="flex:1;" onchange="syncDateRangeLimits()">
-                <button type="button" id="oe-date-from-btn" class="btn btn-sm" style="padding:0 10px;">📅</button>
-              </div>
+              <input type="date" id="oe-date-from" onchange="syncDateRangeLimits()">
             </div>
             <div>
               <label style="margin-top:0;">To</label>
-              <div style="position:relative;display:flex;gap:4px;">
-                <input type="date" id="oe-date-to" style="flex:1;" onchange="syncDateRangeLimits()">
-                <button type="button" id="oe-date-to-btn" class="btn btn-sm" style="padding:0 10px;">📅</button>
-              </div>
+              <input type="date" id="oe-date-to" onchange="syncDateRangeLimits()">
             </div>
             <div>
               <button class="btn btn-primary" onclick="renderOfficeEntries()" style="width:100%;margin-top:0;">Search</button>
@@ -662,17 +647,11 @@ textarea { height: 60px; resize: none; }
           <div style="padding:0 1rem;display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;margin-bottom:1rem;">
             <div>
               <label style="margin-top:0;">Approved / Declined from</label>
-              <div style="position:relative;display:flex;gap:4px;">
-                <input type="date" id="ot-date-from" style="flex:1;">
-                <button type="button" id="ot-date-from-btn" class="btn btn-sm" style="padding:0 10px;">📅</button>
-              </div>
+              <input type="date" id="ot-date-from">
             </div>
             <div>
               <label style="margin-top:0;">To</label>
-              <div style="position:relative;display:flex;gap:4px;">
-                <input type="date" id="ot-date-to" style="flex:1;">
-                <button type="button" id="ot-date-to-btn" class="btn btn-sm" style="padding:0 10px;">📅</button>
-              </div>
+              <input type="date" id="ot-date-to">
             </div>
             <div>
               <button class="btn btn-primary" onclick="renderOvertimeTab()" style="width:100%;margin-top:0;">Search</button>
@@ -3730,123 +3709,6 @@ function initInlineJobSelects() {
   });
 }
 // ── Searchable Select — wraps any native <select> ────────────────
-// ── Masked date input (replaces native <input type="date"> typing) ─
-// Chromium's native date input has a well-known bug: mid-typing the year
-// segment, the browser briefly treats the whole value as invalid and resets
-// the day/month back to placeholder state. This can't be intercepted via JS
-// since it happens inside the browser before any event fires. Fix: convert
-// the field to a masked dd/mm/yyyy text input we fully control, while still
-// exposing the exact same ISO (YYYY-MM-DD) .value contract everything else
-// in the app already relies on — so no other code needs to change.
-function makeMaskedDateInput(id) {
-  const input = document.getElementById(id);
-  if (!input || input._masked) return;
-  input._masked = true;
-
-  const nativeDesc = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
-  const nativeGet = nativeDesc.get;
-  const nativeSet = nativeDesc.set;
-
-  const startingVal = nativeGet.call(input);
-  let isoVal = /^\d{4}-\d{2}-\d{2}$/.test(startingVal) ? startingVal : '';
-
-  function isoToDisplay(iso) {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return '';
-    const [y, m, d] = iso.split('-');
-    return d + '/' + m + '/' + y;
-  }
-
-  function digitsToIso(digits) {
-    if (digits.length !== 8) return '';
-    const d = digits.slice(0, 2), m = digits.slice(2, 4), y = digits.slice(4, 8);
-    const dd = parseInt(d, 10), mm = parseInt(m, 10), yy = parseInt(y, 10);
-    if (dd < 1 || dd > 31 || mm < 1 || mm > 12 || yy < 1900) return '';
-    const dt = new Date(yy, mm - 1, dd);
-    if (dt.getFullYear() !== yy || dt.getMonth() !== mm - 1 || dt.getDate() !== dd) return '';
-    return y + '-' + m + '-' + d;
-  }
-
-  function formatFromDigits(digits) {
-    let out = digits.slice(0, 2);
-    if (digits.length > 2) out += '/' + digits.slice(2, 4);
-    if (digits.length > 4) out += '/' + digits.slice(4, 8);
-    return out;
-  }
-
-  input.type = 'text';
-  input.placeholder = 'dd/mm/yyyy';
-  input.setAttribute('maxlength', '10');
-  input.setAttribute('inputmode', 'numeric');
-  input.autocomplete = 'off';
-  nativeSet.call(input, isoToDisplay(isoVal));
-
-  input.addEventListener('input', function () {
-    const digits = nativeGet.call(input).replace(/\D/g, '').slice(0, 8);
-    const formatted = formatFromDigits(digits);
-    nativeSet.call(input, formatted);
-    input.setSelectionRange(formatted.length, formatted.length);
-    isoVal = digitsToIso(digits);
-    if (isoVal) input.dispatchEvent(new Event('change', { bubbles: true }));
-  });
-
-  input.addEventListener('blur', function () {
-    // An incomplete typed date is cleared rather than left half-formed
-    const digits = nativeGet.call(input).replace(/\D/g, '');
-    if (digits.length > 0 && digits.length < 8) {
-      nativeSet.call(input, '');
-      isoVal = '';
-    }
-  });
-
-  // Select the whole value on focus/click so typing anywhere in the field
-  // simply overwrites it and starts a fresh date, rather than requiring
-  // precise mid-string cursor editing (which masked inputs handle badly).
-  // Deferred a tick because the browser's own click-to-place-caret behavior
-  // runs after 'focus' and would otherwise immediately undo the selection.
-  function selectAllDeferred() {
-    setTimeout(function () { input.select(); }, 0);
-  }
-  input.addEventListener('focus', selectAllDeferred);
-  input.addEventListener('click', selectAllDeferred);
-
-  Object.defineProperty(input, 'value', {
-    configurable: true,
-    get() { return isoVal; },
-    set(v) {
-      isoVal = (v && /^\d{4}-\d{2}-\d{2}$/.test(v)) ? v : '';
-      nativeSet.call(input, isoToDisplay(isoVal));
-    }
-  });
-}
-
-// Wires a calendar-icon button to a masked field via a hidden native date
-// input, so clicking still opens a real picker (fixes nothing for typing,
-// but typing no longer needs the native control at all).
-function makeDatePickerButton(maskedId, btnId) {
-  const masked = document.getElementById(maskedId);
-  const btn = document.getElementById(btnId);
-  if (!masked || !btn) return;
-  const hidden = document.createElement('input');
-  hidden.type = 'date';
-  hidden.style.position = 'absolute';
-  hidden.style.opacity = '0';
-  hidden.style.width = '1px';
-  hidden.style.height = '1px';
-  hidden.style.pointerEvents = 'none';
-  btn.parentElement.style.position = btn.parentElement.style.position || 'relative';
-  btn.parentElement.appendChild(hidden);
-  hidden.addEventListener('change', function () {
-    masked.value = hidden.value;
-    masked.dispatchEvent(new Event('change', { bubbles: true }));
-  });
-  btn.addEventListener('click', function (e) {
-    e.preventDefault();
-    if (masked.value) hidden.value = masked.value;
-    if (typeof hidden.showPicker === 'function') hidden.showPicker();
-    else hidden.focus();
-  });
-}
-
 function ssAttach(selId, placeholder) {
   var sel = document.getElementById(selId);
   if (!sel || sel._ssAttached) return;
@@ -4242,17 +4104,6 @@ async function reviewWeek(id, status, btn) {
     throw err;
   }
 }
-
-// ── Convert office-side date inputs to masked dd/mm/yyyy fields ────
-// Fixes the native Chromium date-input bug where typing the year resets
-// the day/month back to placeholder mid-entry. See makeMaskedDateInput.
-[
-  'oae-date', 'mae-date-from', 'mae-date-to',
-  'oe-date-from', 'oe-date-to', 'ot-date-from', 'ot-date-to'
-].forEach(function (id) {
-  makeMaskedDateInput(id);
-  makeDatePickerButton(id, id + '-btn');
-});
 
 </script>
 </body>
