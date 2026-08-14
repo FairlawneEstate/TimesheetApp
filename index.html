@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- BUILD MARKER: v79-28 (Enter key now triggers Search on Time Entries filter: worker dropdown, From, and To fields) — check this line via view-source against the file uploaded to Claude to confirm they match -->
+<!-- BUILD MARKER: v79-30 (Overtime tab From/To fields now enforce date order too, via the same shared enforceDateOrder helper used on Time Entries + Multi-Add) — check this line via view-source against the file uploaded to Claude to confirm they match -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Timesheet App</title>
@@ -661,11 +661,11 @@ textarea { height: 60px; resize: none; }
           <div style="padding:0 1rem;display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;margin-bottom:1rem;">
             <div>
               <label style="margin-top:0;">Approved / Declined from</label>
-              <input type="date" id="ot-date-from" autocomplete="off">
+              <input type="date" id="ot-date-from" autocomplete="off" onblur="enforceDateOrder('ot-date-from', 'ot-date-to')">
             </div>
             <div>
               <label style="margin-top:0;">To</label>
-              <input type="date" id="ot-date-to" autocomplete="off">
+              <input type="date" id="ot-date-to" autocomplete="off" onblur="enforceDateOrder('ot-date-from', 'ot-date-to')">
             </div>
             <div>
               <button class="btn btn-primary" onclick="renderOvertimeTab()" style="width:100%;margin-top:0;">Search</button>
