@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- BUILD MARKER: v79-32 (Chris Rosier gets a "Weekly Approvals" toggle button in his worker view, reusing the office approvals screen in place - no second login needed) -->
+<!-- BUILD MARKER: V80-01 (Comments now required for Recurring Jobs, matching the existing Property requirement — applies to worker, office, and daily add-entry forms) -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Timesheet App</title>
@@ -342,7 +342,7 @@ textarea { height: 60px; resize: none; }
             </div>
           </div>
           <div id="rj-prop-worker" class="rj-prop-wrap"></div>
-          <label>Comments (optional)</label>
+          <label id="entry-comments-label">Comments (optional)</label>
           <textarea id="entry-comments" placeholder="What was done..."></textarea>
           <div class="form-footer">
             <button class="btn btn-primary full-width" id="save-btn" onclick="submitEntry()">Save entry</button>
@@ -496,7 +496,7 @@ textarea { height: 60px; resize: none; }
               </div>
               <div>
                 <div id="rj-prop-dae" class="rj-prop-wrap"></div>
-                <label style="margin-top:0;">Comments (optional)</label>
+                <label id="dae-comments-label" style="margin-top:0;">Comments (optional)</label>
                 <input type="text" id="dae-comments" placeholder="What was done...">
               </div>
             </div>
@@ -546,7 +546,7 @@ textarea { height: 60px; resize: none; }
             </div>
             <div style="margin-top:10px;">
               <div id="rj-prop-oae" class="rj-prop-wrap"></div>
-              <label style="margin-top:0;">Comments (optional)</label>
+              <label id="oae-comments-label" style="margin-top:0;">Comments (optional)</label>
               <textarea id="oae-comments" placeholder="What was done..."></textarea>
             </div>
             <div style="display:flex;gap:8px;margin-top:0.75rem;">
@@ -1362,6 +1362,7 @@ async function submitEntry() {
   const jobObj = jobs.find(j => j.id === jobId) || recurringJobs.find(j => j.id === jobId) || absenceTypes.find(a => a.id === jobId);
   const entry = { id: uid(), worker: currentWorker, jobId, date, hours, comments, amendments: [], createdAt: new Date().toISOString(), property: isRecurringJobId(jobId) ? (rjPropGetValue('rj-prop-worker') || (jobObj ? jobObj.property : '')) : (jobObj ? jobObj.property : ''), description: jobObj ? jobObj.description : '' };
   if (isRecurringJobId(jobId) && !rjPropGetValue('rj-prop-worker')) { alert('Please select a property for this recurring job.'); return; }
+  if (isRecurringJobId(jobId) && !comments.trim()) { alert('Please add a comment for this recurring job.'); return; }
 
   if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
   isSubmittingEntry = true;
@@ -2768,6 +2769,8 @@ function toggleOfficeAddEntry() {
     const active = workers.filter(w => w.active !== false && w.active !== 'FALSE');
     workerSel.innerHTML = '<option value="">Select worker...</option>' + active.map(w => `<option value="${w.name}">${w.name}</option>`).join('');
     document.getElementById('oae-job').innerHTML = '<option value="">Select worker first...</option>';
+    const oaeCommentsLabel = document.getElementById('oae-comments-label');
+    if (oaeCommentsLabel) oaeCommentsLabel.textContent = 'Comments (optional)';
     // Close multi-add if it's open, so only one form shows at a time
     const maeForm = document.getElementById('office-multi-add-form');
     if (maeForm && maeForm.style.display !== 'none') toggleMultiAddEntry();
@@ -2939,6 +2942,7 @@ async function submitOfficeEntry() {
     performedBy: currentOfficeUser || 'Office'
   };
   if (isRecurringJobId(jobId) && !rjPropGetValue('rj-prop-oae')) { alert('Please select a property for this recurring job.'); return; }
+  if (isRecurringJobId(jobId) && !comments.trim()) { alert('Please add a comment for this recurring job.'); return; }
   if (isOvertime_oe) { showOvertimeModal(entry_oe, isWeekend_oe); return; }
   const entry = entry_oe;
   entries.push(entry);
@@ -3211,6 +3215,8 @@ function toggleDailyAddEntry() {
     const active = workers.filter(w => w.active !== false && w.active !== 'FALSE');
     workerSel.innerHTML = '<option value="">Select worker...</option>' + active.map(w => `<option value="${w.name}">${w.name}</option>`).join('');
     document.getElementById('dae-job').innerHTML = '<option value="">Select worker first...</option>';
+    const daeCommentsLabel = document.getElementById('dae-comments-label');
+    if (daeCommentsLabel) daeCommentsLabel.textContent = 'Comments (optional)';
   }
 }
 
@@ -3246,6 +3252,7 @@ async function submitDailyEntry() {
   const jobObj = allJobs.find(j => j.id === jobId);
   const entry_de = { id: uid(), worker, jobId, date, hours, comments, amendments: [{ by: currentOfficeUser || 'Office', at: new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }), note: 'Created by Office' }], createdAt: new Date().toISOString(), property: isRecurringJobId(jobId) ? (rjPropGetValue('rj-prop-dae') || (jobObj ? jobObj.property : '')) : (jobObj ? jobObj.property : ''), description: jobObj ? (jobObj.description || jobObj.name || '') : '', performedBy: currentOfficeUser || 'Office' };
   if (isRecurringJobId(jobId) && !rjPropGetValue('rj-prop-dae')) { alert('Please select a property for this recurring job.'); return; }
+  if (isRecurringJobId(jobId) && !comments.trim()) { alert('Please add a comment for this recurring job.'); return; }
   if (isOvertime_de) { showOvertimeModal(entry_de, isWeekend_de); return; }
   const entry = entry_de;
   entries.push(entry);
@@ -4073,8 +4080,15 @@ function rjPropCheck(prefix) {
   var sel = document.getElementById(selId);
   var id  = sel ? sel.value : '';
   var cid = 'rj-prop-' + prefix;
-  if (isRecurringJobId(id)) { rjPropShow(cid); }
-  else { rjPropHide(cid); }
+  var commentsLabelId = (prefix === 'worker' ? 'entry' : prefix) + '-comments-label';
+  var commentsLabel = document.getElementById(commentsLabelId);
+  if (isRecurringJobId(id)) {
+    rjPropShow(cid);
+    if (commentsLabel) commentsLabel.textContent = 'Comments (Required for Recurring Jobs)';
+  } else {
+    rjPropHide(cid);
+    if (commentsLabel) commentsLabel.textContent = 'Comments (optional)';
+  }
 }
 
 // Chromium's native date input fires 'change' as soon as day+month+year all
