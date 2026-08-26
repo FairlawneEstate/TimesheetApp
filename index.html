@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- BUILD MARKER: v79-31 (XLSX exports migrated from SheetJS to ExcelJS for real cell styling; Time Entries export now splits into Mon-Sun weekly tabs; Overtime export gets header/status-row styling) -->
+<!-- BUILD MARKER: v79-32 (Chris Rosier gets a "Weekly Approvals" toggle button in his worker view, reusing the office approvals screen in place - no second login needed) -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Timesheet App</title>
@@ -311,6 +311,7 @@ textarea { height: 60px; resize: none; }
             <span class="sync-dot" id="worker-sync-dot"></span>
             <span id="worker-sync-text">—</span>
           </div>
+          <button class="btn" id="worker-approvals-toggle" style="display:none;" onclick="toggleWorkerApprovals()">Weekly Approvals</button>
           <button class="btn" onclick="workerLogout()">Sign out</button>
         </div>
       </div>
@@ -319,36 +320,45 @@ textarea { height: 60px; resize: none; }
       <div id="toast-amended" class="toast toast-warning">✓ Entry amended</div>
       <div id="toast-error" class="toast toast-error">⚠ Saved locally — will sync when online</div>
 
-      <div class="card">
-        <label>Job number</label>
-        <select id="job-select" onchange="fillJobDetails()">
-          <option value="">Select a job...</option>
-        </select>
-        <div id="job-detail" class="job-detail">
-          <p class="job-title" id="job-prop"></p>
-          <p class="text-muted" id="job-desc"></p>
-          <p class="text-muted" id="job-assigned" style="font-size:12px;margin-top:4px;"></p>
-        </div>
-        <div class="grid2">
-          <div>
-            <label>Date</label>
-            <input type="date" id="entry-date" autocomplete="off" onchange="renderEntriesByDate(); updateHoursPlaceholder()">
+      <div id="worker-entries-section">
+        <div class="card">
+          <label>Job number</label>
+          <select id="job-select" onchange="fillJobDetails()">
+            <option value="">Select a job...</option>
+          </select>
+          <div id="job-detail" class="job-detail">
+            <p class="job-title" id="job-prop"></p>
+            <p class="text-muted" id="job-desc"></p>
+            <p class="text-muted" id="job-assigned" style="font-size:12px;margin-top:4px;"></p>
           </div>
-          <div>
-            <label>Hours</label>
-            <input type="number" id="entry-hours" placeholder="e.g. 4" min="0.5" max="16" step="0.5" onfocus="updateHoursPlaceholder()">
+          <div class="grid2">
+            <div>
+              <label>Date</label>
+              <input type="date" id="entry-date" autocomplete="off" onchange="renderEntriesByDate(); updateHoursPlaceholder()">
+            </div>
+            <div>
+              <label>Hours</label>
+              <input type="number" id="entry-hours" placeholder="e.g. 4" min="0.5" max="16" step="0.5" onfocus="updateHoursPlaceholder()">
+            </div>
+          </div>
+          <div id="rj-prop-worker" class="rj-prop-wrap"></div>
+          <label>Comments (optional)</label>
+          <textarea id="entry-comments" placeholder="What was done..."></textarea>
+          <div class="form-footer">
+            <button class="btn btn-primary full-width" id="save-btn" onclick="submitEntry()">Save entry</button>
           </div>
         </div>
-        <div id="rj-prop-worker" class="rj-prop-wrap"></div>
-        <label>Comments (optional)</label>
-        <textarea id="entry-comments" placeholder="What was done..."></textarea>
-        <div class="form-footer">
-          <button class="btn btn-primary full-width" id="save-btn" onclick="submitEntry()">Save entry</button>
-        </div>
+
+        <p class="section-label">Your entries</p>
+        <div id="entries-by-date"></div>
       </div>
 
-      <p class="section-label">Your entries</p>
-      <div id="entries-by-date"></div>
+      <div id="worker-approvals-section" style="display:none;">
+        <div class="card">
+          <div class="card-header"><p class="section-heading">Weekly Approvals</p></div>
+          <div id="worker-week-approvals-content"><p class="text-muted" style="padding:1rem;">Loading...</p></div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -988,6 +998,13 @@ function workerLogin() {
   document.getElementById('timesheet-screen').style.display = 'block';
   document.getElementById('worker-greeting').textContent = 'Hello, ' + w;
   document.getElementById('entry-date').value = new Date().toISOString().split('T')[0];
+  const approvalsBtn = document.getElementById('worker-approvals-toggle');
+  if (approvalsBtn) {
+    approvalsBtn.style.display = currentWorker.trim().toLowerCase() === 'chris rosier' ? 'inline-block' : 'none';
+    approvalsBtn.textContent = 'Weekly Approvals';
+  }
+  document.getElementById('worker-entries-section').style.display = 'block';
+  document.getElementById('worker-approvals-section').style.display = 'none';
   populateJobDropdown();
   renderEntriesByDate();
   setSyncStatus('worker', syncQueue.length ? 'pending' : 'synced',
@@ -1069,6 +1086,10 @@ async function pollJobs() {
     // they close/reselect).
     renderEntriesByDate();
     updateHoursPlaceholder();
+    const workerApprovalsSection = document.getElementById('worker-approvals-section');
+    if (workerApprovalsSection && workerApprovalsSection.style.display !== 'none') {
+      renderWeekApprovalsTab('worker-week-approvals-content');
+    }
     await flushQueue();
     if (syncQueue.length) {
       setSyncStatus('worker', 'pending', syncQueue.length + ' entries pending sync');
@@ -4081,8 +4102,25 @@ function syncDateRangeLimits() {
   enforceDateOrder('oe-date-from', 'oe-date-to');
 }
 
-function renderWeekApprovalsTab() {
-  const el = document.getElementById('week-approvals-content');
+function toggleWorkerApprovals() {
+  const entriesSection   = document.getElementById('worker-entries-section');
+  const approvalsSection = document.getElementById('worker-approvals-section');
+  const btn = document.getElementById('worker-approvals-toggle');
+  const showingApprovals = approvalsSection.style.display !== 'none';
+  if (showingApprovals) {
+    approvalsSection.style.display = 'none';
+    entriesSection.style.display = 'block';
+    btn.textContent = 'Weekly Approvals';
+  } else {
+    entriesSection.style.display = 'none';
+    approvalsSection.style.display = 'block';
+    btn.textContent = 'Entries';
+    renderWeekApprovalsTab('worker-week-approvals-content');
+  }
+}
+
+function renderWeekApprovalsTab(targetId) {
+  const el = document.getElementById(targetId || 'week-approvals-content');
   if (!el) return;
 
   const pending = weekSubmissions.filter(w => w.status === 'pending')
@@ -4176,7 +4214,7 @@ async function reviewWeek(id, status, btn) {
   buttonsInRow.forEach(b => b.disabled = true);
   if (btn) btn.textContent = status === 'approved' ? 'Approving…' : 'Declining…';
   try {
-    const reviewedBy = currentOfficeUser || 'Office';
+    const reviewedBy = currentOfficeUser || currentWorker || 'Office';
     const { synced } = await queueOrSend('reviewWeekSubmission', { id, status, reviewedBy });
     const sub = weekSubmissions.find(w => w.id === id);
     if (sub) {
@@ -4185,7 +4223,8 @@ async function reviewWeek(id, status, btn) {
       sub.reviewedBy = reviewedBy;
       localStorage.setItem('weekSubmissions', JSON.stringify(weekSubmissions));
     }
-    renderWeekApprovalsTab();
+    renderWeekApprovalsTab('week-approvals-content');
+    renderWeekApprovalsTab('worker-week-approvals-content');
   } catch (err) {
     buttonsInRow.forEach(b => b.disabled = false);
     if (btn) btn.textContent = status === 'approved' ? 'Approve' : 'Decline';
