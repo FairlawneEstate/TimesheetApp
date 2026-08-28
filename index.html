@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- BUILD MARKER: V80-01 (Comments now required for Recurring Jobs, matching the existing Property requirement — applies to worker, office, and daily add-entry forms) -->
+<!-- BUILD MARKER: V80-02 (fixed root cause of duplicate-hours bug: a lagging poll/refresh read could silently erase an already-synced entry from local memory, resetting the hours-today count and letting a duplicate through without triggering overtime) -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Timesheet App</title>
@@ -782,6 +782,21 @@ let isSubmittingEntry = false;
 let isSubmittingOvertime = false;
 let isSubmittingMultiAdd = false;
 let woHoursActiveFilter = '';
+
+// Protects against a real, observed race: a poll's server read can lag
+// behind a write that already genuinely succeeded (Sheets/Apps Script
+// consistency quirk under concurrent executions). Without this, the poll's
+// wholesale entries-replace can silently erase an entry that's already
+// synced-and-removed from the outbound queue, resetting the worker's
+// locally-computed hours-today count and letting a duplicate slip past the
+// overtime check with a different ID. Entries are tracked here for a short
+// window after creation and re-injected if a poll's snapshot is missing them.
+const RECENT_ENTRY_WINDOW_MS = 3 * 60 * 1000; // 3 minutes
+let recentlyCreatedEntries = [];
+function trackRecentEntry(entry) {
+  recentlyCreatedEntries.push({ entry, at: Date.now() });
+  recentlyCreatedEntries = recentlyCreatedEntries.filter(r => Date.now() - r.at < RECENT_ENTRY_WINDOW_MS);
+}
 let dailyViewDate = new Date().toISOString().slice(0, 10);
 let currentWorker = null;
 let syncQueue = JSON.parse(localStorage.getItem('syncQueue') || '[]');
@@ -1040,6 +1055,14 @@ async function pollJobs() {
       overtimeEnd: toHHMM(e.overtimeEnd)
     })).filter(e => !pendingDeleteEntryIds.has(String(e.id)));
     syncQueue.forEach(q => { if (q.payload?.entry && !entries.find(e => e.id === q.payload.entry.id)) entries.push(q.payload.entry); });
+    // Guard against a lagging server read silently dropping an entry that
+    // already synced successfully — see trackRecentEntry for why this exists.
+    recentlyCreatedEntries = recentlyCreatedEntries.filter(r => Date.now() - r.at < RECENT_ENTRY_WINDOW_MS);
+    recentlyCreatedEntries.forEach(r => {
+      if (!entries.find(e => e.id === r.entry.id) && !pendingDeleteEntryIds.has(String(r.entry.id))) {
+        entries.push(r.entry);
+      }
+    });
     recurringJobs = (data.recurringJobs || recurringJobs).map(j => ({ ...j, assignedTo: String(j.assignedTo || '') }));
     absenceTypes = data.absenceTypes || absenceTypes;
     overtimeRequests = data.overtimeRequests || overtimeRequests;
@@ -1367,7 +1390,7 @@ async function submitEntry() {
   if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
   isSubmittingEntry = true;
   try {
-    entries.push(entry);
+    entries.push(entry); trackRecentEntry(entry);
     localStorage.setItem('entries', JSON.stringify(entries));
 
     document.getElementById('job-select').value = '';
@@ -1825,7 +1848,7 @@ async function submitAbsenceEntry() {
     property: '',
     description: absType ? absType.name : jobId
   };
-  entries.push(entry);
+  entries.push(entry); trackRecentEntry(entry);
   localStorage.setItem('entries', JSON.stringify(entries));
   document.getElementById('abs-entry-worker').value = '';
   document.getElementById('abs-entry-job').value = '';
@@ -2075,6 +2098,13 @@ async function refreshOffice() {
         overtimeStart: toHHMM(e.overtimeStart),
         overtimeEnd: toHHMM(e.overtimeEnd)
       })).filter(e => !pendingDeleteEntryIds.has(String(e.id)));
+      syncQueue.forEach(q => { if (q.payload?.entry && !entries.find(e => e.id === q.payload.entry.id)) entries.push(q.payload.entry); });
+      recentlyCreatedEntries = recentlyCreatedEntries.filter(r => Date.now() - r.at < RECENT_ENTRY_WINDOW_MS);
+      recentlyCreatedEntries.forEach(r => {
+        if (!entries.find(e => e.id === r.entry.id) && !pendingDeleteEntryIds.has(String(r.entry.id))) {
+          entries.push(r.entry);
+        }
+      });
         recurringJobs = (data.recurringJobs || []).map(j => ({ ...j, assignedTo: String(j.assignedTo || '') }));
       tasks = (data.tasks || tasks).map(t => ({ ...t }));
     rjProperties = (data.properties || rjProperties).map(function(p) { return String(p.name || p || ''); }).filter(Boolean);
@@ -2874,7 +2904,7 @@ async function submitMultiAddEntries() {
         isOvertime: false,
         performedBy: currentOfficeUser || 'Office'
       };
-      entries.push(entry);
+      entries.push(entry); trackRecentEntry(entry);
       localStorage.setItem('entries', JSON.stringify(entries));
       const { synced } = await queueOrSend('addEntry', { entry: { ...entry, amendments: amendmentsToString(entry.amendments) } });
       if (!synced) failedCount++;
@@ -2945,7 +2975,7 @@ async function submitOfficeEntry() {
   if (isRecurringJobId(jobId) && !comments.trim()) { alert('Please add a comment for this recurring job.'); return; }
   if (isOvertime_oe) { showOvertimeModal(entry_oe, isWeekend_oe); return; }
   const entry = entry_oe;
-  entries.push(entry);
+  entries.push(entry); trackRecentEntry(entry);
   localStorage.setItem('entries', JSON.stringify(entries));
 
   // Keep the form open and keep worker + date as-is — office staff are usually
@@ -3255,7 +3285,7 @@ async function submitDailyEntry() {
   if (isRecurringJobId(jobId) && !comments.trim()) { alert('Please add a comment for this recurring job.'); return; }
   if (isOvertime_de) { showOvertimeModal(entry_de, isWeekend_de); return; }
   const entry = entry_de;
-  entries.push(entry);
+  entries.push(entry); trackRecentEntry(entry);
   localStorage.setItem('entries', JSON.stringify(entries));
   document.getElementById('dae-worker').value = '';
   document.getElementById('dae-job').innerHTML = '<option value="">Select worker first...</option>';
