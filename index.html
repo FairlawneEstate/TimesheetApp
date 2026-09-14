@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- BUILD MARKER: V80-02 (Added Ben Collins as office user) -->
+<!-- BUILD MARKER: V80-03 (Overtime export: added separate Time 1/Time 2 columns alongside Time Range, removed Hours numFmt to fix trailing-dot display artifact) -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Timesheet App</title>
@@ -3731,10 +3731,10 @@ async function exportOvertimeXLSX() {
 
   sheet.columns = [
     { width: 16 }, { width: 12 }, { width: 14 }, { width: 30 }, { width: 35 },
-    { width: 8 },  { width: 16 }, { width: 10 }, { width: 20 }, { width: 16 }, { width: 20 }, { width: 30 }
+    { width: 8 },  { width: 16 }, { width: 10 }, { width: 10 }, { width: 10 }, { width: 20 }, { width: 16 }, { width: 20 }, { width: 30 }
   ];
 
-  const headerRow = sheet.addRow(['Worker', 'Date', 'W/O Number', 'Property', 'Description', 'Hours', 'Time Range', 'Status', 'Submitted', 'Reviewed By', 'Reviewed At', 'Comment']);
+  const headerRow = sheet.addRow(['Worker', 'Date', 'W/O Number', 'Property', 'Description', 'Hours', 'Time Range', 'Time 1', 'Time 2', 'Status', 'Submitted', 'Reviewed By', 'Reviewed At', 'Comment']);
   headerRow.height = 20;
   headerRow.eachCell({ includeEmpty: true }, cell => {
     cell.font = HEADER_FONT;
@@ -3753,12 +3753,15 @@ async function exportOvertimeXLSX() {
     const reviewedFmt  = o.reviewedAt  ? new Date(o.reviewedAt).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
     const comment = o.status === 'pending' ? (o.workerComment || '') : (o.reviewComment || o.workerComment || '');
 
+    const timeParts = (o.timeRange || '').split(/\s*[–-]\s*/);
+    const time1 = timeParts[0] ? timeParts[0].trim() : '';
+    const time2 = timeParts[1] ? timeParts[1].trim() : '';
+
     const row = sheet.addRow([
       o.worker, normaliseDate(o.date), o.jobId, property, description,
-      parseFloat(o.hours) || 0, o.timeRange || '', o.status,
+      parseFloat(o.hours) || 0, o.timeRange || '', time1, time2, o.status,
       submittedFmt, o.reviewedBy || '', reviewedFmt, comment
     ]);
-    row.getCell(6).numFmt = '0.##';
     const rowFill = o.status === 'approved' ? APPROVED_FILL : o.status === 'declined' ? DECLINED_FILL : null;
     row.eachCell({ includeEmpty: true }, cell => {
       cell.border = THIN_BORDER;
