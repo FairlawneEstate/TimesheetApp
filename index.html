@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- BUILD MARKER: V80-10 (WO1142 driving jobs: added a Cancel/Restore toggle next to Approved Rate — marks a segment "Driving Cancelled" and reports £50 flat instead of an hourly multiplier; restores the prior rate when un-cancelled) -->
+<!-- BUILD MARKER: V80-11 (OT rate dropdown widened so "1.5x" isn't clipped; added a "Rate Report" export — Sheet 1: Worker/Date/W-O/Desc/Hours/Time Range/Rate/Approved Y-N/Approved By per segment, Sheet 2: per-worker totals by rate for approved OT) -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Timesheet App</title>
@@ -667,7 +667,10 @@ textarea { height: 60px; resize: none; }
         <div class="card">
           <div class="row-between card-header">
             <p class="section-heading">⏱ Overtime Requests</p>
-            <button class="btn btn-primary btn-sm" onclick="exportOvertimeXLSX()">↓ Export XLSX</button>
+            <div>
+              <button class="btn btn-primary btn-sm" onclick="exportOvertimeXLSX()">↓ Export XLSX</button>
+              <button class="btn btn-sm" onclick="exportOvertimeRateReport()" style="margin-left:6px;">↓ Rate Report</button>
+            </div>
           </div>
           <div style="padding:0 1rem;display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;margin-bottom:1rem;">
             <div>
@@ -3605,7 +3608,7 @@ function renderOvertimeTab() {
         <td style="padding:6px 10px;font-size:12px;vertical-align:top;">
           ${isCancelled
             ? `<span style="font-weight:600;color:var(--color-text-error);">Driving Cancelled</span><div style="font-size:11px;color:var(--color-text-secondary);">£50 flat</div>`
-            : `<select id="ot-rate-${o.id}-${segIdx}" ${locked ? 'disabled' : ''} onchange="updateOTSegmentRate('${o.id}', ${segIdx}, this.value)" style="font-size:12px;padding:2px 4px;">
+            : `<select id="ot-rate-${o.id}-${segIdx}" ${locked ? 'disabled' : ''} onchange="updateOTSegmentRate('${o.id}', ${segIdx}, this.value)" style="font-size:12px;padding:2px 4px;width:64px;">
                 <option value="1.0" ${seg.rate === '1.0' ? 'selected' : ''}>1.0x</option>
                 <option value="1.5" ${seg.rate === '1.5' ? 'selected' : ''}>1.5x</option>
                 <option value="2.0" ${seg.rate === '2.0' ? 'selected' : ''}>2.0x</option>
@@ -4070,6 +4073,111 @@ async function exportOvertimeXLSX() {
   const fromPart = fromVal || 'start';
   const toPart   = toVal   || 'today';
   a.download = `Fairlawne_Overtime_${fromPart}_to_${toPart}.xlsx`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+}
+
+// Simple two-sheet overtime rate report:
+//  1) one row per rate segment — who, when, the job, the time range, the
+//     rate, and whether/by-whom the request was approved.
+//  2) a per-worker total of hours at each rate, for payroll reconciliation.
+async function exportOvertimeRateReport() {
+  const fromVal = document.getElementById('ot-date-from')?.value || '';
+  const toVal   = document.getElementById('ot-date-to')?.value || '';
+  const inRange = o => {
+    const d = normaliseDate(o.date);
+    return (!fromVal || d >= fromVal) && (!toVal || d <= toVal);
+  };
+
+  const approved = overtimeRequests.filter(o => o.status === 'approved').filter(inRange);
+  const declined = overtimeRequests.filter(o => o.status === 'declined').filter(inRange);
+  const all = [...approved, ...declined].sort((a, b) => normaliseDate(a.date).localeCompare(normaliseDate(b.date)));
+
+  if (!all.length) { alert('No overtime requests match the current filters.'); return; }
+
+  const rateLabel = seg => (seg.cancelled === true || seg.cancelled === 'TRUE') ? 'Cancelled (£50)' : (seg.rate ? seg.rate + 'x' : '');
+
+  const HEADER_FILL = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2C2C2C' } };
+  const HEADER_FONT = { bold: true, color: { argb: 'FFFFFFFF' } };
+  const THIN = { style: 'thin', color: { argb: 'FFCCCCCC' } };
+  const THIN_BORDER = { top: THIN, bottom: THIN, left: THIN, right: THIN };
+
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'Fairlawne Timesheet App';
+  workbook.created = new Date();
+
+  // Sheet 1 — one row per rate segment
+  const sheet = workbook.addWorksheet('Overtime');
+  sheet.columns = [
+    { width: 16 }, { width: 12 }, { width: 14 }, { width: 35 },
+    { width: 8 }, { width: 16 }, { width: 12 }, { width: 12 }, { width: 20 }
+  ];
+  const headerRow = sheet.addRow(['Worker', 'Date', 'W/O', 'Description', 'Hours', 'Time Range', 'Rate', 'Approved (Y/N)', 'Approved By']);
+  headerRow.height = 20;
+  headerRow.eachCell({ includeEmpty: true }, cell => {
+    cell.font = HEADER_FONT;
+    cell.fill = HEADER_FILL;
+    cell.alignment = { vertical: 'middle', horizontal: 'center' };
+    cell.border = THIN_BORDER;
+  });
+  sheet.views = [{ state: 'frozen', ySplit: 1 }];
+
+  const totals = {}; // { worker: { rate: totalHours } }
+
+  for (const o of all) {
+    const job = jobs.find(j => j.id === o.jobId) || recurringJobs.find(j => j.id === o.jobId);
+    const description = (job ? (job.description || '') : '') || o.description || '';
+    const segments = getOTSegments(o);
+    const isApproved = o.status === 'approved';
+
+    for (const seg of segments) {
+      const hours = Math.round(otSegDuration(seg) * 100) / 100;
+      const rate = rateLabel(seg);
+      const row = sheet.addRow([
+        o.worker, normaliseDate(o.date), o.jobId, description,
+        hours, `${seg.start} – ${seg.end}`, rate,
+        isApproved ? 'Y' : 'N', o.reviewedBy || ''
+      ]);
+      row.eachCell({ includeEmpty: true }, cell => { cell.border = THIN_BORDER; });
+
+      if (isApproved) {
+        totals[o.worker] = totals[o.worker] || {};
+        totals[o.worker][rate] = (totals[o.worker][rate] || 0) + hours;
+      }
+    }
+  }
+
+  // Sheet 2 — totals by worker + rate (approved OT only)
+  const totalsSheet = workbook.addWorksheet('Totals by Rate');
+  totalsSheet.columns = [{ width: 22 }, { width: 16 }, { width: 14 }];
+  const totalsHeaderRow = totalsSheet.addRow(['Name', 'Rate', 'Total Hours']);
+  totalsHeaderRow.height = 20;
+  totalsHeaderRow.eachCell({ includeEmpty: true }, cell => {
+    cell.font = HEADER_FONT;
+    cell.fill = HEADER_FILL;
+    cell.alignment = { vertical: 'middle', horizontal: 'center' };
+    cell.border = THIN_BORDER;
+  });
+  totalsSheet.views = [{ state: 'frozen', ySplit: 1 }];
+
+  const workerNames = Object.keys(totals).sort((a, b) => a.localeCompare(b));
+  for (const worker of workerNames) {
+    const rateKeys = Object.keys(totals[worker]).sort((a, b) => a.localeCompare(b));
+    for (const rate of rateKeys) {
+      const row = totalsSheet.addRow([worker, rate, Math.round(totals[worker][rate] * 100) / 100]);
+      row.eachCell({ includeEmpty: true }, cell => { cell.border = THIN_BORDER; });
+    }
+  }
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  const fromPart = fromVal || 'start';
+  const toPart   = toVal   || 'today';
+  a.download = `Fairlawne_Overtime_RateReport_${fromPart}_to_${toPart}.xlsx`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
