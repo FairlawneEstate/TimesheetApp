@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- BUILD MARKER: V80-05 (Overtime rate now supports multiple time segments per request — Split/Merge buttons, each segment independently rated and lockable, Admin view only) -->
+<!-- BUILD MARKER: V80-06 (OT overtime tab restyled as per-entry cards; segments auto-split at rate boundaries by default; manual split reworked into a carve-out picker with two constrained dropdowns) -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Timesheet App</title>
@@ -3394,22 +3394,24 @@ function autoSplitOTSegments(dateStr, start, end) {
   return segments;
 }
 
-// Valid split points for the manual splitter — clock-aligned, and always
-// strictly inside the segment (so even a short segment like 20:00-21:00
-// still offers real choices, just at finer granularity than 15 min).
+// Valid boundary points for the manual carve-out picker — clock-aligned
+// interior points plus the segment's own start/end, so the user can pick
+// a sub-range that touches either edge (a plain 2-way split) or sits
+// fully inside it (a 3-way split: before / carved-out / after).
 function getOTSplitOptions(seg) {
   let s = otTimeToMinutes(seg.start), e = otTimeToMinutes(seg.end);
   if (e <= s) e += 1440;
+  let interior = [];
   for (const step of [15, 10, 5, 1]) {
     const opts = [];
     let t = Math.ceil((s + 1) / step) * step;
     for (; t < e; t += step) opts.push(t);
-    if (opts.length) return opts;
+    if (opts.length) { interior = opts; break; }
   }
-  return [];
+  return [s, ...interior, e];
 }
 
-let otSplitUIState = {}; // { [otId]: segIdx currently showing the inline split-time picker }
+let otSplitUIState = {}; // { [otId]: segIdx currently showing the inline carve-out picker }
 
 function splitOTSegment(id, segIdx) {
   otSplitUIState = { [id]: segIdx };
@@ -3421,39 +3423,45 @@ function cancelSplitOTSegment(id) {
   renderOvertimeTab();
 }
 
-function syncOTSplitSelect(id, segIdx, source) {
-  const a = document.getElementById(`ot-split-a-${id}-${segIdx}`);
-  const b = document.getElementById(`ot-split-b-${id}-${segIdx}`);
-  if (!a || !b) return;
-  if (source === 'a') b.value = a.value; else a.value = b.value;
-}
-
+// Carve the selected start–end sub-range out of the segment. Whatever's
+// left before and/or after the carved-out piece becomes its own
+// segment(s) too, each with a rate guessed from getOTRateSuggestion.
 async function confirmSplitOTSegment(id, segIdx) {
-  const select = document.getElementById(`ot-split-a-${id}-${segIdx}`) || document.getElementById(`ot-split-b-${id}-${segIdx}`);
-  const splitTime = select ? select.value : '';
-  if (!splitTime) { alert('Please choose a split time.'); return; }
+  const startSel = document.getElementById(`ot-split-a-${id}-${segIdx}`);
+  const endSel = document.getElementById(`ot-split-b-${id}-${segIdx}`);
+  const rangeStart = startSel ? startSel.value : '';
+  const rangeEnd = endSel ? endSel.value : '';
+  if (!rangeStart || !rangeEnd) { alert('Please choose both a start and end time.'); return; }
 
   const o = overtimeRequests.find(r => r.id === id);
   if (!o) return;
   const segments = getOTSegments(o);
   const seg = segments[segIdx];
 
-  let segStart = otTimeToMinutes(seg.start);
-  let segEnd = otTimeToMinutes(seg.end);
+  let segStart = otTimeToMinutes(seg.start), segEnd = otTimeToMinutes(seg.end);
   if (segEnd <= segStart) segEnd += 1440;
-  let splitMin = otTimeToMinutes(splitTime);
-  if (splitMin <= segStart) splitMin += 1440;
+  let rStart = otTimeToMinutes(rangeStart);
+  if (rStart < segStart) rStart += 1440;
+  let rEnd = otTimeToMinutes(rangeEnd);
+  if (rEnd < segStart) rEnd += 1440;
+  if (rEnd <= rStart) rEnd += 1440;
 
-  if (splitMin <= segStart || splitMin >= segEnd) {
-    alert('Split time must fall strictly within this segment (' + seg.start + ' – ' + seg.end + ').');
+  if (rStart < segStart || rEnd > segEnd || rStart >= rEnd) {
+    alert('The selected range must fall within this segment (' + seg.start + ' – ' + seg.end + ') with the end after the start.');
     return;
   }
 
-  const splitTimeNormalised = otMinutesToTime(splitMin);
-  const firstHalf  = { start: seg.start, end: splitTimeNormalised, rate: getOTRateSuggestion(normaliseDate(o.date), seg.start), approved: false };
-  const secondHalf = { start: splitTimeNormalised, end: seg.end, rate: getOTRateSuggestion(normaliseDate(o.date), splitTimeNormalised), approved: false };
+  const dateStr = normaliseDate(o.date);
+  const newPieces = [];
+  if (rStart > segStart) {
+    newPieces.push({ start: otMinutesToTime(segStart), end: otMinutesToTime(rStart), rate: otRateAtAbsoluteMinute(dateStr, segStart), approved: false });
+  }
+  newPieces.push({ start: otMinutesToTime(rStart), end: otMinutesToTime(rEnd), rate: otRateAtAbsoluteMinute(dateStr, rStart), approved: false });
+  if (rEnd < segEnd) {
+    newPieces.push({ start: otMinutesToTime(rEnd), end: otMinutesToTime(segEnd), rate: otRateAtAbsoluteMinute(dateStr, rEnd), approved: false });
+  }
 
-  segments.splice(segIdx, 1, firstHalf, secondHalf);
+  segments.splice(segIdx, 1, ...newPieces);
   delete otSplitUIState[id];
   await saveOTSegmentsToBackend(o, segments);
 }
@@ -3519,47 +3527,25 @@ function renderOvertimeTab() {
 
   const isAdminView = (currentOfficeUser || '').trim().toLowerCase() === 'admin';
 
-  function otRowGroup(o, showActions) {
+  function otEntryCard(o, showActions) {
     const job = jobs.find(j => j.id === o.jobId) || recurringJobs.find(j => j.id === o.jobId);
     const isRJ = recurringJobs.some(j => j.id === o.jobId);
     const property = isRJ ? (o.property || (job ? job.property : '')) : ((job ? job.property : '') || o.property || '');
     const desc     = (job ? (job.description || '') : '') || o.description || '';
     const segments = getOTSegments(o);
     const splittingIdx = otSplitUIState[o.id];
-    const rowspan = segments.length;
+    const submittedLabel = o.submittedAt ? new Date(o.submittedAt).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
 
-    const sharedCells = `
-      <td rowspan="${rowspan}" style="padding:6px 10px;font-size:12px;font-weight:500;vertical-align:top;">${o.worker}</td>
-      <td rowspan="${rowspan}" style="padding:6px 10px;font-size:12px;vertical-align:top;">${fmtShortDate(o.date)}</td>
-      <td rowspan="${rowspan}" style="padding:6px 10px;font-size:12px;font-weight:600;vertical-align:top;">${o.jobId}</td>
-      <td rowspan="${rowspan}" style="padding:6px 10px;font-size:12px;color:var(--color-text-secondary);vertical-align:top;">${propLabel(property, 35)}</td>
-      <td rowspan="${rowspan}" style="padding:6px 10px;font-size:12px;color:var(--color-text-secondary);vertical-align:top;">${desc}</td>
-      <td rowspan="${rowspan}" style="padding:6px 10px;font-size:12px;font-weight:500;text-align:center;vertical-align:top;">${o.hours}h</td>`;
-
-    const submittedCell = `<td rowspan="${rowspan}" style="padding:6px 10px;font-size:11px;color:var(--color-text-secondary);vertical-align:top;">${o.submittedAt ? new Date(o.submittedAt).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : ''}</td>`;
-
-    const actionCell = showActions === 'pending' ? `
-      <td rowspan="${rowspan}" style="padding:4px 8px;min-width:180px;vertical-align:top;">
-        <textarea id="ot-comment-${o.id}" placeholder="Reason (optional)" style="width:100%;font-size:11px;padding:4px 6px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-sm);resize:vertical;min-height:48px;margin-bottom:6px;"></textarea>
-        <div style="white-space:nowrap;">
-          <button id="ot-approve-${o.id}" class="btn btn-sm" style="background:var(--color-background-success);color:var(--color-text-success);border-color:var(--color-border-success);margin-right:4px;" onclick="officeReviewOvertime('${o.id}','approved')">Approve</button>
-          <button id="ot-decline-${o.id}" class="btn btn-sm" style="color:var(--color-text-error);border-color:var(--color-border-error);" onclick="officeReviewOvertime('${o.id}','declined')">Decline</button>
-        </div>
-      </td>` : `
-      <td rowspan="${rowspan}" style="padding:6px 10px;font-size:11px;color:var(--color-text-secondary);vertical-align:top;">
-        <div style="font-weight:500;">${o.reviewedBy || ''} · ${o.reviewedAt ? new Date(o.reviewedAt).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : ''}</div>
-        ${o.reviewComment ? `<div style="margin-top:3px;font-style:italic;">${o.reviewComment}</div>` : ''}
-      </td>`;
-
-    return segments.map((seg, segIdx) => {
-      const isFirst = segIdx === 0;
+    const segRows = segments.map((seg, segIdx) => {
       const dur = otSegDuration(seg);
       const durLabel = (Math.round(dur * 100) / 100).toString();
       const locked = seg.approved === true || seg.approved === 'TRUE';
       const isSplitting = splittingIdx === segIdx;
 
       const splitOpts = isSplitting ? getOTSplitOptions(seg) : [];
-      const defaultSplitTime = splitOpts.length ? otMinutesToTime(splitOpts[Math.floor(splitOpts.length / 2)]) : '';
+      const defStartIdx = splitOpts.length ? Math.floor(splitOpts.length / 3) : 0;
+      const defEndIdx = splitOpts.length ? Math.max(defStartIdx + 1, Math.floor(splitOpts.length * 2 / 3)) : 0;
+      const optHtml = selVal => splitOpts.map(m => { const t = otMinutesToTime(m); return `<option value="${t}" ${t === selVal ? 'selected' : ''}>${t}</option>`; }).join('');
 
       const rateCells = isAdminView ? `
         <td style="padding:6px 10px;font-size:12px;">
@@ -3576,17 +3562,13 @@ function renderOvertimeTab() {
         </td>
         <td style="padding:6px 10px;font-size:11px;white-space:nowrap;">
           ${isSplitting ? `
-            <div style="display:flex;flex-direction:column;gap:3px;align-items:flex-start;">
-              <select id="ot-split-a-${o.id}-${segIdx}" onchange="syncOTSplitSelect('${o.id}', ${segIdx}, 'a')" style="font-size:10px;padding:2px 4px;max-width:150px;">
-                ${splitOpts.map(m => { const t = otMinutesToTime(m); return `<option value="${t}" ${t === defaultSplitTime ? 'selected' : ''}>${seg.start} – ${t}</option>`; }).join('')}
-              </select>
-              <select id="ot-split-b-${o.id}-${segIdx}" onchange="syncOTSplitSelect('${o.id}', ${segIdx}, 'b')" style="font-size:10px;padding:2px 4px;max-width:150px;">
-                ${splitOpts.map(m => { const t = otMinutesToTime(m); return `<option value="${t}" ${t === defaultSplitTime ? 'selected' : ''}>${t} – ${seg.end}</option>`; }).join('')}
-              </select>
-              <div>
-                <button class="btn btn-sm" style="font-size:10px;padding:2px 6px;" onclick="confirmSplitOTSegment('${o.id}', ${segIdx})">✓</button>
-                <button class="btn btn-sm" style="font-size:10px;padding:2px 6px;" onclick="cancelSplitOTSegment('${o.id}')">✕</button>
-              </div>
+            <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;">
+              <span style="color:var(--color-text-secondary);">from</span>
+              <select id="ot-split-a-${o.id}-${segIdx}" style="font-size:10px;padding:2px 4px;">${optHtml(otMinutesToTime(splitOpts[defStartIdx]))}</select>
+              <span style="color:var(--color-text-secondary);">to</span>
+              <select id="ot-split-b-${o.id}-${segIdx}" style="font-size:10px;padding:2px 4px;">${optHtml(otMinutesToTime(splitOpts[defEndIdx]))}</select>
+              <button class="btn btn-sm" style="font-size:10px;padding:2px 6px;" onclick="confirmSplitOTSegment('${o.id}', ${segIdx})">✓</button>
+              <button class="btn btn-sm" style="font-size:10px;padding:2px 6px;" onclick="cancelSplitOTSegment('${o.id}')">✕</button>
             </div>
           ` : `
             <button class="btn btn-sm" style="font-size:10px;padding:2px 6px;" onclick="splitOTSegment('${o.id}', ${segIdx})">Split ↓</button>
@@ -3594,47 +3576,62 @@ function renderOvertimeTab() {
           `}
         </td>` : '';
 
-      return `<tr style="${!isFirst ? 'border-top:0.5px dashed var(--color-border-tertiary);' : ''}">
-        ${isFirst ? sharedCells : ''}
+      return `<tr style="${segIdx > 0 ? 'border-top:0.5px dashed var(--color-border-tertiary);' : ''}">
         <td style="padding:6px 10px;font-size:12px;font-style:italic;">${seg.start} – ${seg.end} <span style="color:var(--color-text-secondary);font-style:normal;">(${durLabel}h)</span></td>
         ${rateCells}
-        ${isFirst ? submittedCell : ''}
-        ${isFirst ? actionCell : ''}
       </tr>`;
     }).join('');
+
+    const footer = showActions === 'pending' ? `
+      <div style="margin-top:10px;">
+        <textarea id="ot-comment-${o.id}" placeholder="Reason (optional)" style="width:100%;font-size:11px;padding:4px 6px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-sm);resize:vertical;min-height:40px;margin-bottom:6px;"></textarea>
+        <button id="ot-approve-${o.id}" class="btn btn-sm" style="background:var(--color-background-success);color:var(--color-text-success);border-color:var(--color-border-success);margin-right:4px;" onclick="officeReviewOvertime('${o.id}','approved')">Approve</button>
+        <button id="ot-decline-${o.id}" class="btn btn-sm" style="color:var(--color-text-error);border-color:var(--color-border-error);" onclick="officeReviewOvertime('${o.id}','declined')">Decline</button>
+      </div>` : (o.reviewedBy || o.reviewComment) ? `
+      <div style="margin-top:10px;font-size:11px;color:var(--color-text-secondary);">
+        <div style="font-weight:500;">${o.reviewedBy || ''} · ${o.reviewedAt ? new Date(o.reviewedAt).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : ''}</div>
+        ${o.reviewComment ? `<div style="margin-top:3px;font-style:italic;">${o.reviewComment}</div>` : ''}
+      </div>` : '';
+
+    return `<div class="card" style="padding:0.85rem 1rem;margin-bottom:0.75rem;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+        <div>
+          <div style="font-size:13px;font-weight:600;">${o.worker} <span style="color:var(--color-text-secondary);font-weight:400;">· ${fmtShortDate(o.date)}</span></div>
+          <div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px;">${o.jobId} · ${propLabel(property, 45)}${desc ? ' · ' + desc : ''}</div>
+        </div>
+        <div style="text-align:right;font-size:11px;color:var(--color-text-secondary);">
+          <div style="font-weight:500;color:var(--color-text-primary);">${o.hours}h total</div>
+          ${submittedLabel ? `<div>Submitted ${submittedLabel}</div>` : ''}
+        </div>
+      </div>
+      <table style="width:100%;border-collapse:collapse;">
+        <thead><tr style="border-bottom:1px solid var(--color-border-tertiary);">
+          <th style="padding:4px 10px;font-size:11px;text-align:left;">Time Range</th>
+          ${isAdminView ? '<th style="padding:4px 10px;font-size:11px;text-align:left;">Rate</th><th style="padding:4px 10px;font-size:11px;text-align:center;">Approved</th><th style="padding:4px 10px;font-size:11px;text-align:left;">Adjust</th>' : ''}
+        </tr></thead>
+        <tbody>${segRows}</tbody>
+      </table>
+      ${footer}
+    </div>`;
   }
 
-  function otTable(list, showActions) {
+  function otList(list, showActions) {
     if (!list.length) return '<p class="text-muted" style="padding:0.5rem 0;">None.</p>';
-    return `<table style="width:100%;border-collapse:collapse;">
-      <thead><tr style="border-bottom:1px solid var(--color-border-secondary);">
-        <th style="padding:6px 10px;font-size:11px;text-align:left;">Worker</th>
-        <th style="padding:6px 10px;font-size:11px;text-align:left;">Date</th>
-        <th style="padding:6px 10px;font-size:11px;text-align:left;">W/O</th>
-        <th style="padding:6px 10px;font-size:11px;text-align:left;">Property</th>
-        <th style="padding:6px 10px;font-size:11px;text-align:left;">Description</th>
-        <th style="padding:6px 10px;font-size:11px;text-align:center;">Hrs</th>
-        <th style="padding:6px 10px;font-size:11px;text-align:left;">Time Range</th>
-        ${isAdminView ? '<th style="padding:6px 10px;font-size:11px;text-align:left;">Rate</th><th style="padding:6px 10px;font-size:11px;text-align:center;">Approved Rate</th><th style="padding:6px 10px;font-size:11px;text-align:left;">Adjust</th>' : ''}
-        <th style="padding:6px 10px;font-size:11px;text-align:left;">Submitted</th>
-        <th style="padding:6px 10px;font-size:11px;text-align:left;">${showActions === 'pending' ? 'Reason / Action' : 'Reviewed by / Comment'}</th>
-      </tr></thead>
-      <tbody>${list.map(o => otRowGroup(o, showActions)).join('')}</tbody>
-    </table>`;
+    return list.map(o => otEntryCard(o, showActions)).join('');
   }
 
   el.innerHTML = `
     <div style="margin-bottom:1.5rem;">
       <p style="font-size:13px;font-weight:600;margin-bottom:0.5rem;color:#856404;">⏳ Pending (${pending.length})</p>
-      ${otTable(pending, 'pending')}
+      ${otList(pending, 'pending')}
     </div>
     <div style="margin-bottom:1.5rem;">
       <p style="font-size:13px;font-weight:600;margin-bottom:0.5rem;color:var(--color-text-success);">✓ Approved (${approved.length}) — in range</p>
-      ${otTable(approved, 'approved')}
+      ${otList(approved, 'approved')}
     </div>
     <div>
       <p style="font-size:13px;font-weight:600;margin-bottom:0.5rem;color:var(--color-text-error);">✕ Declined (${declined.length}) — in range</p>
-      ${otTable(declined, 'declined')}
+      ${otList(declined, 'declined')}
     </div>`;
 }
 
