@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- BUILD MARKER: V80-04 (DEMO: Overtime rate suggestion + Approved Rate lock, Admin view only — pending feedback) -->
+<!-- BUILD MARKER: V80-05 (Overtime rate now supports multiple time segments per request — Split/Merge buttons, each segment independently rated and lockable, Admin view only) -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Timesheet App</title>
@@ -3321,6 +3321,112 @@ function getOTRateSuggestion(dateStr, startTime) {
   return '1.5'; // outside normal OT hours entirely - safe fallback, always manually adjustable
 }
 
+// ── OT rate segments — a single OT request can span multiple rate bands
+// (e.g. 06:00-08:00 crosses the weekday 2.0x/1.5x boundary at 07:00), so
+// each request can be split into independently-rated time segments.
+function otTimeToMinutes(t) {
+  const p = (t || '').split(':').map(Number);
+  return (p[0] || 0) * 60 + (p[1] || 0);
+}
+function otMinutesToTime(m) {
+  m = ((m % 1440) + 1440) % 1440;
+  return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+}
+function otSegDuration(seg) {
+  let s = otTimeToMinutes(seg.start), e = otTimeToMinutes(seg.end);
+  if (e <= s) e += 1440; // crosses midnight
+  return (e - s) / 60;
+}
+function getOTSegments(o) {
+  if (o.rateSegments) {
+    try {
+      const parsed = JSON.parse(o.rateSegments);
+      if (Array.isArray(parsed) && parsed.length) return parsed;
+    } catch (e) { /* fall through to default single segment */ }
+  }
+  const parts = (o.timeRange || '').split(/\s*[–-]\s*/);
+  const start = parts[0] ? parts[0].trim() : '';
+  const end = parts[1] ? parts[1].trim() : '';
+  const rate = o.rate || getOTRateSuggestion(normaliseDate(o.date), start);
+  return [{ start, end, rate, approved: (o.rateApproved === true || o.rateApproved === 'TRUE') }];
+}
+
+let otSplitUIState = {}; // { [otId]: segIdx currently showing the inline split-time picker }
+
+function splitOTSegment(id, segIdx) {
+  otSplitUIState = { [id]: segIdx };
+  renderOvertimeTab();
+}
+
+function cancelSplitOTSegment(id) {
+  delete otSplitUIState[id];
+  renderOvertimeTab();
+}
+
+async function confirmSplitOTSegment(id, segIdx) {
+  const input = document.getElementById(`ot-split-time-${id}-${segIdx}`);
+  const splitTime = input ? input.value : '';
+  if (!splitTime) { alert('Please choose a split time.'); return; }
+
+  const o = overtimeRequests.find(r => r.id === id);
+  if (!o) return;
+  const segments = getOTSegments(o);
+  const seg = segments[segIdx];
+
+  let segStart = otTimeToMinutes(seg.start);
+  let segEnd = otTimeToMinutes(seg.end);
+  if (segEnd <= segStart) segEnd += 1440;
+  let splitMin = otTimeToMinutes(splitTime);
+  if (splitMin <= segStart) splitMin += 1440;
+
+  if (splitMin <= segStart || splitMin >= segEnd) {
+    alert('Split time must fall strictly within this segment (' + seg.start + ' – ' + seg.end + ').');
+    return;
+  }
+
+  const splitTimeNormalised = otMinutesToTime(splitMin);
+  const firstHalf  = { start: seg.start, end: splitTimeNormalised, rate: getOTRateSuggestion(normaliseDate(o.date), seg.start), approved: false };
+  const secondHalf = { start: splitTimeNormalised, end: seg.end, rate: getOTRateSuggestion(normaliseDate(o.date), splitTimeNormalised), approved: false };
+
+  segments.splice(segIdx, 1, firstHalf, secondHalf);
+  delete otSplitUIState[id];
+  await saveOTSegmentsToBackend(o, segments);
+}
+
+async function deleteOTSegment(id, segIdx) {
+  if (segIdx === 0) return; // nothing above the first segment to merge into
+  const o = overtimeRequests.find(r => r.id === id);
+  if (!o) return;
+  const segments = getOTSegments(o);
+  if (segments.length <= 1) return;
+  segments[segIdx - 1].end = segments[segIdx].end;
+  segments.splice(segIdx, 1);
+  await saveOTSegmentsToBackend(o, segments);
+}
+
+async function updateOTSegmentRate(id, segIdx, rate) {
+  const o = overtimeRequests.find(r => r.id === id);
+  if (!o) return;
+  const segments = getOTSegments(o);
+  segments[segIdx].rate = rate;
+  await saveOTSegmentsToBackend(o, segments);
+}
+
+async function toggleOTSegmentLock(id, segIdx, lock) {
+  const o = overtimeRequests.find(r => r.id === id);
+  if (!o) return;
+  const segments = getOTSegments(o);
+  segments[segIdx].approved = lock;
+  await saveOTSegmentsToBackend(o, segments);
+}
+
+async function saveOTSegmentsToBackend(o, segments) {
+  o.rateSegments = JSON.stringify(segments);
+  localStorage.setItem('overtimeRequests', JSON.stringify(overtimeRequests));
+  renderOvertimeTab();
+  await api('saveOTRate', { id: o.id, rateSegments: o.rateSegments, performedBy: currentOfficeUser || 'Office' });
+}
+
 function renderOvertimeTab() {
   const el = document.getElementById('overtime-tab-content');
   if (!el) return;
@@ -3348,50 +3454,81 @@ function renderOvertimeTab() {
 
   const isAdminView = (currentOfficeUser || '').trim().toLowerCase() === 'admin';
 
-  function otRow(o, showActions) {
+  function otRowGroup(o, showActions) {
     const job = jobs.find(j => j.id === o.jobId) || recurringJobs.find(j => j.id === o.jobId);
     const isRJ = recurringJobs.some(j => j.id === o.jobId);
     const property = isRJ ? (o.property || (job ? job.property : '')) : ((job ? job.property : '') || o.property || '');
     const desc     = (job ? (job.description || '') : '') || o.description || '';
-    const startTime = (o.timeRange || '').split(/\s*[–-]\s*/)[0] || '';
-    const rate = o.rate || getOTRateSuggestion(normaliseDate(o.date), startTime);
-    const rateLocked = o.rateApproved === true || o.rateApproved === 'TRUE';
-    const rateCell = isAdminView ? `
-      <td style="padding:6px 10px;font-size:12px;">
-        <select id="ot-rate-${o.id}" ${rateLocked ? 'disabled' : ''} onchange="updateOTRate('${o.id}', this.value)" style="font-size:12px;padding:2px 4px;">
-          <option value="1.0" ${rate === '1.0' ? 'selected' : ''}>1.0x</option>
-          <option value="1.5" ${rate === '1.5' ? 'selected' : ''}>1.5x</option>
-          <option value="2.0" ${rate === '2.0' ? 'selected' : ''}>2.0x</option>
-        </select>
-      </td>
-      <td style="padding:6px 10px;font-size:12px;text-align:center;">
-        ${rateLocked
-          ? `<span class="badge badge-done" style="margin-right:4px;">✓ Locked</span><button class="btn btn-sm" style="font-size:10px;padding:2px 6px;" onclick="toggleOTRateLock('${o.id}', false)">Unlock</button>`
-          : `<button class="btn btn-sm" style="font-size:11px;" onclick="toggleOTRateLock('${o.id}', true)">Yes</button>`}
-      </td>` : '';
-    return `<tr>
-      <td style="padding:6px 10px;font-size:12px;font-weight:500;">${o.worker}</td>
-      <td style="padding:6px 10px;font-size:12px;">${fmtShortDate(o.date)}</td>
-      <td style="padding:6px 10px;font-size:12px;font-weight:600;">${o.jobId}</td>
-      <td style="padding:6px 10px;font-size:12px;color:var(--color-text-secondary);">${propLabel(property, 35)}</td>
-      <td style="padding:6px 10px;font-size:12px;color:var(--color-text-secondary);">${desc}</td>
-      <td style="padding:6px 10px;font-size:12px;font-weight:500;text-align:center;">${o.hours}h</td>
-      <td style="padding:6px 10px;font-size:12px;font-style:italic;">${o.timeRange || ''}</td>
-      ${rateCell}
-      <td style="padding:6px 10px;font-size:11px;color:var(--color-text-secondary);">${o.submittedAt ? new Date(o.submittedAt).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : ''}</td>
-      ${showActions === 'pending' ? `
-      <td style="padding:4px 8px;min-width:180px;">
+    const segments = getOTSegments(o);
+    const splittingIdx = otSplitUIState[o.id];
+    const rowspan = segments.length;
+
+    const sharedCells = `
+      <td rowspan="${rowspan}" style="padding:6px 10px;font-size:12px;font-weight:500;vertical-align:top;">${o.worker}</td>
+      <td rowspan="${rowspan}" style="padding:6px 10px;font-size:12px;vertical-align:top;">${fmtShortDate(o.date)}</td>
+      <td rowspan="${rowspan}" style="padding:6px 10px;font-size:12px;font-weight:600;vertical-align:top;">${o.jobId}</td>
+      <td rowspan="${rowspan}" style="padding:6px 10px;font-size:12px;color:var(--color-text-secondary);vertical-align:top;">${propLabel(property, 35)}</td>
+      <td rowspan="${rowspan}" style="padding:6px 10px;font-size:12px;color:var(--color-text-secondary);vertical-align:top;">${desc}</td>
+      <td rowspan="${rowspan}" style="padding:6px 10px;font-size:12px;font-weight:500;text-align:center;vertical-align:top;">${o.hours}h</td>`;
+
+    const submittedCell = `<td rowspan="${rowspan}" style="padding:6px 10px;font-size:11px;color:var(--color-text-secondary);vertical-align:top;">${o.submittedAt ? new Date(o.submittedAt).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : ''}</td>`;
+
+    const actionCell = showActions === 'pending' ? `
+      <td rowspan="${rowspan}" style="padding:4px 8px;min-width:180px;vertical-align:top;">
         <textarea id="ot-comment-${o.id}" placeholder="Reason (optional)" style="width:100%;font-size:11px;padding:4px 6px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-sm);resize:vertical;min-height:48px;margin-bottom:6px;"></textarea>
         <div style="white-space:nowrap;">
           <button id="ot-approve-${o.id}" class="btn btn-sm" style="background:var(--color-background-success);color:var(--color-text-success);border-color:var(--color-border-success);margin-right:4px;" onclick="officeReviewOvertime('${o.id}','approved')">Approve</button>
           <button id="ot-decline-${o.id}" class="btn btn-sm" style="color:var(--color-text-error);border-color:var(--color-border-error);" onclick="officeReviewOvertime('${o.id}','declined')">Decline</button>
         </div>
       </td>` : `
-      <td style="padding:6px 10px;font-size:11px;color:var(--color-text-secondary);">
+      <td rowspan="${rowspan}" style="padding:6px 10px;font-size:11px;color:var(--color-text-secondary);vertical-align:top;">
         <div style="font-weight:500;">${o.reviewedBy || ''} · ${o.reviewedAt ? new Date(o.reviewedAt).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : ''}</div>
         ${o.reviewComment ? `<div style="margin-top:3px;font-style:italic;">${o.reviewComment}</div>` : ''}
-      </td>`}
-    </tr>`;
+      </td>`;
+
+    return segments.map((seg, segIdx) => {
+      const isFirst = segIdx === 0;
+      const dur = otSegDuration(seg);
+      const durLabel = (Math.round(dur * 100) / 100).toString();
+      const locked = seg.approved === true || seg.approved === 'TRUE';
+      const isSplitting = splittingIdx === segIdx;
+
+      let segStartMin = otTimeToMinutes(seg.start), segEndMin = otTimeToMinutes(seg.end);
+      if (segEndMin <= segStartMin) segEndMin += 1440;
+      const defaultSplitTime = otMinutesToTime(segStartMin + Math.round((segEndMin - segStartMin) / 2));
+
+      const rateCells = isAdminView ? `
+        <td style="padding:6px 10px;font-size:12px;">
+          <select id="ot-rate-${o.id}-${segIdx}" ${locked ? 'disabled' : ''} onchange="updateOTSegmentRate('${o.id}', ${segIdx}, this.value)" style="font-size:12px;padding:2px 4px;">
+            <option value="1.0" ${seg.rate === '1.0' ? 'selected' : ''}>1.0x</option>
+            <option value="1.5" ${seg.rate === '1.5' ? 'selected' : ''}>1.5x</option>
+            <option value="2.0" ${seg.rate === '2.0' ? 'selected' : ''}>2.0x</option>
+          </select>
+        </td>
+        <td style="padding:6px 10px;font-size:12px;text-align:center;white-space:nowrap;">
+          ${locked
+            ? `<span class="badge badge-done" style="margin-right:4px;">✓ Locked</span><button class="btn btn-sm" style="font-size:10px;padding:2px 6px;" onclick="toggleOTSegmentLock('${o.id}', ${segIdx}, false)">Unlock</button>`
+            : `<button class="btn btn-sm" style="font-size:11px;" onclick="toggleOTSegmentLock('${o.id}', ${segIdx}, true)">Yes</button>`}
+        </td>
+        <td style="padding:6px 10px;font-size:11px;white-space:nowrap;">
+          ${isSplitting ? `
+            <input type="time" id="ot-split-time-${o.id}-${segIdx}" value="${defaultSplitTime}" style="font-size:11px;padding:2px 4px;width:90px;">
+            <button class="btn btn-sm" style="font-size:10px;padding:2px 6px;" onclick="confirmSplitOTSegment('${o.id}', ${segIdx})">✓</button>
+            <button class="btn btn-sm" style="font-size:10px;padding:2px 6px;" onclick="cancelSplitOTSegment('${o.id}')">✕</button>
+          ` : `
+            <button class="btn btn-sm" style="font-size:10px;padding:2px 6px;" onclick="splitOTSegment('${o.id}', ${segIdx})">Split ↓</button>
+            ${segments.length > 1 ? `<button class="btn btn-sm" style="font-size:10px;padding:2px 6px;color:var(--color-text-error);border-color:var(--color-border-error);" onclick="deleteOTSegment('${o.id}', ${segIdx})">Merge ↑</button>` : ''}
+          `}
+        </td>` : '';
+
+      return `<tr style="${!isFirst ? 'border-top:0.5px dashed var(--color-border-tertiary);' : ''}">
+        ${isFirst ? sharedCells : ''}
+        <td style="padding:6px 10px;font-size:12px;font-style:italic;">${seg.start} – ${seg.end} <span style="color:var(--color-text-secondary);font-style:normal;">(${durLabel}h)</span></td>
+        ${rateCells}
+        ${isFirst ? submittedCell : ''}
+        ${isFirst ? actionCell : ''}
+      </tr>`;
+    }).join('');
   }
 
   function otTable(list, showActions) {
@@ -3405,11 +3542,11 @@ function renderOvertimeTab() {
         <th style="padding:6px 10px;font-size:11px;text-align:left;">Description</th>
         <th style="padding:6px 10px;font-size:11px;text-align:center;">Hrs</th>
         <th style="padding:6px 10px;font-size:11px;text-align:left;">Time Range</th>
-        ${isAdminView ? '<th style="padding:6px 10px;font-size:11px;text-align:left;">Rate</th><th style="padding:6px 10px;font-size:11px;text-align:center;">Approved Rate</th>' : ''}
+        ${isAdminView ? '<th style="padding:6px 10px;font-size:11px;text-align:left;">Rate</th><th style="padding:6px 10px;font-size:11px;text-align:center;">Approved Rate</th><th style="padding:6px 10px;font-size:11px;text-align:left;">Adjust</th>' : ''}
         <th style="padding:6px 10px;font-size:11px;text-align:left;">Submitted</th>
         <th style="padding:6px 10px;font-size:11px;text-align:left;">${showActions === 'pending' ? 'Reason / Action' : 'Reviewed by / Comment'}</th>
       </tr></thead>
-      <tbody>${list.map(o => otRow(o, showActions)).join('')}</tbody>
+      <tbody>${list.map(o => otRowGroup(o, showActions)).join('')}</tbody>
     </table>`;
   }
 
@@ -3426,27 +3563,6 @@ function renderOvertimeTab() {
       <p style="font-size:13px;font-weight:600;margin-bottom:0.5rem;color:var(--color-text-error);">✕ Declined (${declined.length}) — in range</p>
       ${otTable(declined, 'declined')}
     </div>`;
-}
-
-async function updateOTRate(id, rate) {
-  const idx = overtimeRequests.findIndex(o => o.id === id);
-  if (idx !== -1) {
-    overtimeRequests[idx].rate = rate;
-    localStorage.setItem('overtimeRequests', JSON.stringify(overtimeRequests));
-  }
-  await api('saveOTRate', { id, rate, performedBy: currentOfficeUser || 'Office' });
-}
-
-async function toggleOTRateLock(id, lock) {
-  const idx = overtimeRequests.findIndex(o => o.id === id);
-  const rate = idx !== -1 ? (overtimeRequests[idx].rate || getOTRateSuggestion(normaliseDate(overtimeRequests[idx].date), (overtimeRequests[idx].timeRange || '').split(/\s*[–-]\s*/)[0] || '')) : null;
-  if (idx !== -1) {
-    overtimeRequests[idx].rateApproved = lock;
-    if (rate) overtimeRequests[idx].rate = rate;
-    localStorage.setItem('overtimeRequests', JSON.stringify(overtimeRequests));
-  }
-  renderOvertimeTab();
-  await api('saveOTRate', { id, rate, rateApproved: lock, performedBy: currentOfficeUser || 'Office' });
 }
 
 async function officeReviewOvertime(id, status) {
