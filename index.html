@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- BUILD MARKER: V80-08 (OT tab: real border-bottom line under each entry instead of unreliable tbody borders; time-range/rate cells top-aligned to match the other columns instead of sinking mid-row) -->
+<!-- BUILD MARKER: V80-09 (OT tab Date column now shows day-of-week alongside the date, e.g. "Mon 15 Aug") -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Timesheet App</title>
@@ -3527,6 +3527,12 @@ function renderOvertimeTab() {
 
   const isAdminView = (currentOfficeUser || '').trim().toLowerCase() === 'admin';
 
+  function otDayLabel(dateStr) {
+    const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const d = new Date(normaliseDate(dateStr) + 'T12:00:00');
+    return days[d.getDay()];
+  }
+
   function otEntryCard(o, showActions) {
     const job = jobs.find(j => j.id === o.jobId) || recurringJobs.find(j => j.id === o.jobId);
     const isRJ = recurringJobs.some(j => j.id === o.jobId);
@@ -3538,7 +3544,7 @@ function renderOvertimeTab() {
 
     const sharedCells = `
       <td rowspan="${rowspan}" style="padding:6px 10px;font-size:12px;font-weight:500;vertical-align:top;">${o.worker}</td>
-      <td rowspan="${rowspan}" style="padding:6px 10px;font-size:12px;vertical-align:top;">${fmtShortDate(o.date)}</td>
+      <td rowspan="${rowspan}" style="padding:6px 10px;font-size:12px;vertical-align:top;">${otDayLabel(o.date)} ${fmtShortDate(o.date)}</td>
       <td rowspan="${rowspan}" style="padding:6px 10px;font-size:12px;font-weight:600;vertical-align:top;">${o.jobId}</td>
       <td rowspan="${rowspan}" style="padding:6px 10px;font-size:12px;color:var(--color-text-secondary);vertical-align:top;">${propLabel(property, 35)}</td>
       <td rowspan="${rowspan}" style="padding:6px 10px;font-size:12px;color:var(--color-text-secondary);vertical-align:top;">${desc}</td>
