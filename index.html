@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- BUILD MARKER: V80-09 (OT tab Date column now shows day-of-week alongside the date, e.g. "Mon 15 Aug") -->
+<!-- BUILD MARKER: V80-10 (WO1142 driving jobs: added a Cancel/Restore toggle next to Approved Rate — marks a segment "Driving Cancelled" and reports £50 flat instead of an hourly multiplier; restores the prior rate when un-cancelled) -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Timesheet App</title>
@@ -3493,6 +3493,26 @@ async function toggleOTSegmentLock(id, segIdx, lock) {
   await saveOTSegmentsToBackend(o, segments);
 }
 
+// WO1142 driving jobs only — marks a segment as a cancelled drive, which
+// reports as a flat £50 instead of an hourly rate multiplier. Toggling it
+// off restores whatever multiplier the segment had before it was cancelled.
+async function toggleOTSegmentCancelled(id, segIdx, cancelled) {
+  const o = overtimeRequests.find(r => r.id === id);
+  if (!o) return;
+  const segments = getOTSegments(o);
+  const seg = segments[segIdx];
+  if (cancelled) {
+    seg._prevRate = seg.rate;
+    seg.rate = '50';
+    seg.cancelled = true;
+  } else {
+    seg.rate = seg._prevRate || '1.5';
+    delete seg._prevRate;
+    seg.cancelled = false;
+  }
+  await saveOTSegmentsToBackend(o, segments);
+}
+
 async function saveOTSegmentsToBackend(o, segments) {
   o.rateSegments = JSON.stringify(segments);
   localStorage.setItem('overtimeRequests', JSON.stringify(overtimeRequests));
@@ -3578,18 +3598,26 @@ function renderOvertimeTab() {
       const defEndIdx = splitOpts.length ? Math.max(defStartIdx + 1, Math.floor(splitOpts.length * 2 / 3)) : 0;
       const optHtml = selVal => splitOpts.map(m => { const t = otMinutesToTime(m); return `<option value="${t}" ${t === selVal ? 'selected' : ''}>${t}</option>`; }).join('');
 
+      const isCancelled = seg.cancelled === true || seg.cancelled === 'TRUE';
+      const isDrivingJob = o.jobId === 'WO1142';
+
       const rateCells = isAdminView ? `
         <td style="padding:6px 10px;font-size:12px;vertical-align:top;">
-          <select id="ot-rate-${o.id}-${segIdx}" ${locked ? 'disabled' : ''} onchange="updateOTSegmentRate('${o.id}', ${segIdx}, this.value)" style="font-size:12px;padding:2px 4px;">
-            <option value="1.0" ${seg.rate === '1.0' ? 'selected' : ''}>1.0x</option>
-            <option value="1.5" ${seg.rate === '1.5' ? 'selected' : ''}>1.5x</option>
-            <option value="2.0" ${seg.rate === '2.0' ? 'selected' : ''}>2.0x</option>
-          </select>
+          ${isCancelled
+            ? `<span style="font-weight:600;color:var(--color-text-error);">Driving Cancelled</span><div style="font-size:11px;color:var(--color-text-secondary);">£50 flat</div>`
+            : `<select id="ot-rate-${o.id}-${segIdx}" ${locked ? 'disabled' : ''} onchange="updateOTSegmentRate('${o.id}', ${segIdx}, this.value)" style="font-size:12px;padding:2px 4px;">
+                <option value="1.0" ${seg.rate === '1.0' ? 'selected' : ''}>1.0x</option>
+                <option value="1.5" ${seg.rate === '1.5' ? 'selected' : ''}>1.5x</option>
+                <option value="2.0" ${seg.rate === '2.0' ? 'selected' : ''}>2.0x</option>
+              </select>`}
         </td>
         <td style="padding:6px 10px;font-size:12px;text-align:center;white-space:nowrap;vertical-align:top;">
-          ${locked
+          ${isCancelled ? '' : (locked
             ? `<span class="badge badge-done" style="margin-right:4px;">✓ Locked</span><button class="btn btn-sm" style="font-size:10px;padding:2px 6px;" onclick="toggleOTSegmentLock('${o.id}', ${segIdx}, false)">Unlock</button>`
-            : `<button class="btn btn-sm" style="font-size:11px;" onclick="toggleOTSegmentLock('${o.id}', ${segIdx}, true)">Yes</button>`}
+            : `<button class="btn btn-sm" style="font-size:11px;" onclick="toggleOTSegmentLock('${o.id}', ${segIdx}, true)">Yes</button>`)}
+          ${isDrivingJob ? `<div style="margin-top:${isCancelled ? '0' : '4px'};">
+              <button class="btn btn-sm" style="font-size:10px;padding:2px 6px;${isCancelled ? 'color:var(--color-text-error);border-color:var(--color-border-error);' : ''}" onclick="toggleOTSegmentCancelled('${o.id}', ${segIdx}, ${!isCancelled})">${isCancelled ? 'Restore' : 'Cancel'}</button>
+            </div>` : ''}
         </td>
         <td style="padding:6px 10px;font-size:11px;white-space:nowrap;vertical-align:top;">
           ${isSplitting ? `
