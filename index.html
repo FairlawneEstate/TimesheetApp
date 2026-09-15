@@ -3323,7 +3323,8 @@ function getOTRateSuggestion(dateStr, startTime) {
 
 // ── OT rate segments — a single OT request can span multiple rate bands
 // (e.g. 06:00-08:00 crosses the weekday 2.0x/1.5x boundary at 07:00), so
-// each request can be split into independently-rated time segments.
+// each request is auto-split into independently-rated time segments the
+// first time it's viewed, and can be further split/merged manually.
 function otTimeToMinutes(t) {
   const p = (t || '').split(':').map(Number);
   return (p[0] || 0) * 60 + (p[1] || 0);
@@ -3342,13 +3343,70 @@ function getOTSegments(o) {
     try {
       const parsed = JSON.parse(o.rateSegments);
       if (Array.isArray(parsed) && parsed.length) return parsed;
-    } catch (e) { /* fall through to default single segment */ }
+    } catch (e) { /* fall through to auto-split */ }
   }
   const parts = (o.timeRange || '').split(/\s*[–-]\s*/);
   const start = parts[0] ? parts[0].trim() : '';
   const end = parts[1] ? parts[1].trim() : '';
-  const rate = o.rate || getOTRateSuggestion(normaliseDate(o.date), start);
-  return [{ start, end, rate, approved: (o.rateApproved === true || o.rateApproved === 'TRUE') }];
+  if (!start || !end) {
+    const rate = o.rate || getOTRateSuggestion(normaliseDate(o.date), start);
+    return [{ start, end, rate, approved: (o.rateApproved === true || o.rateApproved === 'TRUE') }];
+  }
+  return autoSplitOTSegments(normaliseDate(o.date), start, end);
+}
+
+// Rate at an absolute minute offset from a base date (offset can exceed
+// 1440 / go negative to reach into the next or previous calendar day,
+// which matters for requests that cross midnight into a different
+// weekday/weekend/bank-holiday status).
+function otRateAtAbsoluteMinute(baseDateStr, absMin) {
+  const dayOffset = Math.floor(absMin / 1440);
+  const localMin = ((absMin % 1440) + 1440) % 1440;
+  const d = new Date(baseDateStr + 'T12:00:00');
+  d.setDate(d.getDate() + dayOffset);
+  const thisDateStr = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  return getOTRateSuggestion(thisDateStr, otMinutesToTime(localMin));
+}
+
+// Auto-split a raw start–end range into segments wherever the applicable
+// rate actually changes (weekday/weekend 07:00 and 21:00 boundaries, and
+// any weekday/weekend/bank-holiday transition at midnight).
+function autoSplitOTSegments(dateStr, start, end) {
+  let s = otTimeToMinutes(start);
+  let e = otTimeToMinutes(end);
+  if (e <= s) e += 1440;
+  const cutPoints = [];
+  let prevRate = otRateAtAbsoluteMinute(dateStr, s);
+  for (let t = s + 1; t < e; t++) {
+    const r = otRateAtAbsoluteMinute(dateStr, t);
+    if (r !== prevRate) { cutPoints.push(t); prevRate = r; }
+  }
+  const points = [s, ...cutPoints, e];
+  const segments = [];
+  for (let i = 0; i < points.length - 1; i++) {
+    segments.push({
+      start: otMinutesToTime(points[i]),
+      end: otMinutesToTime(points[i + 1]),
+      rate: otRateAtAbsoluteMinute(dateStr, points[i]),
+      approved: false
+    });
+  }
+  return segments;
+}
+
+// Valid split points for the manual splitter — clock-aligned, and always
+// strictly inside the segment (so even a short segment like 20:00-21:00
+// still offers real choices, just at finer granularity than 15 min).
+function getOTSplitOptions(seg) {
+  let s = otTimeToMinutes(seg.start), e = otTimeToMinutes(seg.end);
+  if (e <= s) e += 1440;
+  for (const step of [15, 10, 5, 1]) {
+    const opts = [];
+    let t = Math.ceil((s + 1) / step) * step;
+    for (; t < e; t += step) opts.push(t);
+    if (opts.length) return opts;
+  }
+  return [];
 }
 
 let otSplitUIState = {}; // { [otId]: segIdx currently showing the inline split-time picker }
@@ -3363,9 +3421,16 @@ function cancelSplitOTSegment(id) {
   renderOvertimeTab();
 }
 
+function syncOTSplitSelect(id, segIdx, source) {
+  const a = document.getElementById(`ot-split-a-${id}-${segIdx}`);
+  const b = document.getElementById(`ot-split-b-${id}-${segIdx}`);
+  if (!a || !b) return;
+  if (source === 'a') b.value = a.value; else a.value = b.value;
+}
+
 async function confirmSplitOTSegment(id, segIdx) {
-  const input = document.getElementById(`ot-split-time-${id}-${segIdx}`);
-  const splitTime = input ? input.value : '';
+  const select = document.getElementById(`ot-split-a-${id}-${segIdx}`) || document.getElementById(`ot-split-b-${id}-${segIdx}`);
+  const splitTime = select ? select.value : '';
   if (!splitTime) { alert('Please choose a split time.'); return; }
 
   const o = overtimeRequests.find(r => r.id === id);
@@ -3493,9 +3558,8 @@ function renderOvertimeTab() {
       const locked = seg.approved === true || seg.approved === 'TRUE';
       const isSplitting = splittingIdx === segIdx;
 
-      let segStartMin = otTimeToMinutes(seg.start), segEndMin = otTimeToMinutes(seg.end);
-      if (segEndMin <= segStartMin) segEndMin += 1440;
-      const defaultSplitTime = otMinutesToTime(segStartMin + Math.round((segEndMin - segStartMin) / 2));
+      const splitOpts = isSplitting ? getOTSplitOptions(seg) : [];
+      const defaultSplitTime = splitOpts.length ? otMinutesToTime(splitOpts[Math.floor(splitOpts.length / 2)]) : '';
 
       const rateCells = isAdminView ? `
         <td style="padding:6px 10px;font-size:12px;">
@@ -3512,9 +3576,18 @@ function renderOvertimeTab() {
         </td>
         <td style="padding:6px 10px;font-size:11px;white-space:nowrap;">
           ${isSplitting ? `
-            <input type="time" id="ot-split-time-${o.id}-${segIdx}" value="${defaultSplitTime}" style="font-size:11px;padding:2px 4px;width:90px;">
-            <button class="btn btn-sm" style="font-size:10px;padding:2px 6px;" onclick="confirmSplitOTSegment('${o.id}', ${segIdx})">✓</button>
-            <button class="btn btn-sm" style="font-size:10px;padding:2px 6px;" onclick="cancelSplitOTSegment('${o.id}')">✕</button>
+            <div style="display:flex;flex-direction:column;gap:3px;align-items:flex-start;">
+              <select id="ot-split-a-${o.id}-${segIdx}" onchange="syncOTSplitSelect('${o.id}', ${segIdx}, 'a')" style="font-size:10px;padding:2px 4px;max-width:150px;">
+                ${splitOpts.map(m => { const t = otMinutesToTime(m); return `<option value="${t}" ${t === defaultSplitTime ? 'selected' : ''}>${seg.start} – ${t}</option>`; }).join('')}
+              </select>
+              <select id="ot-split-b-${o.id}-${segIdx}" onchange="syncOTSplitSelect('${o.id}', ${segIdx}, 'b')" style="font-size:10px;padding:2px 4px;max-width:150px;">
+                ${splitOpts.map(m => { const t = otMinutesToTime(m); return `<option value="${t}" ${t === defaultSplitTime ? 'selected' : ''}>${t} – ${seg.end}</option>`; }).join('')}
+              </select>
+              <div>
+                <button class="btn btn-sm" style="font-size:10px;padding:2px 6px;" onclick="confirmSplitOTSegment('${o.id}', ${segIdx})">✓</button>
+                <button class="btn btn-sm" style="font-size:10px;padding:2px 6px;" onclick="cancelSplitOTSegment('${o.id}')">✕</button>
+              </div>
+            </div>
           ` : `
             <button class="btn btn-sm" style="font-size:10px;padding:2px 6px;" onclick="splitOTSegment('${o.id}', ${segIdx})">Split ↓</button>
             ${segments.length > 1 ? `<button class="btn btn-sm" style="font-size:10px;padding:2px 6px;color:var(--color-text-error);border-color:var(--color-border-error);" onclick="deleteOTSegment('${o.id}', ${segIdx})">Merge ↑</button>` : ''}
