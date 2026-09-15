@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- BUILD MARKER: V80-07 (OT tab reverted to original compact table layout; each request's rows now boxed in their own bordered group instead of spaced-out cards; carve-out split picker retained) -->
+<!-- BUILD MARKER: V80-08 (OT tab: real border-bottom line under each entry instead of unreliable tbody borders; time-range/rate cells top-aligned to match the other columns instead of sinking mid-row) -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Timesheet App</title>
@@ -3561,6 +3561,7 @@ function renderOvertimeTab() {
 
     const segRows = segments.map((seg, segIdx) => {
       const isFirst = segIdx === 0;
+      const isLast = segIdx === segments.length - 1;
       const dur = otSegDuration(seg);
       const durLabel = (Math.round(dur * 100) / 100).toString();
       const locked = seg.approved === true || seg.approved === 'TRUE';
@@ -3572,19 +3573,19 @@ function renderOvertimeTab() {
       const optHtml = selVal => splitOpts.map(m => { const t = otMinutesToTime(m); return `<option value="${t}" ${t === selVal ? 'selected' : ''}>${t}</option>`; }).join('');
 
       const rateCells = isAdminView ? `
-        <td style="padding:6px 10px;font-size:12px;">
+        <td style="padding:6px 10px;font-size:12px;vertical-align:top;">
           <select id="ot-rate-${o.id}-${segIdx}" ${locked ? 'disabled' : ''} onchange="updateOTSegmentRate('${o.id}', ${segIdx}, this.value)" style="font-size:12px;padding:2px 4px;">
             <option value="1.0" ${seg.rate === '1.0' ? 'selected' : ''}>1.0x</option>
             <option value="1.5" ${seg.rate === '1.5' ? 'selected' : ''}>1.5x</option>
             <option value="2.0" ${seg.rate === '2.0' ? 'selected' : ''}>2.0x</option>
           </select>
         </td>
-        <td style="padding:6px 10px;font-size:12px;text-align:center;white-space:nowrap;">
+        <td style="padding:6px 10px;font-size:12px;text-align:center;white-space:nowrap;vertical-align:top;">
           ${locked
             ? `<span class="badge badge-done" style="margin-right:4px;">✓ Locked</span><button class="btn btn-sm" style="font-size:10px;padding:2px 6px;" onclick="toggleOTSegmentLock('${o.id}', ${segIdx}, false)">Unlock</button>`
             : `<button class="btn btn-sm" style="font-size:11px;" onclick="toggleOTSegmentLock('${o.id}', ${segIdx}, true)">Yes</button>`}
         </td>
-        <td style="padding:6px 10px;font-size:11px;white-space:nowrap;">
+        <td style="padding:6px 10px;font-size:11px;white-space:nowrap;vertical-align:top;">
           ${isSplitting ? `
             <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;">
               <span style="color:var(--color-text-secondary);">from</span>
@@ -3600,21 +3601,21 @@ function renderOvertimeTab() {
           `}
         </td>` : '';
 
-      return `<tr style="${!isFirst ? 'border-top:0.5px dashed var(--color-border-tertiary);' : ''}">
+      return `<tr style="${!isFirst ? 'border-top:0.5px dashed var(--color-border-tertiary);' : ''}${isLast ? 'border-bottom:1px solid var(--color-border-secondary);' : ''}">
         ${isFirst ? sharedCells : ''}
-        <td style="padding:6px 10px;font-size:12px;font-style:italic;">${seg.start} – ${seg.end} <span style="color:var(--color-text-secondary);font-style:normal;">(${durLabel}h)</span></td>
+        <td style="padding:6px 10px;font-size:12px;font-style:italic;vertical-align:top;">${seg.start} – ${seg.end} <span style="color:var(--color-text-secondary);font-style:normal;">(${durLabel}h)</span></td>
         ${rateCells}
         ${isFirst ? submittedCell : ''}
         ${isFirst ? actionCell : ''}
       </tr>`;
     }).join('');
 
-    return `<tbody style="border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);">${segRows}</tbody>`;
+    return segRows;
   }
 
   function otTable(list, showActions) {
     if (!list.length) return '<p class="text-muted" style="padding:0.5rem 0;">None.</p>';
-    return `<table style="width:100%;border-collapse:separate;border-spacing:0 6px;">
+    return `<table style="width:100%;border-collapse:collapse;">
       <thead><tr style="border-bottom:1px solid var(--color-border-secondary);">
         <th style="padding:6px 10px;font-size:11px;text-align:left;">Worker</th>
         <th style="padding:6px 10px;font-size:11px;text-align:left;">Date</th>
@@ -3627,7 +3628,7 @@ function renderOvertimeTab() {
         <th style="padding:6px 10px;font-size:11px;text-align:left;">Submitted</th>
         <th style="padding:6px 10px;font-size:11px;text-align:left;">${showActions === 'pending' ? 'Reason / Action' : 'Reviewed by / Comment'}</th>
       </tr></thead>
-      ${list.map(o => otEntryCard(o, showActions)).join('')}
+      <tbody>${list.map(o => otEntryCard(o, showActions)).join('')}</tbody>
     </table>`;
   }
 
