@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- BUILD MARKER: V80-11 (OT rate dropdown widened so "1.5x" isn't clipped; added a "Rate Report" export — Sheet 1: Worker/Date/W-O/Desc/Hours/Time Range/Rate/Approved Y-N/Approved By per segment, Sheet 2: per-worker totals by rate for approved OT) -->
+<!-- BUILD MARKER: V80-12 (Rate-lock now records who approved it and when; Rate Report gains "Rate Approved (Y/N)" / "Rate Approved By" columns alongside the renamed request-level "Request Approved" columns) -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Timesheet App</title>
@@ -3493,6 +3493,8 @@ async function toggleOTSegmentLock(id, segIdx, lock) {
   if (!o) return;
   const segments = getOTSegments(o);
   segments[segIdx].approved = lock;
+  segments[segIdx].approvedBy = lock ? (currentOfficeUser || 'Office') : '';
+  segments[segIdx].approvedAt = lock ? new Date().toISOString() : '';
   await saveOTSegmentsToBackend(o, segments);
 }
 
@@ -3616,7 +3618,7 @@ function renderOvertimeTab() {
         </td>
         <td style="padding:6px 10px;font-size:12px;text-align:center;white-space:nowrap;vertical-align:top;">
           ${isCancelled ? '' : (locked
-            ? `<span class="badge badge-done" style="margin-right:4px;">✓ Locked</span><button class="btn btn-sm" style="font-size:10px;padding:2px 6px;" onclick="toggleOTSegmentLock('${o.id}', ${segIdx}, false)">Unlock</button>`
+            ? `<span class="badge badge-done" style="margin-right:4px;" title="${seg.approvedBy ? 'Rate approved by ' + seg.approvedBy : ''}">✓ Locked</span><button class="btn btn-sm" style="font-size:10px;padding:2px 6px;" onclick="toggleOTSegmentLock('${o.id}', ${segIdx}, false)">Unlock</button>`
             : `<button class="btn btn-sm" style="font-size:11px;" onclick="toggleOTSegmentLock('${o.id}', ${segIdx}, true)">Yes</button>`)}
           ${isDrivingJob ? `<div style="margin-top:${isCancelled ? '0' : '4px'};">
               <button class="btn btn-sm" style="font-size:10px;padding:2px 6px;${isCancelled ? 'color:var(--color-text-error);border-color:var(--color-border-error);' : ''}" onclick="toggleOTSegmentCancelled('${o.id}', ${segIdx}, ${!isCancelled})">${isCancelled ? 'Restore' : 'Cancel'}</button>
@@ -4112,9 +4114,9 @@ async function exportOvertimeRateReport() {
   const sheet = workbook.addWorksheet('Overtime');
   sheet.columns = [
     { width: 16 }, { width: 12 }, { width: 14 }, { width: 35 },
-    { width: 8 }, { width: 16 }, { width: 12 }, { width: 12 }, { width: 20 }
+    { width: 8 }, { width: 16 }, { width: 12 }, { width: 16 }, { width: 20 }, { width: 16 }, { width: 20 }
   ];
-  const headerRow = sheet.addRow(['Worker', 'Date', 'W/O', 'Description', 'Hours', 'Time Range', 'Rate', 'Approved (Y/N)', 'Approved By']);
+  const headerRow = sheet.addRow(['Worker', 'Date', 'W/O', 'Description', 'Hours', 'Time Range', 'Rate', 'Request Approved (Y/N)', 'Request Approved By', 'Rate Approved (Y/N)', 'Rate Approved By']);
   headerRow.height = 20;
   headerRow.eachCell({ includeEmpty: true }, cell => {
     cell.font = HEADER_FONT;
@@ -4135,10 +4137,12 @@ async function exportOvertimeRateReport() {
     for (const seg of segments) {
       const hours = Math.round(otSegDuration(seg) * 100) / 100;
       const rate = rateLabel(seg);
+      const rateApproved = seg.approved === true || seg.approved === 'TRUE';
       const row = sheet.addRow([
         o.worker, normaliseDate(o.date), o.jobId, description,
         hours, `${seg.start} – ${seg.end}`, rate,
-        isApproved ? 'Y' : 'N', o.reviewedBy || ''
+        isApproved ? 'Y' : 'N', o.reviewedBy || '',
+        rateApproved ? 'Y' : 'N', seg.approvedBy || ''
       ]);
       row.eachCell({ includeEmpty: true }, cell => { cell.border = THIN_BORDER; });
 
