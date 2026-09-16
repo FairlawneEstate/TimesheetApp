@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- BUILD MARKER: V80-13 (OT Rate/Approved Rate/Adjust columns now visible to all office users, not just admin; Unlock button remains admin-only — everyone else sees the Locked badge with no way to unlock) -->
+<!-- BUILD MARKER: V80-14 (Reliability/speed pass: frontend api() now retries transient network/HTTP failures with backoff instead of failing the whole call on the first hiccup — companion Code.gs changes provided separately) -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Timesheet App</title>
@@ -832,17 +832,28 @@ window.addEventListener('online', () => {
 
 // ── API helpers ───────────────────────────────────────────────────
 
-function api(action, payload = {}) {
+function api(action, payload = {}, _attempt = 0) {
   if (!SCRIPT_URL) return Promise.reject(new Error('No SCRIPT_URL configured'));
+  const MAX_ATTEMPTS = 3; // 1 initial try + 2 retries
   return fetch(SCRIPT_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain' },
     body: JSON.stringify({ action, ...payload })
   })
-  .then(function(r) { return r.json(); })
+  .then(function(r) {
+    if (!r.ok) throw new Error('HTTP ' + r.status); // transient — worth retrying
+    return r.json().catch(function() { throw new Error('Bad response from server'); }); // non-JSON — also transient
+  })
   .then(function(data) {
-    if (data.error) throw new Error(data.error);
+    if (data.error) throw new Error(data.error); // real app-level error — not retried
     return data;
+  })
+  .catch(function(err) {
+    const isAppError = err.message && !/^HTTP \d|Bad response from server|Failed to fetch|NetworkError|network/i.test(err.message);
+    if (isAppError || _attempt >= MAX_ATTEMPTS - 1) throw err;
+    const delay = 500 * Math.pow(2, _attempt); // 500ms, then 1000ms
+    return new Promise(function(resolve) { setTimeout(resolve, delay); })
+      .then(function() { return api(action, payload, _attempt + 1); });
   });
 }
 
