@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- BUILD MARKER: V80-12 (Rate-lock now records who approved it and when; Rate Report gains "Rate Approved (Y/N)" / "Rate Approved By" columns alongside the renamed request-level "Request Approved" columns) -->
+<!-- BUILD MARKER: V80-13 (OT Rate/Approved Rate/Adjust columns now visible to all office users, not just admin; Unlock button remains admin-only — everyone else sees the Locked badge with no way to unlock) -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Timesheet App</title>
@@ -3606,7 +3606,7 @@ function renderOvertimeTab() {
       const isCancelled = seg.cancelled === true || seg.cancelled === 'TRUE';
       const isDrivingJob = o.jobId === 'WO1142';
 
-      const rateCells = isAdminView ? `
+      const rateCells = `
         <td style="padding:6px 10px;font-size:12px;vertical-align:top;">
           ${isCancelled
             ? `<span style="font-weight:600;color:var(--color-text-error);">Driving Cancelled</span><div style="font-size:11px;color:var(--color-text-secondary);">£50 flat</div>`
@@ -3618,7 +3618,7 @@ function renderOvertimeTab() {
         </td>
         <td style="padding:6px 10px;font-size:12px;text-align:center;white-space:nowrap;vertical-align:top;">
           ${isCancelled ? '' : (locked
-            ? `<span class="badge badge-done" style="margin-right:4px;" title="${seg.approvedBy ? 'Rate approved by ' + seg.approvedBy : ''}">✓ Locked</span><button class="btn btn-sm" style="font-size:10px;padding:2px 6px;" onclick="toggleOTSegmentLock('${o.id}', ${segIdx}, false)">Unlock</button>`
+            ? `<span class="badge badge-done" style="margin-right:4px;" title="${seg.approvedBy ? 'Rate approved by ' + seg.approvedBy : ''}">✓ Locked</span>${isAdminView ? `<button class="btn btn-sm" style="font-size:10px;padding:2px 6px;" onclick="toggleOTSegmentLock('${o.id}', ${segIdx}, false)">Unlock</button>` : ''}`
             : `<button class="btn btn-sm" style="font-size:11px;" onclick="toggleOTSegmentLock('${o.id}', ${segIdx}, true)">Yes</button>`)}
           ${isDrivingJob ? `<div style="margin-top:${isCancelled ? '0' : '4px'};">
               <button class="btn btn-sm" style="font-size:10px;padding:2px 6px;${isCancelled ? 'color:var(--color-text-error);border-color:var(--color-border-error);' : ''}" onclick="toggleOTSegmentCancelled('${o.id}', ${segIdx}, ${!isCancelled})">${isCancelled ? 'Restore' : 'Cancel'}</button>
@@ -3638,7 +3638,7 @@ function renderOvertimeTab() {
             <button class="btn btn-sm" style="font-size:10px;padding:2px 6px;" onclick="splitOTSegment('${o.id}', ${segIdx})">Split ↓</button>
             ${segments.length > 1 ? `<button class="btn btn-sm" style="font-size:10px;padding:2px 6px;color:var(--color-text-error);border-color:var(--color-border-error);" onclick="deleteOTSegment('${o.id}', ${segIdx})">Merge ↑</button>` : ''}
           `}
-        </td>` : '';
+        </td>`;
 
       return `<tr style="${!isFirst ? 'border-top:0.5px dashed var(--color-border-tertiary);' : ''}${isLast ? 'border-bottom:1px solid var(--color-border-secondary);' : ''}">
         ${isFirst ? sharedCells : ''}
@@ -3663,7 +3663,7 @@ function renderOvertimeTab() {
         <th style="padding:6px 10px;font-size:11px;text-align:left;">Description</th>
         <th style="padding:6px 10px;font-size:11px;text-align:center;">Hrs</th>
         <th style="padding:6px 10px;font-size:11px;text-align:left;">Time Range</th>
-        ${isAdminView ? '<th style="padding:6px 10px;font-size:11px;text-align:left;">Rate</th><th style="padding:6px 10px;font-size:11px;text-align:center;">Approved Rate</th><th style="padding:6px 10px;font-size:11px;text-align:left;">Adjust</th>' : ''}
+        <th style="padding:6px 10px;font-size:11px;text-align:left;">Rate</th><th style="padding:6px 10px;font-size:11px;text-align:center;">Approved Rate</th><th style="padding:6px 10px;font-size:11px;text-align:left;">Adjust</th>
         <th style="padding:6px 10px;font-size:11px;text-align:left;">Submitted</th>
         <th style="padding:6px 10px;font-size:11px;text-align:left;">${showActions === 'pending' ? 'Reason / Action' : 'Reviewed by / Comment'}</th>
       </tr></thead>
