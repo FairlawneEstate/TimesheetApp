@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- BUILD MARKER: V80-14 (Reliability/speed pass: frontend api() now retries transient network/HTTP failures with backoff instead of failing the whole call on the first hiccup — companion Code.gs changes provided separately) -->
+<!-- BUILD MARKER: V80-15 (Bank holidays are now live from gov.uk, fetched server-side in Code.gs and passed through getData(); hardcoded list is now only the emergency fallback, with the last live list also cached in localStorage) -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Timesheet App</title>
@@ -862,6 +862,10 @@ function loadInitialData() {
   api('getData').then(function(data) {
     jobs = data.jobs || [];
     workers = (data.workers || []).map(w => ({ ...w, name: String(w.name || '').trim().replace(/\s+/g, ' ') }));
+    if (Array.isArray(data.bankHolidays) && data.bankHolidays.length) {
+      BANK_HOLIDAYS = data.bankHolidays;
+      localStorage.setItem('bankHolidays', JSON.stringify(BANK_HOLIDAYS));
+    }
     entries = (data.entries || []).map(e => ({
       ...e,
       worker: String(e.worker || '').trim().replace(/\s+/g, ' '),
@@ -1058,6 +1062,10 @@ async function pollJobs() {
     const data = await api('getData');
     jobs = data.jobs || [];
     workers = (data.workers || workers).map(w => ({ ...w, name: String(w.name || '').trim().replace(/\s+/g, ' ') }));
+    if (Array.isArray(data.bankHolidays) && data.bankHolidays.length) {
+      BANK_HOLIDAYS = data.bankHolidays;
+      localStorage.setItem('bankHolidays', JSON.stringify(BANK_HOLIDAYS));
+    }
     entries = (data.entries || []).map(e => ({
       ...e,
       worker: String(e.worker || '').trim().replace(/\s+/g, ' '),
@@ -1824,13 +1832,22 @@ function toggleEditWeek(id) {
   if (row) row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
 }
 
-// ── Bank Holidays (England & Wales 2026-2027) ─────────────────────
-const BANK_HOLIDAYS = [
+// ── Bank Holidays — England & Wales, live from gov.uk (see loadInitialData) ──
+// This hardcoded list is only the emergency fallback for a first-ever load
+// with no network and no prior cached data; it's overwritten as soon as a
+// live list is available from the backend (which fetches gov.uk server-side
+// and keeps its own fallback — see getBankHolidaysList_ in Code.gs) or from
+// a previous session's cache.
+let BANK_HOLIDAYS = [
   '2026-01-01','2026-04-03','2026-04-06','2026-05-04','2026-05-25',
   '2026-08-31','2026-12-25','2026-12-28',
   '2027-01-01','2027-03-26','2027-03-29','2027-05-03','2027-05-31',
   '2027-08-30','2027-12-27','2027-12-28'
 ];
+try {
+  const cachedBankHolidays = JSON.parse(localStorage.getItem('bankHolidays') || 'null');
+  if (Array.isArray(cachedBankHolidays) && cachedBankHolidays.length) BANK_HOLIDAYS = cachedBankHolidays;
+} catch (e) { /* keep the hardcoded fallback above */ }
 
 
 
@@ -2104,6 +2121,10 @@ async function refreshOffice() {
       const data = await api('getData');
       jobs = data.jobs || [];
       workers = (data.workers || []).map(w => ({ ...w, name: String(w.name || '').trim().replace(/\s+/g, ' ') }));
+      if (Array.isArray(data.bankHolidays) && data.bankHolidays.length) {
+        BANK_HOLIDAYS = data.bankHolidays;
+        localStorage.setItem('bankHolidays', JSON.stringify(BANK_HOLIDAYS));
+      }
       entries = (data.entries || []).map(e => ({
         ...e,
         worker: String(e.worker || '').trim().replace(/\s+/g, ' '),
