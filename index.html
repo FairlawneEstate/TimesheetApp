@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- BUILD MARKER: V80-16 (Timesheet CSV export now includes rates — split OT entries expand into one row per rate segment with its own Time Range/Rate/Rate Hours, matched back to the originating OT request; non-split entries unaffected) -->
+<!-- BUILD MARKER: V80-17 (Timesheet CSV: split OT rows now report the segment's own hours in the Hours column; separate Rate Hours column removed to prevent double-reporting) -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Timesheet App</title>
@@ -4256,7 +4256,7 @@ function exportCSV() {
     return true;
   });
 
-  const headers = ['Worker', 'Job ID', 'Property', 'Description', 'Date', 'Hours', 'Is Overtime', 'Overtime Start', 'Overtime End', 'Rate Time Range', 'Rate', 'Rate Hours', 'Comments', 'Reported Date', 'Assigned To', 'Amended', 'Amendment Count', 'Last Amended By', 'Last Amended At', 'Last Reason'];
+  const headers = ['Worker', 'Job ID', 'Property', 'Description', 'Date', 'Hours', 'Is Overtime', 'Overtime Start', 'Overtime End', 'Rate Time Range', 'Rate', 'Comments', 'Reported Date', 'Assigned To', 'Amended', 'Amendment Count', 'Last Amended By', 'Last Amended At', 'Last Reason'];
   const rows = filtered.flatMap(e => {
     const job = jobs.find(j => j.id === e.jobId) || recurringJobs.find(j => j.id === e.jobId) || tasks.find(j => j.id === e.jobId);
     const isRJ = recurringJobs.some(j => j.id === e.jobId);
@@ -4281,28 +4281,19 @@ function exportCSV() {
     const toCsvRow = fields => fields.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(',');
 
     if (!e.isOvertime) {
-      return [toCsvRow([...baseFields, '', '', '', ...trailingFields])];
+      return [toCsvRow([...baseFields, '', '', ...trailingFields])];
     }
 
-    // Split OT (e.g. a shift crossing the 9pm rate boundary, or a manual
-    // split/carve-out) gets one CSV row per rate segment — each with its
-    // own Time Range/Rate/Hours — rather than squeezing several rates
-    // into one cell. 'Hours' above stays the full entry total on every
-    // row (so nothing reading that column alone breaks); 'Rate Hours' is
-    // the segment's own duration, so summing that column gives the
-    // correct total without double-counting.
     const otReq = findOTRequestForEntry_(e);
     const segments = otReq
       ? getOTSegments(otReq)
       : [{ start: e.overtimeStart, end: e.overtimeEnd, rate: getOTRateSuggestion(normaliseDate(e.date), e.overtimeStart) }];
 
-    return segments.map(seg => toCsvRow([
-      ...baseFields,
-      seg.start + ' - ' + seg.end,
-      csvRateLabel_(seg),
-      Math.round(otSegDuration(seg) * 100) / 100,
-      ...trailingFields
-    ]));
+    return segments.map(seg => {
+      const fields = [...baseFields];
+      fields[5] = Math.round(otSegDuration(seg) * 100) / 100;
+      return toCsvRow([...fields, seg.start + ' - ' + seg.end, csvRateLabel_(seg), ...trailingFields]);
+    });
   });
 
   const csv = [headers.join(','), ...rows].join('\n');
