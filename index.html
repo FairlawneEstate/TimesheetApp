@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- BUILD MARKER: V80-15 (Bank holidays are now live from gov.uk, fetched server-side in Code.gs and passed through getData(); hardcoded list is now only the emergency fallback, with the last live list also cached in localStorage) -->
+<!-- BUILD MARKER: V80-16 (Timesheet CSV export now includes rates — split OT entries expand into one row per rate segment with its own Time Range/Rate/Rate Hours, matched back to the originating OT request; non-split entries unaffected) -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Timesheet App</title>
@@ -4221,6 +4221,28 @@ async function exportOvertimeRateReport() {
 }
 
 
+// Finds the approved OT request an auto-created overtime entry came from —
+// reliable because approval creates the entry with the exact same worker,
+// job, date and time range as the request itself (see reviewOvertimeRequest
+// in Code.gs). Needed so the CSV can show each entry's actual rate
+// segments rather than just the overall start/end time it was approved for.
+function findOTRequestForEntry_(e) {
+  if (!e.isOvertime) return null;
+  const dateStr = normaliseDate(e.date);
+  return overtimeRequests.find(o => {
+    if (o.worker !== e.worker || o.jobId !== e.jobId || normaliseDate(o.date) !== dateStr) return false;
+    const parts = (o.timeRange || '').split(/\s*[–-]\s*/);
+    const oStart = parts[0] ? parts[0].trim() : '';
+    const oEnd   = parts[1] ? parts[1].trim() : '';
+    return oStart === e.overtimeStart && oEnd === e.overtimeEnd;
+  }) || null;
+}
+
+function csvRateLabel_(seg) {
+  if (seg.cancelled === true || seg.cancelled === 'TRUE') return 'Cancelled (£50)';
+  return seg.rate ? seg.rate + 'x' : '';
+}
+
 function exportCSV() {
   const workerFilter = document.getElementById('oe-worker-filter')?.value || '';
   const fromVal      = document.getElementById('oe-date-from')?.value || '';
@@ -4234,25 +4256,53 @@ function exportCSV() {
     return true;
   });
 
-  const headers = ['Worker', 'Job ID', 'Property', 'Description', 'Date', 'Hours', 'Is Overtime', 'Overtime Start', 'Overtime End', 'Comments', 'Reported Date', 'Assigned To', 'Amended', 'Amendment Count', 'Last Amended By', 'Last Amended At', 'Last Reason'];
-  const rows = filtered.map(e => {
+  const headers = ['Worker', 'Job ID', 'Property', 'Description', 'Date', 'Hours', 'Is Overtime', 'Overtime Start', 'Overtime End', 'Rate Time Range', 'Rate', 'Rate Hours', 'Comments', 'Reported Date', 'Assigned To', 'Amended', 'Amendment Count', 'Last Amended By', 'Last Amended At', 'Last Reason'];
+  const rows = filtered.flatMap(e => {
     const job = jobs.find(j => j.id === e.jobId) || recurringJobs.find(j => j.id === e.jobId) || tasks.find(j => j.id === e.jobId);
     const isRJ = recurringJobs.some(j => j.id === e.jobId);
     const last = e.amendments && e.amendments.length ? e.amendments[e.amendments.length - 1] : null;
-    return [
+
+    const baseFields = [
       e.worker, e.jobId,
       isRJ ? (e.property || (job ? job.property : '')) : (job ? job.property : (e.property || '')),
       (job ? (job.description || '') : (e.description || '')).slice(0, 200),
       e.date, e.hours,
       e.isOvertime ? 'Yes' : 'No',
       e.overtimeStart || '',
-      e.overtimeEnd || '',
+      e.overtimeEnd || ''
+    ];
+    const trailingFields = [
       e.comments || '',
       job ? (job.reportedDate || '') : '',
       job ? (job.assignedTo || '') : '',
       last ? 'Yes' : 'No', e.amendments ? e.amendments.length : 0,
       last ? last.by : '', last ? last.at : '', last ? last.note : ''
-    ].map(v => '"' + String(v).replace(/"/g, '""') + '"').join(',');
+    ];
+    const toCsvRow = fields => fields.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(',');
+
+    if (!e.isOvertime) {
+      return [toCsvRow([...baseFields, '', '', '', ...trailingFields])];
+    }
+
+    // Split OT (e.g. a shift crossing the 9pm rate boundary, or a manual
+    // split/carve-out) gets one CSV row per rate segment — each with its
+    // own Time Range/Rate/Hours — rather than squeezing several rates
+    // into one cell. 'Hours' above stays the full entry total on every
+    // row (so nothing reading that column alone breaks); 'Rate Hours' is
+    // the segment's own duration, so summing that column gives the
+    // correct total without double-counting.
+    const otReq = findOTRequestForEntry_(e);
+    const segments = otReq
+      ? getOTSegments(otReq)
+      : [{ start: e.overtimeStart, end: e.overtimeEnd, rate: getOTRateSuggestion(normaliseDate(e.date), e.overtimeStart) }];
+
+    return segments.map(seg => toCsvRow([
+      ...baseFields,
+      seg.start + ' - ' + seg.end,
+      csvRateLabel_(seg),
+      Math.round(otSegDuration(seg) * 100) / 100,
+      ...trailingFields
+    ]));
   });
 
   const csv = [headers.join(','), ...rows].join('\n');
