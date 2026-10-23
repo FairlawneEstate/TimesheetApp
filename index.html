@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- BUILD MARKER: V80-18 (Merged V80-06/07 from live: 8h/day OT split with normal-part entry, OT pending badge by entryId) | prev V80-17 (Timesheet CSV: split OT rows now report the segment's own hours in the Hours column; separate Rate Hours column removed to prevent double-reporting) -->
+<!-- BUILD MARKER: V80-19 (OT rate activity log now records the specific action: split, merge, rate change, lock/unlock, driving cancel/restore, with segment and worker/WO/date) | prev V80-18 (Merged V80-06/07 from live: 8h/day OT split with normal-part entry, OT pending badge by entryId) | prev V80-17 (Timesheet CSV: split OT rows now report the segment's own hours in the Hours column; separate Rate Hours column removed to prevent double-reporting) -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Timesheet App</title>
@@ -3515,9 +3515,10 @@ async function confirmSplitOTSegment(id, segIdx) {
     newPieces.push({ start: otMinutesToTime(rEnd), end: otMinutesToTime(segEnd), rate: otRateAtAbsoluteMinute(dateStr, rEnd), approved: false });
   }
 
+  const origLabel = seg.start + '–' + seg.end;
   segments.splice(segIdx, 1, ...newPieces);
   delete otSplitUIState[id];
-  await saveOTSegmentsToBackend(o, segments);
+  await saveOTSegmentsToBackend(o, segments, 'Split ' + origLabel + ' into ' + newPieces.map(otLogSeg_).join(', '));
 }
 
 async function deleteOTSegment(id, segIdx) {
@@ -3526,17 +3527,19 @@ async function deleteOTSegment(id, segIdx) {
   if (!o) return;
   const segments = getOTSegments(o);
   if (segments.length <= 1) return;
+  const mergedFrom = otLogSeg_(segments[segIdx - 1]) + ' + ' + otLogSeg_(segments[segIdx]);
   segments[segIdx - 1].end = segments[segIdx].end;
   segments.splice(segIdx, 1);
-  await saveOTSegmentsToBackend(o, segments);
+  await saveOTSegmentsToBackend(o, segments, 'Merged ' + mergedFrom + ' into ' + segments[segIdx - 1].start + '–' + segments[segIdx - 1].end);
 }
 
 async function updateOTSegmentRate(id, segIdx, rate) {
   const o = overtimeRequests.find(r => r.id === id);
   if (!o) return;
   const segments = getOTSegments(o);
+  const oldRate = segments[segIdx].rate;
   segments[segIdx].rate = rate;
-  await saveOTSegmentsToBackend(o, segments);
+  await saveOTSegmentsToBackend(o, segments, 'Rate changed ' + oldRate + 'x to ' + rate + 'x for ' + segments[segIdx].start + '–' + segments[segIdx].end);
 }
 
 async function toggleOTSegmentLock(id, segIdx, lock) {
@@ -3546,7 +3549,7 @@ async function toggleOTSegmentLock(id, segIdx, lock) {
   segments[segIdx].approved = lock;
   segments[segIdx].approvedBy = lock ? (currentOfficeUser || 'Office') : '';
   segments[segIdx].approvedAt = lock ? new Date().toISOString() : '';
-  await saveOTSegmentsToBackend(o, segments);
+  await saveOTSegmentsToBackend(o, segments, (lock ? 'Locked ' : 'Unlocked ') + otLogSeg_(segments[segIdx]));
 }
 
 // WO1142 driving jobs only — marks a segment as a cancelled drive, which
@@ -3566,14 +3569,18 @@ async function toggleOTSegmentCancelled(id, segIdx, cancelled) {
     delete seg._prevRate;
     seg.cancelled = false;
   }
-  await saveOTSegmentsToBackend(o, segments);
+  await saveOTSegmentsToBackend(o, segments, (cancelled ? 'Driving cancelled ' : 'Driving restored ') + seg.start + '–' + seg.end + ' (' + otLogRate_(seg) + ')');
 }
 
-async function saveOTSegmentsToBackend(o, segments) {
+function otLogRate_(seg) { return seg.cancelled ? 'Driving Cancelled (£50)' : seg.rate + 'x'; }
+function otLogSeg_(seg) { return seg.start + '–' + seg.end + ' @ ' + otLogRate_(seg); }
+function otLogCtx_(o) { return o.worker + ', ' + o.jobId + ', ' + normaliseDate(o.date); }
+
+async function saveOTSegmentsToBackend(o, segments, detail) {
   o.rateSegments = JSON.stringify(segments);
   localStorage.setItem('overtimeRequests', JSON.stringify(overtimeRequests));
   renderOvertimeTab();
-  await api('saveOTRate', { id: o.id, rateSegments: o.rateSegments, performedBy: currentOfficeUser || 'Office' });
+  await api('saveOTRate', { id: o.id, rateSegments: o.rateSegments, performedBy: currentOfficeUser || 'Office', detail: detail ? detail + ' (' + otLogCtx_(o) + ')' : '' });
 }
 
 function renderOvertimeTab() {
