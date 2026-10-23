@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- BUILD MARKER: V80-17 (Timesheet CSV: split OT rows now report the segment's own hours in the Hours column; separate Rate Hours column removed to prevent double-reporting) -->
+<!-- BUILD MARKER: V80-06 (OT now splits at 8h/day: only hours over the limit go to OT, remainder saved as normal entry) | prev V80-05 (Overtime rate now supports multiple time segments per request — Split/Merge buttons, each segment independently rated and lockable, Admin view only) -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Timesheet App</title>
@@ -667,10 +667,7 @@ textarea { height: 60px; resize: none; }
         <div class="card">
           <div class="row-between card-header">
             <p class="section-heading">⏱ Overtime Requests</p>
-            <div>
-              <button class="btn btn-primary btn-sm" onclick="exportOvertimeXLSX()">↓ Export XLSX</button>
-              <button class="btn btn-sm" onclick="exportOvertimeRateReport()" style="margin-left:6px;">↓ Rate Report</button>
-            </div>
+            <button class="btn btn-primary btn-sm" onclick="exportOvertimeXLSX()">↓ Export XLSX</button>
           </div>
           <div style="padding:0 1rem;display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;margin-bottom:1rem;">
             <div>
@@ -832,28 +829,17 @@ window.addEventListener('online', () => {
 
 // ── API helpers ───────────────────────────────────────────────────
 
-function api(action, payload = {}, _attempt = 0) {
+function api(action, payload = {}) {
   if (!SCRIPT_URL) return Promise.reject(new Error('No SCRIPT_URL configured'));
-  const MAX_ATTEMPTS = 3; // 1 initial try + 2 retries
   return fetch(SCRIPT_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain' },
     body: JSON.stringify({ action, ...payload })
   })
-  .then(function(r) {
-    if (!r.ok) throw new Error('HTTP ' + r.status); // transient — worth retrying
-    return r.json().catch(function() { throw new Error('Bad response from server'); }); // non-JSON — also transient
-  })
+  .then(function(r) { return r.json(); })
   .then(function(data) {
-    if (data.error) throw new Error(data.error); // real app-level error — not retried
+    if (data.error) throw new Error(data.error);
     return data;
-  })
-  .catch(function(err) {
-    const isAppError = err.message && !/^HTTP \d|Bad response from server|Failed to fetch|NetworkError|network/i.test(err.message);
-    if (isAppError || _attempt >= MAX_ATTEMPTS - 1) throw err;
-    const delay = 500 * Math.pow(2, _attempt); // 500ms, then 1000ms
-    return new Promise(function(resolve) { setTimeout(resolve, delay); })
-      .then(function() { return api(action, payload, _attempt + 1); });
   });
 }
 
@@ -862,10 +848,6 @@ function loadInitialData() {
   api('getData').then(function(data) {
     jobs = data.jobs || [];
     workers = (data.workers || []).map(w => ({ ...w, name: String(w.name || '').trim().replace(/\s+/g, ' ') }));
-    if (Array.isArray(data.bankHolidays) && data.bankHolidays.length) {
-      BANK_HOLIDAYS = data.bankHolidays;
-      localStorage.setItem('bankHolidays', JSON.stringify(BANK_HOLIDAYS));
-    }
     entries = (data.entries || []).map(e => ({
       ...e,
       worker: String(e.worker || '').trim().replace(/\s+/g, ' '),
@@ -1062,10 +1044,6 @@ async function pollJobs() {
     const data = await api('getData');
     jobs = data.jobs || [];
     workers = (data.workers || workers).map(w => ({ ...w, name: String(w.name || '').trim().replace(/\s+/g, ' ') }));
-    if (Array.isArray(data.bankHolidays) && data.bankHolidays.length) {
-      BANK_HOLIDAYS = data.bankHolidays;
-      localStorage.setItem('bankHolidays', JSON.stringify(BANK_HOLIDAYS));
-    }
     entries = (data.entries || []).map(e => ({
       ...e,
       worker: String(e.worker || '').trim().replace(/\s+/g, ' '),
@@ -1247,11 +1225,20 @@ function generateTimeOptions() {
   return opts;
 }
 
+function prepareOvertimeSplit(entry, isWeekend, alreadyLogged) {
+  entry.normalPart = null;
+  if (isWeekend) return;
+  const remaining = Math.max(0, 8 - alreadyLogged);
+  if (remaining <= 0 || entry.hours <= remaining) return;
+  entry.normalPart = { ...entry, id: uid(), hours: remaining, amendments: (entry.amendments || []).slice() };
+  entry.hours = parseFloat((entry.hours - remaining).toFixed(2));
+}
+
 function showOvertimeModal(entry, isWeekend) {
   pendingOvertimeEntry = entry;
   const msg = isWeekend
     ? 'Weekend hours are automatically logged as overtime. Please confirm the time range.'
-    : 'You are about to log overtime. Please confirm the time range.';
+    : (entry.normalPart ? entry.normalPart.hours + 'h will be saved as normal time. The remaining ' + entry.hours + 'h is overtime — please confirm its time range.' : 'You are about to log overtime. Please confirm the time range.');
   document.getElementById('ot-message').textContent = msg;
 
   const times = generateTimeOptions();
@@ -1309,6 +1296,8 @@ async function confirmOvertime() {
   const timeRange = start + ' – ' + end;
 
   const entry = pendingOvertimeEntry;
+  const normalPart = entry.normalPart || null;
+  delete entry.normalPart;
   entry.overtimeStatus = 'pending';
   entry.overtimeTimeRange = timeRange;
   entry.overtimeHours = otHours;
@@ -1358,6 +1347,13 @@ async function confirmOvertime() {
     renderOfficeEntries();
     renderDailyView();
 
+    if (normalPart) {
+      entries.push(normalPart); trackRecentEntry(normalPart);
+      localStorage.setItem('entries', JSON.stringify(entries));
+      renderEntriesByDate(); renderOfficeEntries(); renderDailyView();
+      if (typeof updateHoursPlaceholder === 'function') updateHoursPlaceholder();
+      await queueOrSend('addEntry', { entry: { ...normalPart, amendments: amendmentsToString(normalPart.amendments) } });
+    }
     const { synced } = await queueOrSend('saveOvertimeRequest', { request: otRequest });
     if (synced) {
       showToast('toast-worker');
@@ -1401,6 +1397,7 @@ async function submitEntry() {
   if (isOvertime) {
     const jobObj = jobs.find(j => j.id === jobId) || recurringJobs.find(j => j.id === jobId) || absenceTypes.find(a => a.id === jobId);
     const entry = { id: uid(), worker: currentWorker, jobId, date, hours, comments, amendments: [], createdAt: new Date().toISOString(), property: isRecurringJobId(jobId) ? (rjPropGetValue('rj-prop-worker') || (jobObj ? jobObj.property : '')) : (jobObj ? jobObj.property : ''), description: jobObj ? (jobObj.description || jobObj.name || '') : '' };
+    prepareOvertimeSplit(entry, isWeekend, alreadyLogged);
     showOvertimeModal(entry, isWeekend);
     return;
   }
@@ -1832,22 +1829,13 @@ function toggleEditWeek(id) {
   if (row) row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
 }
 
-// ── Bank Holidays — England & Wales, live from gov.uk (see loadInitialData) ──
-// This hardcoded list is only the emergency fallback for a first-ever load
-// with no network and no prior cached data; it's overwritten as soon as a
-// live list is available from the backend (which fetches gov.uk server-side
-// and keeps its own fallback — see getBankHolidaysList_ in Code.gs) or from
-// a previous session's cache.
-let BANK_HOLIDAYS = [
+// ── Bank Holidays (England & Wales 2026-2027) ─────────────────────
+const BANK_HOLIDAYS = [
   '2026-01-01','2026-04-03','2026-04-06','2026-05-04','2026-05-25',
   '2026-08-31','2026-12-25','2026-12-28',
   '2027-01-01','2027-03-26','2027-03-29','2027-05-03','2027-05-31',
   '2027-08-30','2027-12-27','2027-12-28'
 ];
-try {
-  const cachedBankHolidays = JSON.parse(localStorage.getItem('bankHolidays') || 'null');
-  if (Array.isArray(cachedBankHolidays) && cachedBankHolidays.length) BANK_HOLIDAYS = cachedBankHolidays;
-} catch (e) { /* keep the hardcoded fallback above */ }
 
 
 
@@ -2121,10 +2109,6 @@ async function refreshOffice() {
       const data = await api('getData');
       jobs = data.jobs || [];
       workers = (data.workers || []).map(w => ({ ...w, name: String(w.name || '').trim().replace(/\s+/g, ' ') }));
-      if (Array.isArray(data.bankHolidays) && data.bankHolidays.length) {
-        BANK_HOLIDAYS = data.bankHolidays;
-        localStorage.setItem('bankHolidays', JSON.stringify(BANK_HOLIDAYS));
-      }
       entries = (data.entries || []).map(e => ({
         ...e,
         worker: String(e.worker || '').trim().replace(/\s+/g, ' '),
@@ -3009,7 +2993,7 @@ async function submitOfficeEntry() {
   };
   if (isRecurringJobId(jobId) && !rjPropGetValue('rj-prop-oae')) { alert('Please select a property for this recurring job.'); return; }
   if (isRecurringJobId(jobId) && !comments.trim()) { alert('Please add a comment for this recurring job.'); return; }
-  if (isOvertime_oe) { showOvertimeModal(entry_oe, isWeekend_oe); return; }
+  if (isOvertime_oe) { prepareOvertimeSplit(entry_oe, isWeekend_oe, alreadyLogged); showOvertimeModal(entry_oe, isWeekend_oe); return; }
   const entry = entry_oe;
   entries.push(entry); trackRecentEntry(entry);
   localStorage.setItem('entries', JSON.stringify(entries));
@@ -3319,7 +3303,7 @@ async function submitDailyEntry() {
   const entry_de = { id: uid(), worker, jobId, date, hours, comments, amendments: [{ by: currentOfficeUser || 'Office', at: new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }), note: 'Created by Office' }], createdAt: new Date().toISOString(), property: isRecurringJobId(jobId) ? (rjPropGetValue('rj-prop-dae') || (jobObj ? jobObj.property : '')) : (jobObj ? jobObj.property : ''), description: jobObj ? (jobObj.description || jobObj.name || '') : '', performedBy: currentOfficeUser || 'Office' };
   if (isRecurringJobId(jobId) && !rjPropGetValue('rj-prop-dae')) { alert('Please select a property for this recurring job.'); return; }
   if (isRecurringJobId(jobId) && !comments.trim()) { alert('Please add a comment for this recurring job.'); return; }
-  if (isOvertime_de) { showOvertimeModal(entry_de, isWeekend_de); return; }
+  if (isOvertime_de) { prepareOvertimeSplit(entry_de, isWeekend_de, alreadyLogged); showOvertimeModal(entry_de, isWeekend_de); return; }
   const entry = entry_de;
   entries.push(entry); trackRecentEntry(entry);
   localStorage.setItem('entries', JSON.stringify(entries));
@@ -3358,8 +3342,7 @@ function getOTRateSuggestion(dateStr, startTime) {
 
 // ── OT rate segments — a single OT request can span multiple rate bands
 // (e.g. 06:00-08:00 crosses the weekday 2.0x/1.5x boundary at 07:00), so
-// each request is auto-split into independently-rated time segments the
-// first time it's viewed, and can be further split/merged manually.
+// each request can be split into independently-rated time segments.
 function otTimeToMinutes(t) {
   const p = (t || '').split(':').map(Number);
   return (p[0] || 0) * 60 + (p[1] || 0);
@@ -3378,75 +3361,16 @@ function getOTSegments(o) {
     try {
       const parsed = JSON.parse(o.rateSegments);
       if (Array.isArray(parsed) && parsed.length) return parsed;
-    } catch (e) { /* fall through to auto-split */ }
+    } catch (e) { /* fall through to default single segment */ }
   }
   const parts = (o.timeRange || '').split(/\s*[–-]\s*/);
   const start = parts[0] ? parts[0].trim() : '';
   const end = parts[1] ? parts[1].trim() : '';
-  if (!start || !end) {
-    const rate = o.rate || getOTRateSuggestion(normaliseDate(o.date), start);
-    return [{ start, end, rate, approved: (o.rateApproved === true || o.rateApproved === 'TRUE') }];
-  }
-  return autoSplitOTSegments(normaliseDate(o.date), start, end);
+  const rate = o.rate || getOTRateSuggestion(normaliseDate(o.date), start);
+  return [{ start, end, rate, approved: (o.rateApproved === true || o.rateApproved === 'TRUE') }];
 }
 
-// Rate at an absolute minute offset from a base date (offset can exceed
-// 1440 / go negative to reach into the next or previous calendar day,
-// which matters for requests that cross midnight into a different
-// weekday/weekend/bank-holiday status).
-function otRateAtAbsoluteMinute(baseDateStr, absMin) {
-  const dayOffset = Math.floor(absMin / 1440);
-  const localMin = ((absMin % 1440) + 1440) % 1440;
-  const d = new Date(baseDateStr + 'T12:00:00');
-  d.setDate(d.getDate() + dayOffset);
-  const thisDateStr = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-  return getOTRateSuggestion(thisDateStr, otMinutesToTime(localMin));
-}
-
-// Auto-split a raw start–end range into segments wherever the applicable
-// rate actually changes (weekday/weekend 07:00 and 21:00 boundaries, and
-// any weekday/weekend/bank-holiday transition at midnight).
-function autoSplitOTSegments(dateStr, start, end) {
-  let s = otTimeToMinutes(start);
-  let e = otTimeToMinutes(end);
-  if (e <= s) e += 1440;
-  const cutPoints = [];
-  let prevRate = otRateAtAbsoluteMinute(dateStr, s);
-  for (let t = s + 1; t < e; t++) {
-    const r = otRateAtAbsoluteMinute(dateStr, t);
-    if (r !== prevRate) { cutPoints.push(t); prevRate = r; }
-  }
-  const points = [s, ...cutPoints, e];
-  const segments = [];
-  for (let i = 0; i < points.length - 1; i++) {
-    segments.push({
-      start: otMinutesToTime(points[i]),
-      end: otMinutesToTime(points[i + 1]),
-      rate: otRateAtAbsoluteMinute(dateStr, points[i]),
-      approved: false
-    });
-  }
-  return segments;
-}
-
-// Valid boundary points for the manual carve-out picker — clock-aligned
-// interior points plus the segment's own start/end, so the user can pick
-// a sub-range that touches either edge (a plain 2-way split) or sits
-// fully inside it (a 3-way split: before / carved-out / after).
-function getOTSplitOptions(seg) {
-  let s = otTimeToMinutes(seg.start), e = otTimeToMinutes(seg.end);
-  if (e <= s) e += 1440;
-  let interior = [];
-  for (const step of [15, 10, 5, 1]) {
-    const opts = [];
-    let t = Math.ceil((s + 1) / step) * step;
-    for (; t < e; t += step) opts.push(t);
-    if (opts.length) { interior = opts; break; }
-  }
-  return [s, ...interior, e];
-}
-
-let otSplitUIState = {}; // { [otId]: segIdx currently showing the inline carve-out picker }
+let otSplitUIState = {}; // { [otId]: segIdx currently showing the inline split-time picker }
 
 function splitOTSegment(id, segIdx) {
   otSplitUIState = { [id]: segIdx };
@@ -3458,45 +3382,32 @@ function cancelSplitOTSegment(id) {
   renderOvertimeTab();
 }
 
-// Carve the selected start–end sub-range out of the segment. Whatever's
-// left before and/or after the carved-out piece becomes its own
-// segment(s) too, each with a rate guessed from getOTRateSuggestion.
 async function confirmSplitOTSegment(id, segIdx) {
-  const startSel = document.getElementById(`ot-split-a-${id}-${segIdx}`);
-  const endSel = document.getElementById(`ot-split-b-${id}-${segIdx}`);
-  const rangeStart = startSel ? startSel.value : '';
-  const rangeEnd = endSel ? endSel.value : '';
-  if (!rangeStart || !rangeEnd) { alert('Please choose both a start and end time.'); return; }
+  const input = document.getElementById(`ot-split-time-${id}-${segIdx}`);
+  const splitTime = input ? input.value : '';
+  if (!splitTime) { alert('Please choose a split time.'); return; }
 
   const o = overtimeRequests.find(r => r.id === id);
   if (!o) return;
   const segments = getOTSegments(o);
   const seg = segments[segIdx];
 
-  let segStart = otTimeToMinutes(seg.start), segEnd = otTimeToMinutes(seg.end);
+  let segStart = otTimeToMinutes(seg.start);
+  let segEnd = otTimeToMinutes(seg.end);
   if (segEnd <= segStart) segEnd += 1440;
-  let rStart = otTimeToMinutes(rangeStart);
-  if (rStart < segStart) rStart += 1440;
-  let rEnd = otTimeToMinutes(rangeEnd);
-  if (rEnd < segStart) rEnd += 1440;
-  if (rEnd <= rStart) rEnd += 1440;
+  let splitMin = otTimeToMinutes(splitTime);
+  if (splitMin <= segStart) splitMin += 1440;
 
-  if (rStart < segStart || rEnd > segEnd || rStart >= rEnd) {
-    alert('The selected range must fall within this segment (' + seg.start + ' – ' + seg.end + ') with the end after the start.');
+  if (splitMin <= segStart || splitMin >= segEnd) {
+    alert('Split time must fall strictly within this segment (' + seg.start + ' – ' + seg.end + ').');
     return;
   }
 
-  const dateStr = normaliseDate(o.date);
-  const newPieces = [];
-  if (rStart > segStart) {
-    newPieces.push({ start: otMinutesToTime(segStart), end: otMinutesToTime(rStart), rate: otRateAtAbsoluteMinute(dateStr, segStart), approved: false });
-  }
-  newPieces.push({ start: otMinutesToTime(rStart), end: otMinutesToTime(rEnd), rate: otRateAtAbsoluteMinute(dateStr, rStart), approved: false });
-  if (rEnd < segEnd) {
-    newPieces.push({ start: otMinutesToTime(rEnd), end: otMinutesToTime(segEnd), rate: otRateAtAbsoluteMinute(dateStr, rEnd), approved: false });
-  }
+  const splitTimeNormalised = otMinutesToTime(splitMin);
+  const firstHalf  = { start: seg.start, end: splitTimeNormalised, rate: getOTRateSuggestion(normaliseDate(o.date), seg.start), approved: false };
+  const secondHalf = { start: splitTimeNormalised, end: seg.end, rate: getOTRateSuggestion(normaliseDate(o.date), splitTimeNormalised), approved: false };
 
-  segments.splice(segIdx, 1, ...newPieces);
+  segments.splice(segIdx, 1, firstHalf, secondHalf);
   delete otSplitUIState[id];
   await saveOTSegmentsToBackend(o, segments);
 }
@@ -3525,28 +3436,6 @@ async function toggleOTSegmentLock(id, segIdx, lock) {
   if (!o) return;
   const segments = getOTSegments(o);
   segments[segIdx].approved = lock;
-  segments[segIdx].approvedBy = lock ? (currentOfficeUser || 'Office') : '';
-  segments[segIdx].approvedAt = lock ? new Date().toISOString() : '';
-  await saveOTSegmentsToBackend(o, segments);
-}
-
-// WO1142 driving jobs only — marks a segment as a cancelled drive, which
-// reports as a flat £50 instead of an hourly rate multiplier. Toggling it
-// off restores whatever multiplier the segment had before it was cancelled.
-async function toggleOTSegmentCancelled(id, segIdx, cancelled) {
-  const o = overtimeRequests.find(r => r.id === id);
-  if (!o) return;
-  const segments = getOTSegments(o);
-  const seg = segments[segIdx];
-  if (cancelled) {
-    seg._prevRate = seg.rate;
-    seg.rate = '50';
-    seg.cancelled = true;
-  } else {
-    seg.rate = seg._prevRate || '1.5';
-    delete seg._prevRate;
-    seg.cancelled = false;
-  }
   await saveOTSegmentsToBackend(o, segments);
 }
 
@@ -3584,13 +3473,7 @@ function renderOvertimeTab() {
 
   const isAdminView = (currentOfficeUser || '').trim().toLowerCase() === 'admin';
 
-  function otDayLabel(dateStr) {
-    const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-    const d = new Date(normaliseDate(dateStr) + 'T12:00:00');
-    return days[d.getDay()];
-  }
-
-  function otEntryCard(o, showActions) {
+  function otRowGroup(o, showActions) {
     const job = jobs.find(j => j.id === o.jobId) || recurringJobs.find(j => j.id === o.jobId);
     const isRJ = recurringJobs.some(j => j.id === o.jobId);
     const property = isRJ ? (o.property || (job ? job.property : '')) : ((job ? job.property : '') || o.property || '');
@@ -3601,7 +3484,7 @@ function renderOvertimeTab() {
 
     const sharedCells = `
       <td rowspan="${rowspan}" style="padding:6px 10px;font-size:12px;font-weight:500;vertical-align:top;">${o.worker}</td>
-      <td rowspan="${rowspan}" style="padding:6px 10px;font-size:12px;vertical-align:top;">${otDayLabel(o.date)} ${fmtShortDate(o.date)}</td>
+      <td rowspan="${rowspan}" style="padding:6px 10px;font-size:12px;vertical-align:top;">${fmtShortDate(o.date)}</td>
       <td rowspan="${rowspan}" style="padding:6px 10px;font-size:12px;font-weight:600;vertical-align:top;">${o.jobId}</td>
       <td rowspan="${rowspan}" style="padding:6px 10px;font-size:12px;color:var(--color-text-secondary);vertical-align:top;">${propLabel(property, 35)}</td>
       <td rowspan="${rowspan}" style="padding:6px 10px;font-size:12px;color:var(--color-text-secondary);vertical-align:top;">${desc}</td>
@@ -3622,66 +3505,49 @@ function renderOvertimeTab() {
         ${o.reviewComment ? `<div style="margin-top:3px;font-style:italic;">${o.reviewComment}</div>` : ''}
       </td>`;
 
-    const segRows = segments.map((seg, segIdx) => {
+    return segments.map((seg, segIdx) => {
       const isFirst = segIdx === 0;
-      const isLast = segIdx === segments.length - 1;
       const dur = otSegDuration(seg);
       const durLabel = (Math.round(dur * 100) / 100).toString();
       const locked = seg.approved === true || seg.approved === 'TRUE';
       const isSplitting = splittingIdx === segIdx;
 
-      const splitOpts = isSplitting ? getOTSplitOptions(seg) : [];
-      const defStartIdx = splitOpts.length ? Math.floor(splitOpts.length / 3) : 0;
-      const defEndIdx = splitOpts.length ? Math.max(defStartIdx + 1, Math.floor(splitOpts.length * 2 / 3)) : 0;
-      const optHtml = selVal => splitOpts.map(m => { const t = otMinutesToTime(m); return `<option value="${t}" ${t === selVal ? 'selected' : ''}>${t}</option>`; }).join('');
+      let segStartMin = otTimeToMinutes(seg.start), segEndMin = otTimeToMinutes(seg.end);
+      if (segEndMin <= segStartMin) segEndMin += 1440;
+      const defaultSplitTime = otMinutesToTime(segStartMin + Math.round((segEndMin - segStartMin) / 2));
 
-      const isCancelled = seg.cancelled === true || seg.cancelled === 'TRUE';
-      const isDrivingJob = o.jobId === 'WO1142';
-
-      const rateCells = `
-        <td style="padding:6px 10px;font-size:12px;vertical-align:top;">
-          ${isCancelled
-            ? `<span style="font-weight:600;color:var(--color-text-error);">Driving Cancelled</span><div style="font-size:11px;color:var(--color-text-secondary);">£50 flat</div>`
-            : `<select id="ot-rate-${o.id}-${segIdx}" ${locked ? 'disabled' : ''} onchange="updateOTSegmentRate('${o.id}', ${segIdx}, this.value)" style="font-size:12px;padding:2px 4px;width:64px;">
-                <option value="1.0" ${seg.rate === '1.0' ? 'selected' : ''}>1.0x</option>
-                <option value="1.5" ${seg.rate === '1.5' ? 'selected' : ''}>1.5x</option>
-                <option value="2.0" ${seg.rate === '2.0' ? 'selected' : ''}>2.0x</option>
-              </select>`}
+      const rateCells = isAdminView ? `
+        <td style="padding:6px 10px;font-size:12px;">
+          <select id="ot-rate-${o.id}-${segIdx}" ${locked ? 'disabled' : ''} onchange="updateOTSegmentRate('${o.id}', ${segIdx}, this.value)" style="font-size:12px;padding:2px 4px;">
+            <option value="1.0" ${seg.rate === '1.0' ? 'selected' : ''}>1.0x</option>
+            <option value="1.5" ${seg.rate === '1.5' ? 'selected' : ''}>1.5x</option>
+            <option value="2.0" ${seg.rate === '2.0' ? 'selected' : ''}>2.0x</option>
+          </select>
         </td>
-        <td style="padding:6px 10px;font-size:12px;text-align:center;white-space:nowrap;vertical-align:top;">
-          ${isCancelled ? '' : (locked
-            ? `<span class="badge badge-done" style="margin-right:4px;" title="${seg.approvedBy ? 'Rate approved by ' + seg.approvedBy : ''}">✓ Locked</span>${isAdminView ? `<button class="btn btn-sm" style="font-size:10px;padding:2px 6px;" onclick="toggleOTSegmentLock('${o.id}', ${segIdx}, false)">Unlock</button>` : ''}`
-            : `<button class="btn btn-sm" style="font-size:11px;" onclick="toggleOTSegmentLock('${o.id}', ${segIdx}, true)">Yes</button>`)}
-          ${isDrivingJob ? `<div style="margin-top:${isCancelled ? '0' : '4px'};">
-              <button class="btn btn-sm" style="font-size:10px;padding:2px 6px;${isCancelled ? 'color:var(--color-text-error);border-color:var(--color-border-error);' : ''}" onclick="toggleOTSegmentCancelled('${o.id}', ${segIdx}, ${!isCancelled})">${isCancelled ? 'Restore' : 'Cancel'}</button>
-            </div>` : ''}
+        <td style="padding:6px 10px;font-size:12px;text-align:center;white-space:nowrap;">
+          ${locked
+            ? `<span class="badge badge-done" style="margin-right:4px;">✓ Locked</span><button class="btn btn-sm" style="font-size:10px;padding:2px 6px;" onclick="toggleOTSegmentLock('${o.id}', ${segIdx}, false)">Unlock</button>`
+            : `<button class="btn btn-sm" style="font-size:11px;" onclick="toggleOTSegmentLock('${o.id}', ${segIdx}, true)">Yes</button>`}
         </td>
-        <td style="padding:6px 10px;font-size:11px;white-space:nowrap;vertical-align:top;">
+        <td style="padding:6px 10px;font-size:11px;white-space:nowrap;">
           ${isSplitting ? `
-            <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;">
-              <span style="color:var(--color-text-secondary);">from</span>
-              <select id="ot-split-a-${o.id}-${segIdx}" style="font-size:10px;padding:2px 4px;">${optHtml(otMinutesToTime(splitOpts[defStartIdx]))}</select>
-              <span style="color:var(--color-text-secondary);">to</span>
-              <select id="ot-split-b-${o.id}-${segIdx}" style="font-size:10px;padding:2px 4px;">${optHtml(otMinutesToTime(splitOpts[defEndIdx]))}</select>
-              <button class="btn btn-sm" style="font-size:10px;padding:2px 6px;" onclick="confirmSplitOTSegment('${o.id}', ${segIdx})">✓</button>
-              <button class="btn btn-sm" style="font-size:10px;padding:2px 6px;" onclick="cancelSplitOTSegment('${o.id}')">✕</button>
-            </div>
+            <input type="time" id="ot-split-time-${o.id}-${segIdx}" value="${defaultSplitTime}" style="font-size:11px;padding:2px 4px;width:90px;">
+            <button class="btn btn-sm" style="font-size:10px;padding:2px 6px;" onclick="confirmSplitOTSegment('${o.id}', ${segIdx})">✓</button>
+            <button class="btn btn-sm" style="font-size:10px;padding:2px 6px;" onclick="cancelSplitOTSegment('${o.id}')">✕</button>
           ` : `
             <button class="btn btn-sm" style="font-size:10px;padding:2px 6px;" onclick="splitOTSegment('${o.id}', ${segIdx})">Split ↓</button>
             ${segments.length > 1 ? `<button class="btn btn-sm" style="font-size:10px;padding:2px 6px;color:var(--color-text-error);border-color:var(--color-border-error);" onclick="deleteOTSegment('${o.id}', ${segIdx})">Merge ↑</button>` : ''}
           `}
-        </td>`;
+        </td>` : '';
 
-      return `<tr style="${!isFirst ? 'border-top:0.5px dashed var(--color-border-tertiary);' : ''}${isLast ? 'border-bottom:1px solid var(--color-border-secondary);' : ''}">
+      return `<tr style="${!isFirst ? 'border-top:0.5px dashed var(--color-border-tertiary);' : ''}">
         ${isFirst ? sharedCells : ''}
-        <td style="padding:6px 10px;font-size:12px;font-style:italic;vertical-align:top;">${seg.start} – ${seg.end} <span style="color:var(--color-text-secondary);font-style:normal;">(${durLabel}h)</span></td>
+        <td style="padding:6px 10px;font-size:12px;font-style:italic;">${seg.start} – ${seg.end} <span style="color:var(--color-text-secondary);font-style:normal;">(${durLabel}h)</span></td>
         ${rateCells}
         ${isFirst ? submittedCell : ''}
         ${isFirst ? actionCell : ''}
       </tr>`;
     }).join('');
-
-    return segRows;
   }
 
   function otTable(list, showActions) {
@@ -3695,11 +3561,11 @@ function renderOvertimeTab() {
         <th style="padding:6px 10px;font-size:11px;text-align:left;">Description</th>
         <th style="padding:6px 10px;font-size:11px;text-align:center;">Hrs</th>
         <th style="padding:6px 10px;font-size:11px;text-align:left;">Time Range</th>
-        <th style="padding:6px 10px;font-size:11px;text-align:left;">Rate</th><th style="padding:6px 10px;font-size:11px;text-align:center;">Approved Rate</th><th style="padding:6px 10px;font-size:11px;text-align:left;">Adjust</th>
+        ${isAdminView ? '<th style="padding:6px 10px;font-size:11px;text-align:left;">Rate</th><th style="padding:6px 10px;font-size:11px;text-align:center;">Approved Rate</th><th style="padding:6px 10px;font-size:11px;text-align:left;">Adjust</th>' : ''}
         <th style="padding:6px 10px;font-size:11px;text-align:left;">Submitted</th>
         <th style="padding:6px 10px;font-size:11px;text-align:left;">${showActions === 'pending' ? 'Reason / Action' : 'Reviewed by / Comment'}</th>
       </tr></thead>
-      <tbody>${list.map(o => otEntryCard(o, showActions)).join('')}</tbody>
+      <tbody>${list.map(o => otRowGroup(o, showActions)).join('')}</tbody>
     </table>`;
   }
 
@@ -4113,135 +3979,6 @@ async function exportOvertimeXLSX() {
   URL.revokeObjectURL(a.href);
 }
 
-// Simple two-sheet overtime rate report:
-//  1) one row per rate segment — who, when, the job, the time range, the
-//     rate, and whether/by-whom the request was approved.
-//  2) a per-worker total of hours at each rate, for payroll reconciliation.
-async function exportOvertimeRateReport() {
-  const fromVal = document.getElementById('ot-date-from')?.value || '';
-  const toVal   = document.getElementById('ot-date-to')?.value || '';
-  const inRange = o => {
-    const d = normaliseDate(o.date);
-    return (!fromVal || d >= fromVal) && (!toVal || d <= toVal);
-  };
-
-  const approved = overtimeRequests.filter(o => o.status === 'approved').filter(inRange);
-  const declined = overtimeRequests.filter(o => o.status === 'declined').filter(inRange);
-  const all = [...approved, ...declined].sort((a, b) => normaliseDate(a.date).localeCompare(normaliseDate(b.date)));
-
-  if (!all.length) { alert('No overtime requests match the current filters.'); return; }
-
-  const rateLabel = seg => (seg.cancelled === true || seg.cancelled === 'TRUE') ? 'Cancelled (£50)' : (seg.rate ? seg.rate + 'x' : '');
-
-  const HEADER_FILL = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2C2C2C' } };
-  const HEADER_FONT = { bold: true, color: { argb: 'FFFFFFFF' } };
-  const THIN = { style: 'thin', color: { argb: 'FFCCCCCC' } };
-  const THIN_BORDER = { top: THIN, bottom: THIN, left: THIN, right: THIN };
-
-  const workbook = new ExcelJS.Workbook();
-  workbook.creator = 'Fairlawne Timesheet App';
-  workbook.created = new Date();
-
-  // Sheet 1 — one row per rate segment
-  const sheet = workbook.addWorksheet('Overtime');
-  sheet.columns = [
-    { width: 16 }, { width: 12 }, { width: 14 }, { width: 35 },
-    { width: 8 }, { width: 16 }, { width: 12 }, { width: 16 }, { width: 20 }, { width: 16 }, { width: 20 }
-  ];
-  const headerRow = sheet.addRow(['Worker', 'Date', 'W/O', 'Description', 'Hours', 'Time Range', 'Rate', 'Request Approved (Y/N)', 'Request Approved By', 'Rate Approved (Y/N)', 'Rate Approved By']);
-  headerRow.height = 20;
-  headerRow.eachCell({ includeEmpty: true }, cell => {
-    cell.font = HEADER_FONT;
-    cell.fill = HEADER_FILL;
-    cell.alignment = { vertical: 'middle', horizontal: 'center' };
-    cell.border = THIN_BORDER;
-  });
-  sheet.views = [{ state: 'frozen', ySplit: 1 }];
-
-  const totals = {}; // { worker: { rate: totalHours } }
-
-  for (const o of all) {
-    const job = jobs.find(j => j.id === o.jobId) || recurringJobs.find(j => j.id === o.jobId);
-    const description = (job ? (job.description || '') : '') || o.description || '';
-    const segments = getOTSegments(o);
-    const isApproved = o.status === 'approved';
-
-    for (const seg of segments) {
-      const hours = Math.round(otSegDuration(seg) * 100) / 100;
-      const rate = rateLabel(seg);
-      const rateApproved = seg.approved === true || seg.approved === 'TRUE';
-      const row = sheet.addRow([
-        o.worker, normaliseDate(o.date), o.jobId, description,
-        hours, `${seg.start} – ${seg.end}`, rate,
-        isApproved ? 'Y' : 'N', o.reviewedBy || '',
-        rateApproved ? 'Y' : 'N', seg.approvedBy || ''
-      ]);
-      row.eachCell({ includeEmpty: true }, cell => { cell.border = THIN_BORDER; });
-
-      if (isApproved) {
-        totals[o.worker] = totals[o.worker] || {};
-        totals[o.worker][rate] = (totals[o.worker][rate] || 0) + hours;
-      }
-    }
-  }
-
-  // Sheet 2 — totals by worker + rate (approved OT only)
-  const totalsSheet = workbook.addWorksheet('Totals by Rate');
-  totalsSheet.columns = [{ width: 22 }, { width: 16 }, { width: 14 }];
-  const totalsHeaderRow = totalsSheet.addRow(['Name', 'Rate', 'Total Hours']);
-  totalsHeaderRow.height = 20;
-  totalsHeaderRow.eachCell({ includeEmpty: true }, cell => {
-    cell.font = HEADER_FONT;
-    cell.fill = HEADER_FILL;
-    cell.alignment = { vertical: 'middle', horizontal: 'center' };
-    cell.border = THIN_BORDER;
-  });
-  totalsSheet.views = [{ state: 'frozen', ySplit: 1 }];
-
-  const workerNames = Object.keys(totals).sort((a, b) => a.localeCompare(b));
-  for (const worker of workerNames) {
-    const rateKeys = Object.keys(totals[worker]).sort((a, b) => a.localeCompare(b));
-    for (const rate of rateKeys) {
-      const row = totalsSheet.addRow([worker, rate, Math.round(totals[worker][rate] * 100) / 100]);
-      row.eachCell({ includeEmpty: true }, cell => { cell.border = THIN_BORDER; });
-    }
-  }
-
-  const buffer = await workbook.xlsx.writeBuffer();
-  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  const fromPart = fromVal || 'start';
-  const toPart   = toVal   || 'today';
-  a.download = `Fairlawne_Overtime_RateReport_${fromPart}_to_${toPart}.xlsx`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(a.href);
-}
-
-
-// Finds the approved OT request an auto-created overtime entry came from —
-// reliable because approval creates the entry with the exact same worker,
-// job, date and time range as the request itself (see reviewOvertimeRequest
-// in Code.gs). Needed so the CSV can show each entry's actual rate
-// segments rather than just the overall start/end time it was approved for.
-function findOTRequestForEntry_(e) {
-  if (!e.isOvertime) return null;
-  const dateStr = normaliseDate(e.date);
-  return overtimeRequests.find(o => {
-    if (o.worker !== e.worker || o.jobId !== e.jobId || normaliseDate(o.date) !== dateStr) return false;
-    const parts = (o.timeRange || '').split(/\s*[–-]\s*/);
-    const oStart = parts[0] ? parts[0].trim() : '';
-    const oEnd   = parts[1] ? parts[1].trim() : '';
-    return oStart === e.overtimeStart && oEnd === e.overtimeEnd;
-  }) || null;
-}
-
-function csvRateLabel_(seg) {
-  if (seg.cancelled === true || seg.cancelled === 'TRUE') return 'Cancelled (£50)';
-  return seg.rate ? seg.rate + 'x' : '';
-}
 
 function exportCSV() {
   const workerFilter = document.getElementById('oe-worker-filter')?.value || '';
@@ -4256,44 +3993,25 @@ function exportCSV() {
     return true;
   });
 
-  const headers = ['Worker', 'Job ID', 'Property', 'Description', 'Date', 'Hours', 'Is Overtime', 'Overtime Start', 'Overtime End', 'Rate Time Range', 'Rate', 'Comments', 'Reported Date', 'Assigned To', 'Amended', 'Amendment Count', 'Last Amended By', 'Last Amended At', 'Last Reason'];
-  const rows = filtered.flatMap(e => {
+  const headers = ['Worker', 'Job ID', 'Property', 'Description', 'Date', 'Hours', 'Is Overtime', 'Overtime Start', 'Overtime End', 'Comments', 'Reported Date', 'Assigned To', 'Amended', 'Amendment Count', 'Last Amended By', 'Last Amended At', 'Last Reason'];
+  const rows = filtered.map(e => {
     const job = jobs.find(j => j.id === e.jobId) || recurringJobs.find(j => j.id === e.jobId) || tasks.find(j => j.id === e.jobId);
     const isRJ = recurringJobs.some(j => j.id === e.jobId);
     const last = e.amendments && e.amendments.length ? e.amendments[e.amendments.length - 1] : null;
-
-    const baseFields = [
+    return [
       e.worker, e.jobId,
       isRJ ? (e.property || (job ? job.property : '')) : (job ? job.property : (e.property || '')),
       (job ? (job.description || '') : (e.description || '')).slice(0, 200),
       e.date, e.hours,
       e.isOvertime ? 'Yes' : 'No',
       e.overtimeStart || '',
-      e.overtimeEnd || ''
-    ];
-    const trailingFields = [
+      e.overtimeEnd || '',
       e.comments || '',
       job ? (job.reportedDate || '') : '',
       job ? (job.assignedTo || '') : '',
       last ? 'Yes' : 'No', e.amendments ? e.amendments.length : 0,
       last ? last.by : '', last ? last.at : '', last ? last.note : ''
-    ];
-    const toCsvRow = fields => fields.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(',');
-
-    if (!e.isOvertime) {
-      return [toCsvRow([...baseFields, '', '', ...trailingFields])];
-    }
-
-    const otReq = findOTRequestForEntry_(e);
-    const segments = otReq
-      ? getOTSegments(otReq)
-      : [{ start: e.overtimeStart, end: e.overtimeEnd, rate: getOTRateSuggestion(normaliseDate(e.date), e.overtimeStart) }];
-
-    return segments.map(seg => {
-      const fields = [...baseFields];
-      fields[5] = Math.round(otSegDuration(seg) * 100) / 100;
-      return toCsvRow([...fields, seg.start + ' - ' + seg.end, csvRateLabel_(seg), ...trailingFields]);
-    });
+    ].map(v => '"' + String(v).replace(/"/g, '""') + '"').join(',');
   });
 
   const csv = [headers.join(','), ...rows].join('\n');
