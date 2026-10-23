@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- BUILD MARKER: V80-06 (OT now splits at 8h/day: only hours over the limit go to OT, remainder saved as normal entry) | prev V80-05 (Overtime rate now supports multiple time segments per request — Split/Merge buttons, each segment independently rated and lockable, Admin view only) -->
+<!-- BUILD MARKER: V80-07 (OT Pending badge matches by entryId) | prev V80-06 (OT now splits at 8h/day: only hours over the limit go to OT, remainder saved as normal entry) | prev V80-05 (Overtime rate now supports multiple time segments per request — Split/Merge buttons, each segment independently rated and lockable, Admin view only) -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Timesheet App</title>
@@ -2498,7 +2498,7 @@ function renderOfficeEntries() {
         const amended = e.amendments && e.amendments.length > 0;
         const lastAmend = amended ? e.amendments[e.amendments.length - 1] : null;
         const isPending = syncQueue.some(q => q.payload?.entry?.id === e.id);
-        const hasPendingOT = overtimeRequests.some(o => o.worker === e.worker && normaliseDate(o.date) === normaliseDate(e.date) && o.jobId === e.jobId && o.status === 'pending');
+        const hasPendingOT = overtimeRequests.some(o => o.entryId === e.id && o.status === 'pending');
         const isWeekApproved = e.approved === true || e.approved === 'TRUE';
         return `
         <tr class="day-row" id="row-o-${e.id}" ${idx === 0 ? 'style="border-top:1.5px solid var(--color-border-secondary);"' : ''}>
