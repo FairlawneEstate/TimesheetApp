@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- BUILD MARKER: V80-19 (OT rate activity log now records the specific action: split, merge, rate change, lock/unlock, driving cancel/restore, with segment and worker/WO/date) | prev V80-18 (Merged V80-06/07 from live: 8h/day OT split with normal-part entry, OT pending badge by entryId) | prev V80-17 (Timesheet CSV: split OT rows now report the segment's own hours in the Hours column; separate Rate Hours column removed to prevent double-reporting) -->
+<!-- BUILD MARKER: V80-20 (Submitted/approved week locks normal entries only; overtime can still be posted) | prev V80-19 (OT rate activity log now records the specific action: split, merge, rate change, lock/unlock, driving cancel/restore, with segment and worker/WO/date) | prev V80-18 (Merged V80-06/07 from live: 8h/day OT split with normal-part entry, OT pending badge by entryId) | prev V80-17 (Timesheet CSV: split OT rows now report the segment's own hours in the Hours column; separate Rate Hours column removed to prevent double-reporting) -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Timesheet App</title>
@@ -374,7 +374,6 @@ textarea { height: 60px; resize: none; }
             <option value="Office">Office</option>
             <option value="Ben Collins">Ben Collins</option>
             <option value="Alex Arrowsmith">Alex Arrowsmith</option>
-            <option value="Chris Rosier">Chris Rosier</option>
             <option value="Dan Simmons">Dan Simmons</option>
             <option value="Accounts">Accounts</option>
             <option value="Admin">Admin</option>
@@ -1402,13 +1401,6 @@ async function submitEntry() {
   const comments = document.getElementById('entry-comments').value;
   if (!jobId || !date || isNaN(hours)) { alert('Please fill in job, date, and hours.'); return; }
 
-  const entryWc = getWeekCommencing(date);
-  const entryWeekSub = getWeekSubmission(currentWorker, entryWc);
-  if (entryWeekSub && (entryWeekSub.status === 'pending' || entryWeekSub.status === 'approved')) {
-    alert('This week has been submitted for approval and is locked. Contact the office if changes are needed.');
-    return;
-  }
-
   const norm = normaliseDate(date);
   const dayOfWeek = new Date(date + 'T12:00:00').getDay();
   const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
@@ -1416,6 +1408,19 @@ async function submitEntry() {
     .filter(e => e.worker === currentWorker && normaliseDate(e.date) === norm && !e.overtimeStatus)
     .reduce((sum, e) => sum + parseFloat(e.hours || 0), 0);
   const isOvertime = isWeekend || (alreadyLogged + hours > 8);
+
+  const entryWc = getWeekCommencing(date);
+  const entryWeekSub = getWeekSubmission(currentWorker, entryWc);
+  if (entryWeekSub && (entryWeekSub.status === 'pending' || entryWeekSub.status === 'approved')) {
+    if (!isOvertime) {
+      alert('This week has been submitted for approval and is locked. Contact the office if changes are needed.');
+      return;
+    }
+    if (!isWeekend && alreadyLogged < 8) {
+      alert('This week has been submitted for approval and is locked. Only overtime can be added, so this entry would put normal hours into a locked week. Contact the office if changes are needed.');
+      return;
+    }
+  }
 
   if (isOvertime) {
     const jobObj = jobs.find(j => j.id === jobId) || recurringJobs.find(j => j.id === jobId) || absenceTypes.find(a => a.id === jobId);
