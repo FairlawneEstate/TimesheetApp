@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- BUILD MARKER: V80-20 (Submitted/approved week locks normal entries only; overtime can still be posted) | prev V80-19 (OT rate activity log now records the specific action: split, merge, rate change, lock/unlock, driving cancel/restore, with segment and worker/WO/date) | prev V80-18 (Merged V80-06/07 from live: 8h/day OT split with normal-part entry, OT pending badge by entryId) | prev V80-17 (Timesheet CSV: split OT rows now report the segment's own hours in the Hours column; separate Rate Hours column removed to prevent double-reporting) -->
+<!-- BUILD MARKER: V80-21 (Declined overtime no longer shows rate, approve-rate or split controls) | prev V80-20 (Submitted/approved week locks normal entries only; overtime can still be posted) | prev V80-19 (OT rate activity log now records the specific action: split, merge, rate change, lock/unlock, driving cancel/restore, with segment and worker/WO/date) | prev V80-18 (Merged V80-06/07 from live: 8h/day OT split with normal-part entry, OT pending badge by entryId) | prev V80-17 (Timesheet CSV: split OT rows now report the segment's own hours in the Hours column; separate Rate Hours column removed to prevent double-reporting) -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Timesheet App</title>
@@ -3628,8 +3628,10 @@ function renderOvertimeTab() {
     const isRJ = recurringJobs.some(j => j.id === o.jobId);
     const property = isRJ ? (o.property || (job ? job.property : '')) : ((job ? job.property : '') || o.property || '');
     const desc     = (job ? (job.description || '') : '') || o.description || '';
-    const segments = getOTSegments(o);
-    const splittingIdx = otSplitUIState[o.id];
+    const isDeclined = o.status === 'declined';
+    const allSegments = getOTSegments(o);
+    const segments = isDeclined ? [allSegments[0]] : allSegments;
+    const splittingIdx = isDeclined ? undefined : otSplitUIState[o.id];
     const rowspan = segments.length;
 
     const sharedCells = `
@@ -3654,6 +3656,20 @@ function renderOvertimeTab() {
         <div style="font-weight:500;">${o.reviewedBy || ''} · ${o.reviewedAt ? new Date(o.reviewedAt).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : ''}</div>
         ${o.reviewComment ? `<div style="margin-top:3px;font-style:italic;">${o.reviewComment}</div>` : ''}
       </td>`;
+
+    if (isDeclined) {
+      const first = allSegments[0], last = allSegments[allSegments.length - 1];
+      const dash = '<span style="color:var(--color-text-secondary);">—</span>';
+      return `<tr style="border-bottom:1px solid var(--color-border-secondary);">
+        ${sharedCells}
+        <td style="padding:6px 10px;font-size:12px;font-style:italic;vertical-align:top;">${first.start} – ${last.end}</td>
+        <td style="padding:6px 10px;font-size:12px;vertical-align:top;">${dash}</td>
+        <td style="padding:6px 10px;font-size:12px;text-align:center;vertical-align:top;">${dash}</td>
+        <td style="padding:6px 10px;font-size:12px;vertical-align:top;">${dash}</td>
+        ${submittedCell}
+        ${actionCell}
+      </tr>`;
+    }
 
     const segRows = segments.map((seg, segIdx) => {
       const isFirst = segIdx === 0;
